@@ -232,8 +232,11 @@
     for (const m of ['tram', 'bus', 'ship', 'train']) if (CATS[m].includes(c)) return m;
     return 'other';
   }
-  function modeOfIcon(icon) {
-    return ({ tram: 'tram', bus: 'bus', train: 'train', ship: 'ship', boat: 'ship' })[icon] || 'other';
+  function modeOfIcon(icon, name) {
+    const m = ({ tram: 'tram', bus: 'bus', train: 'train', ship: 'ship', boat: 'ship' })[icon];
+    if (m) return m;
+    // Données réelles : certains débarcadères n'ont pas d'icône (ex. « Genève-Jardin-Anglais (lac) »)
+    return /\(lac\)/i.test(name || '') ? 'ship' : 'other';
   }
 
   // Libellé de ligne lisible : "12" pour un tram, "L2" pour le Léman Express, "IR 90" pour un train
@@ -284,7 +287,7 @@
     }
     ul.hidden = false;
     ul.innerHTML = stations.slice(0, 10).map(s => {
-      const m = modeOfIcon(s.icon);
+      const m = modeOfIcon(s.icon, s.name);
       const dist = s.distance != null ? `<span class="dist">${Math.round(s.distance)} m</span>` : '';
       return `<li><button data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${m}">` +
              `<span class="ico ${m}">${MODE_ICON[m]}</span><span>${esc(s.name)}</span>${dist}</button></li>`;
