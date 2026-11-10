@@ -50,6 +50,7 @@ python tests/test_sprint01.py
 python tests/test_sprint02.py
 python tests/test_sprint03.py
 python tests/test_sprint04.py            # screenshots in tests/out/
+python tests/test_delayed_departures.py  # BUG-01 regression (reproduces the bug on Sprint 3)
 ```
 
 ## Workflow
