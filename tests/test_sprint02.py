@@ -62,7 +62,9 @@ with sync_playwright() as p:
     pg.locator(".line-chip[data-key='tram|12']").click(); assert "12" not in badges()
     pg.locator(".line-chip[data-key='tram|12']").click(); assert badges().count("12") == 5
     # persistance après rechargement
-    pg.locator(".dir[data-dir='tram|14>300']").click(); pg.reload(); pg.wait_for_selector(".dep")
+    pg.locator(".dir[data-dir='tram|14>300']").click()
+    pg.wait_for_function("(localStorage.getItem('tpp:hidden:8587057') || '').includes('tram|14>300')")
+    pg.reload(); pg.wait_for_selector(".dir[data-dir='tram|14>300']", state="attached")
     assert pg.locator(".dir[data-dir='tram|14>300']").get_attribute("aria-pressed") == "false"
     print("boat dir:", pg.locator(".dir[data-line='ship|M2']").inner_text().replace("\n", " "))
     pg.click("#noLines"); assert pg.locator(".dep").count() == 0

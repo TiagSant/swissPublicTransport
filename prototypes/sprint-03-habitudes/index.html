@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<!--
+  App Transport Public — Prototype Sprint 3 : l'app apprend les habitudes (US-06)
+  Sprint 3 : taper un départ affiche ses prochains arrêts et compte comme un usage de cette direction.
+  Score par arrêt et par direction, demi-vie de 30 jours. Les directions avec un score ≥ 1,5 (≈ 2 usages dans le mois) sont « habituelles » :
+  en mode auto, l'arrêt s'ouvre sur elles seules, leurs pastilles en tête avec ★. Un choix manuel prime toujours.
+  Sprint 2 : chaque ligne se filtre aussi par direction.
+  Sprint 2 : chaque ligne se filtre aussi par direction. Une direction = ligne + prochain arrêt
+  après la station (passList), ce qui regroupe les courses partielles d'un même sens.
+  Préférences du Sprint 1 (lignes masquées) reprises telles quelles.
+  - Recherche d'arrêt (bus, tram, train, bateau) dans la zone Unireso / Léman Express
+  - Prochains départs en temps réel (prognosis) avec compte à rebours
+  - Sélection / désélection des lignes, mémorisée par arrêt
+  - Arrêts les plus consultés en tête, dernier arrêt rouvert au lancement
+  Données : https://transport.opendata.ch (sans clé, CORS ouvert)
+  Fichier autonome : ouvrir directement dans un navigateur (pas de serveur requis).
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Départs Unireso — Prototype Sprint 3</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #c8102e; --late: #d9480f; --ok: #2b8a3e;
+    --tram: #e8590c; --bus: #1c7ed6; --train: #c92a2a; --ship: #0c8599; --other: #495057;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b1220; --card: #141c2e; --text: #e8ecf3; --muted: #94a0b4; --line: #26314a; --late: #ff922b; --ok: #69db7c; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 12px 12px 40px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 2px 12px; }
+  header h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  header small { color: var(--muted); font-size: .75rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+  .search-row { display: flex; gap: 8px; }
+  input[type=search] { flex: 1; min-width: 0; font-size: 1rem; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; }
+  button:active { transform: scale(.98); }
+  .ghost { border: none; background: none; color: var(--muted); padding: 6px 8px; font-size: .85rem; }
+  .opts { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: var(--muted); font-size: .8rem; }
+  .opts label { display: flex; gap: 6px; align-items: center; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  .results li button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: center;
+    border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 11px 4px; }
+  .results li:last-child button { border-bottom: none; }
+  .results .dist { margin-left: auto; color: var(--muted); font-size: .8rem; }
+  .ico { width: 28px; height: 28px; flex: none; border-radius: 7px; display: grid; place-items: center; font-size: .9rem; }
+  .section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stop-chip { border-radius: 999px; padding: 7px 12px; font-size: .9rem; background: var(--bg); }
+  .stop-chip .n { color: var(--muted); font-size: .75rem; margin-left: 4px; }
+  .board-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .board-head h2 { margin: 0; font-size: 1.2rem; }
+  .status { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+  .line-chip { min-width: 44px; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: .9rem;
+    color: #fff; border: 2px solid transparent; display: inline-flex; gap: 5px; align-items: center; justify-content: center; }
+  .line-chip[aria-pressed="false"] { background: transparent !important; color: var(--muted); border-color: var(--line); text-decoration: line-through; }
+  .line-chip[aria-pressed="false"] .m { filter: grayscale(1); opacity: .5; }
+  .line-chip .m { font-size: .8rem; }
+  .line-chip[aria-pressed="mixed"] { opacity: .75; }
+  .line-chip .cnt { font-size: .68rem; font-weight: 600; background: rgba(0,0,0,.25); border-radius: 6px; padding: 1px 5px; }
+  .dir-toggle { padding-left: 0; margin-top: 6px; }
+  .auto-info { font-size: .8rem; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 6px 4px 6px 10px;
+    margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .auto-info button { padding: 4px 8px; font-size: .8rem; color: var(--accent); font-weight: 600; }
+  .line-chip .fav { font-size: .7rem; }
+  .dep { cursor: pointer; }
+  .dep .stops { grid-column: 1 / -1; margin: 2px 0 0 56px; padding: 0; font-size: .8rem; color: var(--muted); }
+  .dep .stops li { display: flex; justify-content: space-between; padding: 2px 0; border-left: 2px solid var(--line); padding-left: 10px; }
+  .dep .stops li span:last-child { font-variant-numeric: tabular-nums; }
+  #dirs { border-top: 1px solid var(--line); margin-top: 4px; }
+  .dir-group { display: grid; grid-template-columns: 64px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .dir-group .line-chip { min-width: 0; padding: 4px 6px; font-size: .85rem; cursor: default; }
+  .dir { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; border: none; background: none; padding: 6px 2px; border-radius: 8px; }
+  .dir .box { width: 22px; height: 22px; flex: none; border-radius: 6px; border: 2px solid var(--line); display: grid; place-items: center; font-size: .8rem; color: #fff; }
+  .dir[aria-pressed="true"] .box { background: var(--accent); border-color: var(--accent); }
+  .dir[aria-pressed="true"] .box::after { content: "✓"; }
+  .dir[aria-pressed="false"] .lbl b { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+  .dir .lbl { min-width: 0; }
+  .dir .lbl b { display: block; font-weight: 600; }
+  .dir .lbl small { color: var(--muted); font-size: .75rem; }
+  .filter-actions { display: flex; gap: 4px; }
+  .dep { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .dep:last-child { border-bottom: none; }
+  .dep .badge { min-width: 46px; text-align: center; padding: 5px 6px; border-radius: 8px; color: #fff; font-weight: 800; font-size: .95rem; }
+  .dep .to { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dep .meta { color: var(--muted); font-size: .78rem; }
+  .dep .meta .late { color: var(--late); font-weight: 600; }
+  .dep .when { text-align: right; font-variant-numeric: tabular-nums; }
+  .dep .when b { font-size: 1.25rem; display: block; line-height: 1.1; }
+  .dep .when .now { color: var(--ok); }
+  .dep .when small { color: var(--muted); font-size: .75rem; }
+  .empty, .error { color: var(--muted); text-align: center; padding: 18px 8px; font-size: .9rem; }
+  .error { color: var(--late); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { color: var(--muted); font-size: .72rem; text-align: center; margin-top: 16px; }
+  footer a { color: inherit; }
+  [hidden] { display: none !important; }
+  .tram { background: var(--tram); } .bus { background: var(--bus); } .train { background: var(--train); }
+  .ship { background: var(--ship); } .other { background: var(--other); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Départs <span>Unireso</span></h1>
+    <small>Prototype · Sprint 3</small>
+  </header>
+
+  <!-- Recherche d'arrêt -->
+  <section class="card" aria-label="Recherche d'arrêt">
+    <div class="search-row">
+      <input id="q" type="search" placeholder="Arrêt : Bel-Air, Cornavin, Pâquis…" autocomplete="off" enterkeyhint="search">
+      <button id="near" title="Arrêts autour de moi" aria-label="Arrêts autour de moi">📍</button>
+    </div>
+    <div class="opts">
+      <label><input id="allCH" type="checkbox"> Inclure toute la Suisse</label>
+      <span id="searchStatus"></span>
+    </div>
+    <ul id="results" class="results" hidden></ul>
+  </section>
+
+  <!-- Arrêts les plus consultés -->
+  <section id="recentCard" class="card" hidden>
+    <p class="section-title">Vos arrêts <button id="clearRecent" class="ghost">Effacer</button></p>
+    <div id="recent" class="chips"></div>
+  </section>
+
+  <!-- Tableau des départs -->
+  <section id="board" class="card" hidden>
+    <div class="board-head">
+      <div>
+        <h2 id="stationName"></h2>
+        <div id="boardStatus" class="status"></div>
+      </div>
+      <button id="refresh" title="Rafraîchir" aria-label="Rafraîchir">↻</button>
+    </div>
+
+    <div style="margin:14px 0 6px">
+      <p class="section-title">Lignes
+        <span class="filter-actions">
+          <button id="allLines" class="ghost">Toutes</button>
+          <button id="noLines" class="ghost">Aucune</button>
+        </span>
+      </p>
+      <div id="autoInfo" class="auto-info" hidden></div>
+      <div id="lines" class="chips"></div>
+      <button id="dirToggle" class="ghost dir-toggle" aria-expanded="false">Choisir les directions ▾</button>
+      <div id="dirs" hidden></div>
+    </div>
+
+    <ul id="departures"></ul>
+  </section>
+
+  <footer>
+    Données : <a href="https://transport.opendata.ch" target="_blank" rel="noopener">transport.opendata.ch</a>
+    (horaires officiels suisses, temps réel quand disponible)
+  </footer>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Configuration ----------
+  const API = 'https://transport.opendata.ch/v1';
+  // Zone approximative Unireso + Léman Pass / Léman Express (GE, district de Nyon, Ain, Haute-Savoie)
+  const ZONE = { latMin: 45.85, latMax: 46.50, lonMin: 5.80, lonMax: 6.65 };
+  const BOARD_LIMIT = 80;       // départs demandés à l'API (assez pour découvrir les lignes d'un gros arrêt)
+  const SHOW_MAX = 25;          // départs affichés après filtrage
+  const REFRESH_MS = 30000;     // rafraîchissement des données
+  const TICK_MS = 15000;        // recalcul des comptes à rebours
+
+  // Codes de catégorie renvoyés par l'API → mode de transport
+  const CATS = {
+    tram:  ['T', 'TRAM', 'NFT', 'STR'],
+    bus:   ['B', 'BUS', 'NFB', 'BN', 'EV', 'KB', 'EXB', 'BP', 'TX', 'NB', 'RUB', 'CAR'],
+    ship:  ['BAT', 'BAV', 'FAE', 'SCH', 'SHIP'],
+    train: ['S', 'SN', 'SL', 'L', 'R', 'RE', 'IR', 'IRE', 'IC', 'ICE', 'ICN', 'EC', 'EN', 'NJ', 'TGV',
+            'TER', 'RJ', 'RJX', 'PE', 'EXT', 'RB', 'IN', 'TRN']
+  };
+  const MODE_LABEL = { tram: 'Tram', bus: 'Bus', ship: 'Bateau', train: 'Train', other: 'Autre' };
+  const MODE_ICON = { tram: '🚋', bus: '🚌', ship: '⛴️', train: '🚆', other: '•' };
+  const MODE_ORDER = { train: 0, tram: 1, bus: 2, ship: 3, other: 4 };
+
+  // ---------- Stockage local (préférences de l'utilisateur, sur cet appareil) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('tpp:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('tpp:' + k, JSON.stringify(v)); } catch { /* stockage indisponible */ } }
+  };
+
+  // ---------- Utilitaires ----------
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const enc = encodeURIComponent;
+
+  async function getJSON(url, signal) {
+    const r = await fetch(url, { signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  // "2026-11-09T23:41:00+0100" → Date (le format +0100 sans ":" n'est pas lu partout, ex. Safari)
+  function parseTime(s) {
+    if (!s) return null;
+    const d = new Date(String(s).replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+    return isNaN(d) ? null : d;
+  }
+  const hhmm = (d) => d.toLocaleTimeString('fr-CH', { hour: '2-digit', minute: '2-digit' });
+
+  function inZone(loc) {
+    const c = loc.coordinate;
+    if (!c || c.x == null || c.y == null) return false;
+    return c.x >= ZONE.latMin && c.x <= ZONE.latMax && c.y >= ZONE.lonMin && c.y <= ZONE.lonMax;
+  }
+
+  function modeOfCategory(cat) {
+    const c = String(cat || '').toUpperCase().trim();
+    for (const m of ['tram', 'bus', 'ship', 'train']) if (CATS[m].includes(c)) return m;
+    return 'other';
+  }
+  function modeOfIcon(icon) {
+    return ({ tram: 'tram', bus: 'bus', train: 'train', ship: 'ship', boat: 'ship' })[icon] || 'other';
+  }
+
+  // Libellé de ligne lisible : "12" pour un tram, "L2" pour le Léman Express, "IR 90" pour un train
+  function lineLabel(j, mode) {
+    const n = String(j.number || '').trim();
+    const c = String(j.category || '').trim();
+    if (mode === 'tram' || mode === 'bus' || mode === 'ship') return n || c || '?';
+    if (/^[A-Za-z]/.test(n)) return n;            // ex. L1…L6, S1
+    if (n && n.length <= 3) return (c + ' ' + n).trim();  // ex. IR 90, RE 33
+    return c || n || '?';                        // n long = numéro de course : on garde la catégorie
+  }
+
+  // ---------- État ----------
+  let current = null;        // { id, name }
+  let departures = [];       // départs normalisés du dernier chargement
+  let lastLoad = null;
+  let refreshTimer = null, tickTimer = null;
+  let searchCtrl = null, boardCtrl = null;
+
+  // ---------- Arrêts fréquents (adaptation à l'utilisateur) ----------
+  function getStops() { return store.get('stops', {}); }
+  function recordVisit(st) {
+    const stops = getStops();
+    const s = stops[st.id] || { id: st.id, name: st.name, mode: st.mode || 'other', count: 0 };
+    s.name = st.name; if (st.mode && st.mode !== 'other') s.mode = st.mode;
+    s.count += 1; s.last = Date.now();
+    stops[st.id] = s;
+    store.set('stops', stops);
+    store.set('lastStop', st.id);
+  }
+  function renderRecent() {
+    const list = Object.values(getStops())
+      .sort((a, b) => b.count - a.count || b.last - a.last)
+      .slice(0, 8);
+    $('recentCard').hidden = list.length === 0;
+    $('recent').innerHTML = list.map(s =>
+      `<button class="stop-chip" data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${esc(s.mode)}">` +
+      `${esc(s.name)}<span class="n">${s.count}×</span></button>`).join('');
+  }
+
+  // ---------- Recherche ----------
+  function renderResults(stations, note) {
+    const ul = $('results');
+    if (!stations.length) {
+      ul.hidden = false;
+      ul.innerHTML = `<li class="empty">${esc(note || 'Aucun arrêt trouvé dans la zone.')}</li>`;
+      return;
+    }
+    ul.hidden = false;
+    ul.innerHTML = stations.slice(0, 10).map(s => {
+      const m = modeOfIcon(s.icon);
+      const dist = s.distance != null ? `<span class="dist">${Math.round(s.distance)} m</span>` : '';
+      return `<li><button data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${m}">` +
+             `<span class="ico ${m}">${MODE_ICON[m]}</span><span>${esc(s.name)}</span>${dist}</button></li>`;
+    }).join('');
+  }
+
+  function uniqueById(arr) {
+    const seen = new Set();
+    return arr.filter(s => s.id && !seen.has(s.id) && seen.add(s.id));
+  }
+
+  async function search(q) {
+    if (searchCtrl) searchCtrl.abort();
+    searchCtrl = new AbortController();
+    const signal = searchCtrl.signal;
+    const allCH = $('allCH').checked;
+    $('searchStatus').innerHTML = '<span class="spinner"></span>';
+    try {
+      const r1 = await getJSON(`${API}/locations?type=station&query=${enc(q)}`, signal);
+      let stations = uniqueById(r1.stations || []);
+      let inside = stations.filter(inZone);
+      // Les noms courts ("Bel-Air", "Gare") renvoient souvent d'abord d'autres villes : on relance en ciblant Genève
+      if (!allCH && inside.length < 3 && !/gen[eè]v/i.test(q)) {
+        const r2 = await getJSON(`${API}/locations?type=station&query=${enc('Genève ' + q)}`, signal);
+        stations = uniqueById([...stations, ...(r2.stations || [])]);
+        inside = stations.filter(inZone);
+      }
+      renderResults(allCH ? stations : inside,
+        allCH ? 'Aucun arrêt trouvé.' : 'Aucun arrêt trouvé dans la zone Unireso. Cochez « toute la Suisse » pour élargir.');
+      $('searchStatus').textContent = '';
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      $('searchStatus').textContent = '';
+      renderResults([], 'Recherche impossible (réseau ?).');
+    }
+  }
+
+  function nearMe() {
+    if (!navigator.geolocation) { renderResults([], 'Géolocalisation non disponible.'); return; }
+    $('searchStatus').innerHTML = '<span class="spinner"></span> localisation…';
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const { latitude: x, longitude: y } = pos.coords;
+        const r = await getJSON(`${API}/locations?x=${x}&y=${y}`);
+        const st = uniqueById((r.stations || []).filter(s => s.id)).sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
+        $('searchStatus').textContent = '';
+        renderResults(st, 'Aucun arrêt à proximité.');
+      } catch {
+        $('searchStatus').textContent = '';
+        renderResults([], 'Impossible de charger les arrêts proches.');
+      }
+    }, () => {
+      $('searchStatus').textContent = '';
+      renderResults([], 'Position refusée ou indisponible.');
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  }
+
+  // ---------- Tableau des départs ----------
+  function normalize(j) {
+    const stop = j.stop || {};
+    const sched = stop.departureTimestamp ? new Date(stop.departureTimestamp * 1000) : parseTime(stop.departure);
+    const real = parseTime(stop.prognosis && stop.prognosis.departure) || sched;
+    let delay = stop.delay != null ? Number(stop.delay) : null;
+    if ((delay == null || isNaN(delay)) && sched && real) delay = Math.round((real - sched) / 60000);
+    const mode = modeOfCategory(j.category);
+    const label = lineLabel(j, mode);
+    const lineKey = mode + '|' + label;
+    // Direction = prochain arrêt après la station courante (regroupe les courses partielles d'un même sens).
+    // Sans passList, on se rabat sur le terminus.
+    const hereId = stop.station && stop.station.id;
+    const pl = Array.isArray(j.passList) ? j.passList : [];
+    const nxt = pl.find((p, i) => i > 0 && p && p.station && p.station.name && p.station.id !== hereId);
+    const nextStop = nxt ? nxt.station.name : '';
+    const dirKey = lineKey + '>' + (nxt ? (nxt.station.id || nextStop) : 'to:' + (j.to || ''));
+    return {
+      lineKey, dirKey, nextStop, label, mode,
+      to: j.to || '', sched, real, delay: delay || 0,
+      platform: (stop.prognosis && stop.prognosis.platform) || stop.platform || '',
+      operator: j.operator || '',
+      // prochains arrêts (affichés en touchant le départ)
+      stops: pl.slice(1).filter(p => p && p.station && p.station.name && p.station.id !== hereId).slice(0, 8)
+        .map(p => ({ name: p.station.name,
+                     time: p.arrivalTimestamp ? new Date(p.arrivalTimestamp * 1000) : parseTime(p.arrival || p.departure) }))
+    };
+  }
+
+  // ---------- Filtre manuel (Sprints 1-2) ----------
+  function hiddenSet() { return new Set(store.get('hidden:' + current.id, [])); }
+  function saveHidden(set) { store.set('hidden:' + current.id, [...set]); store.set('mode:' + current.id, 'manual'); }
+  // Mode manuel si l'utilisateur a déjà réglé ses lignes (y compris un filtre hérité des Sprints 1-2)
+  function isManual() {
+    const m = store.get('mode:' + current.id, null);
+    if (m) return m === 'manual';
+    return store.get('hidden:' + current.id, []).length > 0;
+  }
+
+  // ---------- Habitudes (US-06) ----------
+  const HALF_LIFE_DAYS = 30;   // un usage vieux de 30 jours pèse moitié moins
+  // Seuil « habituel » : 2 usages espacés de moins de 30 jours (1 + 0,5^(Δ/30 j) ≥ 1,5).
+  // Pas 2 : avec la décroissance, deux usages donnent toujours un peu moins de 2.
+  const FAV_MIN = 1.5;
+  const DEBOUNCE_MS = 10 * 60 * 1000; // plusieurs taps en 10 min = un seul usage
+  let peekAll = false;         // « Tout voir » temporaire, oublié en changeant d'arrêt
+
+  const decayed = (u, now) => u ? u.s * Math.pow(0.5, (now - u.t) / (HALF_LIFE_DAYS * 864e5)) : 0;
+  function getUsage() { return store.get('usage:' + current.id, {}); }
+  function recordUse(dirKey) {
+    const usage = getUsage(), now = Date.now(), u = usage[dirKey];
+    if (u && now - u.t < DEBOUNCE_MS) return false;
+    usage[dirKey] = { s: decayed(u, now) + 1, t: now };
+    store.set('usage:' + current.id, usage);
+    return true;
+  }
+  function dirScore(dirKey, usage = getUsage(), now = Date.now()) { return decayed(usage[dirKey], now); }
+  function favoriteDirs() {
+    const usage = getUsage(), now = Date.now(), fav = new Set();
+    lineModel.forEach(l => l.dirs.forEach(d => { if (dirScore(d.key, usage, now) >= FAV_MIN) fav.add(d.key); }));
+    return fav;
+  }
+
+  // Ensemble réellement appliqué : manuel > « tout voir » > auto (habituelles seules) > tout
+  function effectiveHidden() {
+    if (isManual()) return hiddenSet();
+    const fav = favoriteDirs();
+    if (peekAll || fav.size === 0) return new Set();
+    const set = new Set();
+    lineModel.forEach(l => l.dirs.forEach(d => { if (!fav.has(d.key)) set.add(d.key); }));
+    return set;
+  }
+  // Premier réglage manuel : on part de ce que l'utilisateur voit à l'écran
+  function materialize() {
+    if (!isManual()) saveHidden(effectiveHidden());
+    peekAll = false;
+  }
+
+  function renderAutoInfo() {
+    const fav = favoriteDirs(), box = $('autoInfo');
+    let html = '';
+    if (isManual()) {
+      if (fav.size) html = `<span>Sélection manuelle</span><button id="backAuto" class="ghost">Revenir à mes habitudes</button>`;
+    } else if (fav.size) {
+      html = peekAll
+        ? `<span>Toutes les lignes</span><button id="peek" class="ghost">★ Mes lignes</button>`
+        : `<span>★ Vos lignes habituelles à cet arrêt</span><button id="peek" class="ghost">Tout voir</button>`;
+    }
+    box.hidden = !html; box.innerHTML = html;
+  }
+
+  function compareLines(a, b) {
+    return (MODE_ORDER[a.mode] - MODE_ORDER[b.mode]) ||
+      a.label.localeCompare(b.label, 'fr', { numeric: true, sensitivity: 'base' });
+  }
+
+  // Masqué si la ligne entière l'est (clé de ligne, compatible Sprint 1) ou si cette direction l'est
+  const isHidden = (d, set) => set.has(d.lineKey) || set.has(d.dirKey);
+
+  let lineModel = [];
+  function buildLines() {
+    const lines = new Map();
+    for (const d of departures) {
+      let l = lines.get(d.lineKey);
+      if (!l) lines.set(d.lineKey, l = { key: d.lineKey, label: d.label, mode: d.mode, dirs: new Map() });
+      let dir = l.dirs.get(d.dirKey);
+      if (!dir) l.dirs.set(d.dirKey, dir = { key: d.dirKey, next: d.nextStop, termini: new Map() });
+      dir.termini.set(d.to, (dir.termini.get(d.to) || 0) + 1);
+    }
+    const usage = getUsage(), now = Date.now();
+    const lineScore = l => [...l.dirs.keys()].reduce((acc, k) => acc + dirScore(k, usage, now), 0);
+    return [...lines.values()].sort((a, b) => (lineScore(b) - lineScore(a)) || compareLines(a, b)).map(l => ({
+      key: l.key, label: l.label, mode: l.mode,
+      dirs: [...l.dirs.values()].map(x => ({
+        key: x.key, next: x.next,
+        // termini du même sens, le plus fréquent d'abord : "Moillesulaz / Genève, Rive"
+        label: [...x.termini.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).join(' / ')
+      })).sort((a, b) => a.label.localeCompare(b.label, 'fr'))
+    }));
+  }
+  const visibleDirs = (l, set) => set.has(l.key) ? 0 : l.dirs.filter(d => !set.has(d.key)).length;
+
+  function renderLines() {
+    lineModel = buildLines();
+    const hidden = effectiveHidden();
+    const fav = favoriteDirs();
+    renderAutoInfo();
+    $('lines').innerHTML = lineModel.length ? lineModel.map(l => {
+      const n = visibleDirs(l, hidden), total = l.dirs.length;
+      const state = n === 0 ? 'false' : n === total ? 'true' : 'mixed';
+      const cnt = state === 'mixed' ? `<span class="cnt">${n}/${total}</span>` : '';
+      const star = l.dirs.some(d => fav.has(d.key)) ? '<span class="fav">★</span>' : '';
+      return `<button class="line-chip ${l.mode}" data-key="${esc(l.key)}" aria-pressed="${state}" ` +
+        `title="${esc(MODE_LABEL[l.mode] + ' ' + l.label)}"><span class="m">${MODE_ICON[l.mode]}</span>${esc(l.label)}${star}${cnt}</button>`;
+    }).join('') : '<span class="status">Aucune ligne dans les prochains départs.</span>';
+    $('dirToggle').hidden = lineModel.length === 0;
+    renderDirs(hidden);
+  }
+
+  function renderDirs(hidden) {
+    $('dirs').innerHTML = lineModel.map(l => {
+      const rows = l.dirs.map(d => {
+        const on = !hidden.has(l.key) && !hidden.has(d.key);
+        const next = d.next ? `<small>prochain arrêt : ${esc(d.next)}</small>` : '';
+        return `<button class="dir" data-line="${esc(l.key)}" data-dir="${esc(d.key)}" aria-pressed="${on}">` +
+          `<span class="box"></span><span class="lbl"><b>${esc(d.label || '—')}</b>${next}</span></button>`;
+      }).join('');
+      return `<div class="dir-group"><span class="line-chip ${l.mode}"><span class="m">${MODE_ICON[l.mode]}</span>${esc(l.label)}</span><div>${rows}</div></div>`;
+    }).join('');
+  }
+
+  function toggleLine(lineKey) {
+    const l = lineModel.find(x => x.key === lineKey); if (!l) return;
+    materialize();
+    const set = hiddenSet();
+    const anyVisible = visibleDirs(l, set) > 0;
+    l.dirs.forEach(d => set.delete(d.key));
+    anyVisible ? set.add(l.key) : set.delete(l.key);
+    saveHidden(set);
+  }
+
+  function toggleDir(lineKey, dirKey) {
+    const l = lineModel.find(x => x.key === lineKey); if (!l) return;
+    materialize();
+    const set = hiddenSet();
+    if (set.has(l.key)) {
+      // ligne entièrement masquée : on n'active que cette direction
+      set.delete(l.key);
+      l.dirs.forEach(d => { if (d.key !== dirKey) set.add(d.key); });
+      set.delete(dirKey);
+    } else {
+      set.has(dirKey) ? set.delete(dirKey) : set.add(dirKey);
+      // toutes les directions masquées → on masque la ligne (y compris ses futures directions)
+      if (l.dirs.every(d => set.has(d.key))) { l.dirs.forEach(d => set.delete(d.key)); set.add(l.key); }
+    }
+    saveHidden(set);
+  }
+
+  function whenHtml(d, now) {
+    const t = d.real || d.sched;
+    if (!t) return '<b>–</b>';
+    const min = Math.floor((t - now) / 60000);
+    if (min <= 0) return `<b class="now">0′</b><small>${hhmm(t)}</small>`;
+    if (min < 60) return `<b>${min}′</b><small>${hhmm(t)}</small>`;
+    return `<b>${hhmm(t)}</b><small>&nbsp;</small>`;
+  }
+
+  let expanded = null;  // départ déplié (clé unique)
+  const depId = d => d.dirKey + '@' + (d.sched ? d.sched.getTime() : '');
+
+  function renderDepartures() {
+    const now = Date.now();
+    const hidden = effectiveHidden();
+    const list = departures
+      .filter(d => !isHidden(d, hidden))
+      .filter(d => (d.real || d.sched) && (d.real || d.sched) - now > -60000) // on retire les bus déjà partis
+      .slice(0, SHOW_MAX);
+    const ul = $('departures');
+    if (!departures.length) { ul.innerHTML = '<li class="empty">Aucun départ prévu prochainement.</li>'; return; }
+    if (!list.length) {
+      ul.innerHTML = !isManual() && !peekAll && favoriteDirs().size
+        ? '<li class="empty">Aucun départ de vos lignes habituelles prochainement. <button id="peekEmpty">Tout voir</button></li>'
+        : '<li class="empty">Aucune ligne sélectionnée dans les prochains départs.</li>';
+      return;
+    }
+    ul.innerHTML = list.map(d => {
+      const plat = d.platform ? `${d.mode === 'train' ? 'Voie' : 'Quai'} ${esc(d.platform)}` : '';
+      const late = d.delay > 0 ? `<span class="late">+${d.delay} min</span>` : '';
+      const meta = [plat, late].filter(Boolean).join(' · ');
+      const id = depId(d), open = id === expanded;
+      const stops = open ? `<ul class="stops">${d.stops.length ? d.stops.map(st =>
+          `<li><span>${esc(st.name)}</span><span>${st.time ? hhmm(st.time) : ''}</span></li>`).join('')
+          : '<li><span>Prochains arrêts non disponibles</span><span></span></li>'}</ul>` : '';
+      return `<li class="dep" data-dep="${esc(id)}" data-dir="${esc(d.dirKey)}" aria-expanded="${open}"><span class="badge ${d.mode}">${esc(d.label)}</span>` +
+        `<div style="min-width:0"><div class="to">${esc(d.to)}</div><div class="meta">${meta || MODE_LABEL[d.mode]}</div></div>` +
+        `<div class="when">${whenHtml(d, now)}</div>${stops}</li>`;
+    }).join('');
+  }
+
+  function renderStatus(text) {
+    if (text) { $('boardStatus').innerHTML = text; return; }
+    if (!lastLoad) return;
+    const s = Math.round((Date.now() - lastLoad) / 1000);
+    $('boardStatus').textContent = s < 10 ? 'à l\'instant' : `mis à jour il y a ${s < 60 ? s + ' s' : Math.round(s / 60) + ' min'}`;
+  }
+
+  async function loadBoard() {
+    if (!current) return;
+    if (boardCtrl) boardCtrl.abort();
+    boardCtrl = new AbortController();
+    renderStatus('<span class="spinner"></span> chargement…');
+    try {
+      const r = await getJSON(`${API}/stationboard?id=${enc(current.id)}&limit=${BOARD_LIMIT}`, boardCtrl.signal);
+      departures = (r.stationboard || []).map(normalize)
+        .sort((a, b) => (a.real || a.sched) - (b.real || b.sched));
+      if (r.station && r.station.name) $('stationName').textContent = r.station.name;
+      lastLoad = Date.now();
+      renderLines(); renderDepartures(); renderStatus();
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      renderStatus('');
+      $('departures').innerHTML = '<li class="error">Impossible de charger les départs. <button id="retry">Réessayer</button></li>';
+      $('retry').onclick = loadBoard;
+    }
+  }
+
+  function openStop(st) {
+    current = { id: st.id, name: st.name };
+    recordVisit(st);
+    renderRecent();
+    $('results').hidden = true;
+    $('q').value = '';
+    $('q').blur();
+    $('board').hidden = false;
+    $('stationName').textContent = st.name;
+    $('lines').innerHTML = '';
+    $('departures').innerHTML = '';
+    departures = []; lastLoad = null; peekAll = false; expanded = null;
+    loadBoard();
+    clearInterval(refreshTimer); clearInterval(tickTimer);
+    refreshTimer = setInterval(() => { if (document.visibilityState === 'visible') loadBoard(); }, REFRESH_MS);
+    tickTimer = setInterval(() => { renderDepartures(); renderStatus(); }, TICK_MS);
+    $('board').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------- Événements ----------
+  let debounce;
+  $('q').addEventListener('input', e => {
+    clearTimeout(debounce);
+    const q = e.target.value.trim();
+    if (q.length < 2) { $('results').hidden = true; if (searchCtrl) searchCtrl.abort(); $('searchStatus').textContent = ''; return; }
+    debounce = setTimeout(() => search(q), 300);
+  });
+  $('q').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const first = $('results').querySelector('button[data-id]'); if (first) first.click(); }
+  });
+  $('allCH').addEventListener('change', () => { const q = $('q').value.trim(); if (q.length >= 2) search(q); });
+  $('near').addEventListener('click', nearMe);
+
+  const pick = (e) => {
+    const b = e.target.closest('button[data-id]');
+    if (b) openStop({ id: b.dataset.id, name: b.dataset.name, mode: b.dataset.mode });
+  };
+  $('results').addEventListener('click', pick);
+  $('recent').addEventListener('click', pick);
+  $('clearRecent').addEventListener('click', () => { store.set('stops', {}); renderRecent(); });
+
+  $('lines').addEventListener('click', e => {
+    const b = e.target.closest('.line-chip');
+    if (!b) return;
+    toggleLine(b.dataset.key);
+    renderLines(); renderDepartures();
+  });
+  $('dirs').addEventListener('click', e => {
+    const b = e.target.closest('.dir');
+    if (!b) return;
+    toggleDir(b.dataset.line, b.dataset.dir);
+    renderLines(); renderDepartures();
+  });
+  function setDirPanel(open) {
+    $('dirs').hidden = !open;
+    $('dirToggle').setAttribute('aria-expanded', String(open));
+    $('dirToggle').textContent = open ? 'Masquer les directions ▴' : 'Choisir les directions ▾';
+    store.set('dirOpen', open);
+  }
+  $('dirToggle').addEventListener('click', () => setDirPanel($('dirs').hidden));
+  setDirPanel(store.get('dirOpen', false));
+  $('allLines').addEventListener('click', () => { peekAll = false; saveHidden(new Set()); renderLines(); renderDepartures(); });
+  $('autoInfo').addEventListener('click', e => {
+    if (e.target.id === 'peek') peekAll = !peekAll;
+    else if (e.target.id === 'backAuto') { store.set('hidden:' + current.id, []); store.set('mode:' + current.id, 'auto'); peekAll = false; }
+    else return;
+    renderLines(); renderDepartures();
+  });
+  $('departures').addEventListener('click', e => {
+    if (e.target.id === 'peekEmpty') { peekAll = true; renderLines(); renderDepartures(); return; }
+    const li = e.target.closest('.dep'); if (!li) return;
+    const opening = expanded !== li.dataset.dep;
+    expanded = opening ? li.dataset.dep : null;
+    if (opening && recordUse(li.dataset.dir)) renderLines();   // l'usage peut faire monter la ligne
+    renderDepartures();
+  });
+  $('noLines').addEventListener('click', () => {
+    peekAll = false; saveHidden(new Set(lineModel.map(l => l.key))); renderLines(); renderDepartures();
+  });
+  $('refresh').addEventListener('click', loadBoard);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && current && lastLoad && Date.now() - lastLoad > REFRESH_MS) loadBoard();
+  });
+
+  // ---------- Démarrage : accès direct au dernier arrêt consulté ----------
+  renderRecent();
+  const lastId = store.get('lastStop', null);
+  const last = lastId && getStops()[lastId];
+  if (last) {
+    // on rouvre sans incrémenter le compteur de consultation
+    current = { id: last.id, name: last.name };
+    $('board').hidden = false;
+    $('stationName').textContent = last.name;
+    loadBoard();
+    refreshTimer = setInterval(() => { if (document.visibilityState === 'visible') loadBoard(); }, REFRESH_MS);
+    tickTimer = setInterval(() => { renderDepartures(); renderStatus(); }, TICK_MS);
+  }
+})();
+</script>
+</body>
+</html>
