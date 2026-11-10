@@ -20,6 +20,7 @@ Live on GitHub Pages: https://tiagsant.github.io/swissPublicTransport/
 | 1 | [`prototypes/sprint-01-departs`](prototypes/sprint-01-departs/index.html) | Stop search (Unireso area), real-time departures, line selection, frequent stops |
 | 2 | [`prototypes/sprint-02-directions`](prototypes/sprint-02-directions/index.html) | Filter by direction (line + next stop), compatible with Sprint 1 preferences |
 | 3 | [`prototypes/sprint-03-habitudes`](prototypes/sprint-03-habitudes/index.html) | Automatic preselection of usual lines (US-06); tap a departure to see its next stops |
+| 4 | [`prototypes/sprint-04-identity`](prototypes/sprint-04-identity/index.html) | English/French UI (US-10), official SBB pictograms (US-11), operators' line colours (US-12) |
 
 > **Language policy.** From Sprint 4 on, everything on GitHub is in English: code, comments, docs, issues and pull requests. The app UI is English by default and French when the phone is set to French. Prototypes 1–3 predate this rule and are kept as historical snapshots, unchanged.
 
@@ -30,6 +31,11 @@ Live on GitHub Pages: https://tiagsant.github.io/swissPublicTransport/
 - `/v1/stationboard`: upcoming departures at a stop (`passList` is used to identify the direction)
 
 Real-data findings (category codes, operators, fields) are in [`docs/real-data-validation.md`](docs/real-data-validation.md).
+
+## Visual identity
+
+- **Pictograms**: Swiss public transport pictograms and SBB timetable icons, copied unmodified into [`assets/sbb/`](assets/sbb/). They may only be used by a Swiss public transport project, unmodified and non-commercially — see [`assets/sbb/NOTICE.md`](assets/sbb/NOTICE.md). **A commercial release requires prior approval from SBB Brand Management.**
+- **Line colours**: [`assets/line-colors.js`](assets/line-colors.js), surveyed from tpg.ch, lemanexpress.com and mouettesgenevoises.ch. Unknown lines fall back to a neutral badge.
 
 Preferences (visited stops, hidden lines and directions, usage scores per direction) are stored in the device's `localStorage` under the `tpp:` prefix.
 
@@ -42,7 +48,8 @@ pip install -r tests/requirements.txt
 python -m playwright install chromium   # or CHROME_PATH=/path/to/chrome
 python tests/test_sprint01.py
 python tests/test_sprint02.py
-python tests/test_sprint03.py            # screenshots in tests/out/
+python tests/test_sprint03.py
+python tests/test_sprint04.py            # screenshots in tests/out/
 ```
 
 ## Workflow
