@@ -17,8 +17,9 @@ L'application s'adapte à son utilisateur :
 |---|---|---|
 | 1 | [`prototypes/sprint-01-departs`](prototypes/sprint-01-departs/index.html) | Recherche d'arrêt (zone Unireso), prochains départs en temps réel, sélection des lignes, arrêts fréquents |
 | 2 | [`prototypes/sprint-02-directions`](prototypes/sprint-02-directions/index.html) | Filtre par direction (ligne + prochain arrêt), compatible avec les préférences du Sprint 1 |
+| 3 | [`prototypes/sprint-03-habitudes`](prototypes/sprint-03-habitudes/index.html) | Présélection automatique des lignes habituelles (US-06), prochains arrêts d'un départ en le touchant |
 
-Pour les essayer : télécharger le fichier `index.html` et l'ouvrir dans Chrome (téléphone ou ordinateur).
+Pour les essayer : https://tiagsant.github.io/swissPublicTransport/ (GitHub Pages, branche `main`), ou ouvrir le fichier `index.html` dans Chrome.
 
 ## Données
 
@@ -26,7 +27,7 @@ Pour les essayer : télécharger le fichier `index.html` et l'ouvrir dans Chrome
 - `/v1/locations` : recherche d'arrêts (par nom ou par coordonnées)
 - `/v1/stationboard` : prochains départs d'un arrêt (`passList` sert à identifier la direction)
 
-Les préférences (arrêts consultés, lignes et directions masquées) sont gardées dans le `localStorage` de l'appareil, sous le préfixe `tpp:`.
+Les préférences (arrêts consultés, lignes et directions masquées, scores d'usage par direction) sont gardées dans le `localStorage` de l'appareil, sous le préfixe `tpp:`.
 
 ## Tests
 
@@ -36,7 +37,8 @@ Tests de bout en bout avec Playwright. L'API est simulée par des données facti
 pip install -r tests/requirements.txt
 python -m playwright install chromium   # ou CHROME_PATH=/chemin/vers/chrome
 python tests/test_sprint01.py
-python tests/test_sprint02.py            # captures d'écran dans tests/out/
+python tests/test_sprint02.py
+python tests/test_sprint03.py            # captures d'écran dans tests/out/
 ```
 
 ## Organisation
