@@ -1,4 +1,4 @@
-"""Sprint 3 / US-06 : présélection automatique des lignes habituelles."""
+"""Sprint 3 / US-06: automatic preselection of usual lines."""
 import os, json, datetime as dt
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -38,46 +38,46 @@ with sync_playwright() as p:
     pg.goto(PAGE); pg.fill("#q", "Bel-Air"); pg.wait_for_selector("#results button[data-id]")
     pg.locator("#results button[data-id]").first.click(); pg.wait_for_selector(".dep")
 
-    # 1. Premier passage : tout est visible, aucune présélection
-    assert pg.locator(".dep").count() == 7 and pg.locator("#autoInfo").is_hidden(); print("1 vierge OK")
+    # 1. First visit: everything visible, no preselection
+    assert pg.locator(".dep").count() == 7 and pg.locator("#autoInfo").is_hidden(); print("1 fresh OK")
 
-    # 2. Taper un départ : prochains arrêts + 1 usage ; re-taper aussitôt ne compte pas (anti-rebond)
+    # 2. Tap a departure: next stops + 1 use; tapping again right away does not count (debounce)
     MOL = "tram|12>100"
     pg.locator(f".dep[data-dir='{MOL}']").first.click()
-    stops = pg.locator(".dep[aria-expanded='true'] .stops li").all_inner_texts(); print("2 arrêts:", stops)
+    stops = pg.locator(".dep[aria-expanded='true'] .stops li").all_inner_texts(); print("2 stops:", stops)
     assert len(stops) == 3 and "Molard" in stops[0]
     pg.locator(f".dep[data-dir='{MOL}']").first.click(); pg.locator(f".dep[data-dir='{MOL}']").first.click()
-    assert round(LS("usage")[MOL]["s"], 2) == 1.0 and pg.locator("#autoInfo").is_hidden(); print("2 anti-rebond OK")
+    assert round(LS("usage")[MOL]["s"], 2) == 1.0 and pg.locator("#autoInfo").is_hidden(); print("2 debounce OK")
 
-    # 3. Deuxième usage (> 10 min plus tard) → direction habituelle → sélection auto
+    # 3. Second use (> 10 min later) → usual direction → auto selection
     pg.evaluate(f"""(() => {{ const k='tpp:usage:8587057', u=JSON.parse(localStorage.getItem(k));
         u['{MOL}'].t -= 11*60*1000; localStorage.setItem(k, JSON.stringify(u)); }})()""")
     pg.locator(f".dep[data-dir='{MOL}']").first.click(); pg.locator(f".dep[data-dir='{MOL}']").first.click()
     print("3 auto:", pg.locator("#autoInfo").inner_text().replace("\n", " | "), badges())
     assert set(badges()) == {"12>Moillesulaz"}
-    chips = pg.locator(".line-chip").all_inner_texts(); print("3 pastilles:", [c.replace("\n", "") for c in chips])
+    chips = pg.locator(".line-chip").all_inner_texts(); print("3 chips:", [c.replace("\n", "") for c in chips])
     assert chips[0].replace("\n", "").startswith("🚋12★")
     pg.screenshot(path=str(OUT / "s3_auto.png"), full_page=True)
 
-    # 4. « Tout voir » est temporaire
+    # 4. "See all" is temporary
     pg.click("#peek"); assert pg.locator(".dep").count() == 7
-    pg.click("#peek"); assert set(badges()) == {"12>Moillesulaz"}; print("4 tout voir OK")
+    pg.click("#peek"); assert set(badges()) == {"12>Moillesulaz"}; print("4 see all OK")
 
-    # 5. Réglage manuel : on part de ce qui est affiché, on ajoute le 14
+    # 5. Manual setting: start from what is displayed, add the 14
     pg.locator(".line-chip[data-key='tram|14']").click()
-    print("5 manuel:", sorted(set(badges())), pg.locator("#autoInfo").inner_text().replace("\n", " | "))
+    print("5 manual:", sorted(set(badges())), pg.locator("#autoInfo").inner_text().replace("\n", " | "))
     assert set(badges()) == {"12>Moillesulaz", "14>Meyrin, Gravière"} and LS("mode") == "manual"
 
-    # 6. Rechargement : le manuel persiste ; puis retour aux habitudes
+    # 6. Reload: manual persists; then back to habits
     pg.reload(); pg.wait_for_selector(".dep"); assert set(badges()) == {"12>Moillesulaz", "14>Meyrin, Gravière"}
-    pg.click("#backAuto"); assert set(badges()) == {"12>Moillesulaz"} and LS("mode") == "auto"; print("6 retour auto OK")
-    pg.reload(); pg.wait_for_selector(".dep"); assert set(badges()) == {"12>Moillesulaz"}; print("6 auto persiste OK")
+    pg.click("#backAuto"); assert set(badges()) == {"12>Moillesulaz"} and LS("mode") == "auto"; print("6 back to auto OK")
+    pg.reload(); pg.wait_for_selector(".dep"); assert set(badges()) == {"12>Moillesulaz"}; print("6 auto persists OK")
 
-    # 7. Oubli progressif : 4 usages il y a 60 jours = score 1 → plus habituel
+    # 7. Gradual forgetting: 4 uses 60 days ago = score 1 → no longer usual
     pg.evaluate(f"""localStorage.setItem('tpp:usage:8587057', JSON.stringify({{'{MOL}': {{s: 4, t: Date.now() - 60*864e5}}}}))""")
-    pg.reload(); pg.wait_for_selector(".dep"); assert pg.locator(".dep").count() == 7; print("7 décroissance OK")
+    pg.reload(); pg.wait_for_selector(".dep"); assert pg.locator(".dep").count() == 7; print("7 decay OK")
 
-    # 8. Compatibilité : filtre Sprint 2 (ligne 3 masquée, sans mode) → reste manuel
+    # 8. Compatibility: Sprint 2 filter (line 3 hidden, no mode) → stays manual
     pg.evaluate("""localStorage.removeItem('tpp:mode:8587057'); localStorage.setItem('tpp:hidden:8587057', '["bus|3"]')""")
     pg.reload(); pg.wait_for_selector(".dep"); assert "3>Gardiol" not in badges() and pg.locator(".dep").count() == 6
     print("8 migration OK")
