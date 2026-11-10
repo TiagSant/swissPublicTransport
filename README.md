@@ -41,5 +41,5 @@ python tests/test_sprint02.py            # captures d'écran dans tests/out/
 
 ## Organisation
 
-- Backlog et user stories : [`docs/backlog.md`](docs/backlog.md), à migrer vers les GitHub Issues
+- Backlog et user stories : [GitHub Issues](https://github.com/TiagSant/swissPublicTransport/issues), un milestone par sprint (conventions dans [`docs/backlog.md`](docs/backlog.md))
 - Une branche et une pull request par sprint, avec revue de code par le product owner
