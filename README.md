@@ -23,12 +23,21 @@ Live on GitHub Pages: https://tiagsant.github.io/swissPublicTransport/
 | 4 | [`prototypes/sprint-04-identity`](prototypes/sprint-04-identity/index.html) | English/French UI (US-10), official SBB pictograms (US-11), operators' line colours (US-12) |
 | 5 | [`prototypes/sprint-05-platforms`](prototypes/sprint-05-platforms/index.html) | Platform map with the rider's position and walking directions (US-13) |
 | 6 | [`prototypes/sprint-06-journeys`](prototypes/sprint-06-journeys/index.html) | Journey planner (stops, my position, map points; fastest / least walking), get-ready and leave alarms following live data, learned walking speed (US-07…09, US-14…19, TECH-04) |
+| 7 | [`prototypes/sprint-07-official-data`](prototypes/sprint-07-official-data/index.html) | Official data from opentransportdata.swiss (OJP 2.0) with the rider's own key, entered in Settings (TECH-05, TECH-06); remove a single saved stop (US-20) |
 
 > **Language policy.** From Sprint 4 on, everything on GitHub is in English: code, comments, docs, issues and pull requests. The app UI is English by default and French when the phone is set to French. Prototypes 1–3 predate this rule and are kept as historical snapshots, unchanged.
 
 ## Data
 
-[transport.opendata.ch](https://transport.opendata.ch): open API, no key, CORS enabled, covering the official Swiss timetable with real-time data when available.
+**Official source (Sprint 7 on): [opentransportdata.swiss](https://opentransportdata.swiss), OJP 2.0.** The Swiss open-data platform's journey-planner API, with real time and platforms. It needs a personal API key (free plan: 50 requests per minute).
+- **The key is never in the code.** In the prototype, the rider pastes it in Settings ⚙; it is checked with one small request, stored only in the browser (`localStorage`, key `tpp:ojpKey`) and sent only to `api.opentransportdata.swiss` in the `Authorization` header. The service allows browser calls (CORS), so no server is needed for personal testing. Before the APK is distributed, a small relay will hold the key and cache answers (TECH-06).
+- [`assets/ojp.js`](assets/ojp.js) builds the XML requests and turns the answers into the transport.opendata.ch shape below, so every screen works with either source. Stop ids: OJP's `ch:1:sloid:87387` ↔ the app's `8587387`.
+- Requests used: `LocationInformationRequest` (stop search by name; stops in a rectangle around a point), `StopEventRequest` (departures), `TripRequest` (journeys, leaving at or arriving by).
+- Departures with their next stops are heavy (≈ 9 KB each, gzip-compressed on the wire). They are asked once per stop (40 departures) and remembered per run pattern (line, direction, terminus) for a day; the 30-second refreshes ask without them (≈ 2 KB each). A run not yet known is asked again at most every 5 minutes.
+- Note: OJP ignores the stop name when an area is also given, so the name search is Switzerland-wide and the app keeps the Unireso area, as before.
+- Real answers for Geneva are recorded in [`tests/fixtures/ojp/`](tests/fixtures/ojp/) by the `OJP probe` workflow ([`scripts/ojp_probe.mjs`](scripts/ojp_probe.mjs)), using the `OJP_TOKEN` repository secret; it also sends the requests exactly as the app builds them.
+
+**Without a key: [transport.opendata.ch](https://transport.opendata.ch)**: open API, no key, CORS enabled, covering the official Swiss timetable with real-time data when available.
 - `/v1/locations`: stop search (by name or by coordinates)
 - `/v1/stationboard`: upcoming departures at a stop (`passList` is used to identify the direction)
 
@@ -64,9 +73,10 @@ python tests/test_build_quays.py         # platform data builder, synthetic CSV
 python tests/test_sprint06.py            # journeys and alarms, with a frozen browser clock
 python tests/test_api_outage.py          # API down / 503 / 429 / no answer → banner, 10 s timeout
 python tests/test_favorites.py           # remove one stop / clear all, with undo
+python tests/test_sprint07_ojp.py        # OJP key in Settings, departures / search / journeys from recorded real answers
 ```
 
 ## Workflow
 
 - Backlog and user stories: [GitHub Issues](https://github.com/TiagSant/swissPublicTransport/issues), one milestone per sprint (conventions in [`docs/backlog.md`](docs/backlog.md))
-- One branch and one pull request per sprint, code-reviewed by the product owner
+- One branch and one pull request per sprint. Prototype pull requests are merged once their tests pass; the product owner reviews the Android app (APK) releases
