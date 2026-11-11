@@ -194,7 +194,11 @@
   const ASSETS = '../../assets';
   // Approximate Unireso + Léman Pass / Léman Express area (Geneva, Nyon district, Ain, Haute-Savoie)
   const ZONE = { latMin: 45.85, latMax: 46.50, lonMin: 5.80, lonMax: 6.65 };
-  const BOARD_LIMIT = 80;       // departures requested (enough to discover every line of a busy stop)
+  // The API only returns journeys whose *scheduled* time is at or after `datetime`. A bus scheduled at 17:10
+  // running +8 min would vanish at 17:11, so we ask from LOOKBACK_MIN minutes ago and filter on the real time.
+  const LOOKBACK_MIN = 30;
+  const BOARD_LIMIT = 150;      // departures requested: the look-back window plus enough upcoming ones for a busy stop
+  const GONE_MS = 60000;        // a departure is dropped one minute after it has left
   const SHOW_MAX = 25;          // departures shown after filtering
   const REFRESH_MS = 30000;     // data refresh
   const TICK_MS = 15000;        // countdown refresh
@@ -282,6 +286,9 @@
     return isNaN(d) ? null : d;
   }
   const hhmm = (d) => d.toLocaleTimeString(LOCALE[lang], { hour: '2-digit', minute: '2-digit', hour12: false });
+  // API `datetime` parameter: Swiss local time "YYYY-MM-DD HH:mm" (the sv-SE locale formats exactly like that)
+  const apiDateTime = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
 
   function inZone(loc) {
     const c = loc.coordinate;
@@ -466,9 +473,12 @@
   function normalize(j) {
     const stop = j.stop || {};
     const sched = stop.departureTimestamp ? new Date(stop.departureTimestamp * 1000) : parseTime(stop.departure);
-    const real = parseTime(stop.prognosis && stop.prognosis.departure) || sched;
-    let delay = stop.delay != null ? Number(stop.delay) : null;
-    if ((delay == null || isNaN(delay)) && sched && real) delay = Math.round((real - sched) / 60000);
+    // Live data: the real-time estimate, or the scheduled time + delay when only the delay is known.
+    // Without live data, `real` stays null and the departure follows its scheduled time.
+    const prognosis = parseTime(stop.prognosis && stop.prognosis.departure);
+    let delay = stop.delay != null && stop.delay !== '' && !isNaN(Number(stop.delay)) ? Number(stop.delay) : null;
+    const real = prognosis || (sched && delay != null ? new Date(sched.getTime() + delay * 60000) : null);
+    if (prognosis && sched) delay = Math.round((prognosis - sched) / 60000);
     const mode = modeOfCategory(j.category);
     const label = lineLabel(j, mode);
     const lineKey = mode + '|' + label;
@@ -481,7 +491,7 @@
     const dirKey = lineKey + '>' + (nxt ? (nxt.station.id || nextStop) : 'to:' + (j.to || ''));
     return {
       lineKey, dirKey, nextStop, label, mode, style: lineStyle(j, mode, label),
-      to: j.to || '', sched, real, delay: delay || 0,
+      to: j.to || '', sched, real, live: !!real, time: real || sched, delay: delay || 0,
       platform: (stop.prognosis && stop.prognosis.platform) || stop.platform || '',
       operator: j.operator || '',
       // next stops (shown when the departure is tapped)
@@ -560,6 +570,8 @@
 
   // Hidden if the whole line is (line key, Sprint 1 compatible) or if this direction is
   const isHidden = (d, set) => set.has(d.lineKey) || set.has(d.dirKey);
+  // Still to come? Real time when live data exists, otherwise the scheduled time (#19)
+  const upcoming = (d, now) => !!d.time && d.time - now > -GONE_MS;
 
   let lineModel = [];
   function buildLines() {
@@ -641,7 +653,7 @@
   }
 
   function whenHtml(d, now) {
-    const time = d.real || d.sched;
+    const time = d.time;
     if (!time) return '<b>–</b>';
     const min = Math.floor((time - now) / 60000);
     if (min <= 0) return `<b class="now">0′</b><small>${hhmm(time)}</small>`;
@@ -657,7 +669,7 @@
     const hidden = effectiveHidden();
     const list = departures
       .filter(d => !isHidden(d, hidden))
-      .filter(d => (d.real || d.sched) && (d.real || d.sched) - now > -60000) // drop vehicles that have already left
+      .filter(d => upcoming(d, now))   // drop vehicles that have already left
       .slice(0, SHOW_MAX);
     const ul = $('departures');
     if (!departures.length) { ul.innerHTML = `<li class="empty">${esc(t('noDepartures'))}</li>`; return; }
@@ -694,9 +706,12 @@
     boardCtrl = new AbortController();
     renderStatus(`<span class="spinner"></span> ${esc(t('loading'))}`);
     try {
-      const r = await getJSON(`${API}/stationboard?id=${enc(current.id)}&limit=${BOARD_LIMIT}`, boardCtrl.signal);
+      const from = apiDateTime(new Date(Date.now() - LOOKBACK_MIN * 60000));
+      const r = await getJSON(`${API}/stationboard?id=${enc(current.id)}&limit=${BOARD_LIMIT}&datetime=${enc(from)}`, boardCtrl.signal);
+      const now = Date.now();
       departures = (r.stationboard || []).map(normalize)
-        .sort((a, b) => (a.real || a.sched) - (b.real || b.sched));
+        .filter(d => upcoming(d, now))   // the look-back window also returns departures that have already left
+        .sort((a, b) => a.time - b.time);
       if (r.station && r.station.name) $('stationName').textContent = r.station.name;
       lastLoad = Date.now();
       renderLines(); renderDepartures(); renderStatus();
