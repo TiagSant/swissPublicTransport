@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0">
+<OJPRequest>
+  <siri:ServiceRequest>
+    <siri:ServiceRequestContext>
+      <siri:Language>fr</siri:Language>
+    </siri:ServiceRequestContext>
+    <siri:RequestTimestamp>2026-11-11T18:49:21.736Z</siri:RequestTimestamp>
+    <siri:RequestorRef>swissPublicTransport_prototype</siri:RequestorRef>
+    <OJPStopEventRequest>
+      <siri:RequestTimestamp>2026-11-11T18:49:21.736Z</siri:RequestTimestamp>
+      <Location>
+        <PlaceRef>
+          <siri:StopPointRef>8587387</siri:StopPointRef>
+          <Name>
+            <Text>n/a</Text>
+          </Name>
+        </PlaceRef>
+        <DepArrTime>2026-11-11T18:49:21.736Z</DepArrTime>
+      </Location>
+      <Params>
+        <IncludeAllRestrictedLines>true</IncludeAllRestrictedLines>
+        <NumberOfResults>10</NumberOfResults>
+        <StopEventType>departure</StopEventType>
+        <IncludePreviousCalls>true</IncludePreviousCalls>
+        <IncludeOnwardCalls>true</IncludeOnwardCalls>
+        <UseRealtimeData>explanatory</UseRealtimeData>
+      </Params>
+    </OJPStopEventRequest>
+  </siri:ServiceRequest>
+</OJPRequest>
+
+</OJP>
