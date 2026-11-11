@@ -10,6 +10,8 @@
 import * as OJP from 'ojp-sdk';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
+const APP = createRequire(import.meta.url)('../assets/ojp.js');   // the app's own request builders
 
 const OUT = process.argv[2] || 'tests/fixtures/ojp';
 const URL_OJP = 'https://api.opentransportdata.swiss/ojp20';
@@ -22,7 +24,7 @@ const xml = req => req.buildRequestXML('fr', sdk.requestorRef, OJP.DefaultXML_Co
 const R = sdk.requests;
 mkdirSync(OUT, { recursive: true });
 
-const KEEP_HEADERS = /^(x-)?rate|^retry-after|^access-control|^content-type|^x-request-id|^date$/i;
+const KEEP_HEADERS = /^(x-)?rate|^retry-after|^access-control|^content-(type|encoding|length)|^x-request-id|^date$/i;
 const report = { probedAt: new Date().toISOString(), endpoint: URL_OJP, sdk: OJP.SDK_VERSION, requests: {}, cors: {} };
 
 const sleep = ms => new Promise(res => setTimeout(res, ms));
@@ -69,7 +71,19 @@ const m = ser.ser_belair.match(/<JourneyRef>([^<]+)<\/JourneyRef>[\s\S]*?<Operat
 if (m) await post('tir_from_belair', xml(R.TripInfoRequest.initWithJourneyRef(m[1], new Date(m[2] + 'T12:00:00'))));
 else console.log('tir_from_belair        skipped (no JourneyRef found)');
 
-// 5. Can a browser page on GitHub Pages call the API directly? (CORS preflight + a real POST with an Origin)
+// 5. Requests exactly as the prototype sends them (assets/ojp.js), to check them against the live service
+const ZONE = { latMin: 45.85, latMax: 46.50, lonMin: 5.80, lonMax: 6.65 };   // Unireso area, as in the app
+const ago = min => new Date(Date.now() - min * 60000);
+await post('app_lir_name_zone_belair', APP.locationsByName('Bel-Air', { zone: ZONE, limit: 20 }));
+await post('app_lir_name_zone_gare', APP.locationsByName('Gare', { zone: ZONE, limit: 20 }));
+await post('app_lir_zone_esserts', APP.locationsInZone({ latMin: 46.1836, latMax: 46.1926, lonMin: 6.1066, lonMax: 6.1196 }, { limit: 20 }));
+await post('app_ser_esserts_full', APP.stopEvents('8587418', { from: ago(30), limit: 150 }));
+await post('app_ser_esserts_light', APP.stopEvents('8587418', { from: ago(30), limit: 150, onward: false }));
+await post('app_ser_belair_light', APP.stopEvents('8587387', { from: ago(30), limit: 150, onward: false }));
+await post('app_tr_depart', APP.trip('8587418', '8587057', { at: new Date() }));
+await post('app_tr_arrive', APP.trip('8587418', '8587057', { at: new Date(Date.now() + 3600000), arrive: true }));
+
+// 6. Can a browser page on GitHub Pages call the API directly? (CORS preflight + a real POST with an Origin)
 const pre = await fetch(URL_OJP, { method: 'OPTIONS', headers: { Origin: ORIGIN, 'Access-Control-Request-Method': 'POST',
   'Access-Control-Request-Headers': 'authorization,content-type' } });
 report.cors.preflight = { status: pre.status, headers: Object.fromEntries([...pre.headers].filter(([k]) => /^access-control/i.test(k))) };
