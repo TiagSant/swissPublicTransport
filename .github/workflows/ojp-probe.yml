@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - scripts/ojp_probe.mjs
+      - assets/ojp.js
       - .github/workflows/ojp-probe.yml
 
 permissions:

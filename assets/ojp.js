@@ -176,8 +176,8 @@
       category: split.category, number: split.number, name,
       operator: (op && OPERATORS[op]) || '',
       to: txt(service, 'DestinationText'),
-      // a run pattern: same line, direction and terminus → same next stops
-      pattern: [txt(service, 'LineRef'), txt(service, 'DirectionRef'), txt(service, 'DestinationStopPointRef')].join('|')
+      // a run pattern: same line, direction and terminus stop (whatever its platform) → same next stops
+      pattern: [txt(service, 'LineRef'), txt(service, 'DirectionRef'), stopId7(txt(service, 'DestinationStopPointRef'))].join('|')
     };
   }
   const callTimes = (call, kind) => {
