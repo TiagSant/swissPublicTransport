@@ -1,6 +1,6 @@
 # swissPublicTransport
 
-An Android public transport app: Geneva first (Unireso / TPG, Léman Express, Mouettes, CGN), then Lausanne, then the whole of Switzerland.
+An Android public transport app for Switzerland. The first release (MVP) covers **Geneva** (Unireso: TPG, Léman Express, Mouettes, CGN) and **Lausanne** (tl, including the metro); the rest of Switzerland follows.
 
 Before moving to an APK, each sprint ships a **standalone prototype**: a web page that runs in a browser with no server or install.
 
