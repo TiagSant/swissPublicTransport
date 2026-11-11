@@ -125,8 +125,14 @@
   footer { color: var(--muted); font-size: .72rem; text-align: center; margin-top: 16px; }
   footer a { color: inherit; }
   /* Platform links and map sheet (US-13) */
-  .quay-link { border: none; background: none; padding: 0; font: inherit; color: var(--accent); font-weight: 600;
-    text-decoration: underline; text-underline-offset: 2px; }
+  /* Platform chip: looks like the platform sign on site; tapping it opens the map */
+  .plat { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 3px 0 5px; margin-right: 2px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--muted);
+    font: 600 .72rem/1 system-ui, sans-serif; vertical-align: middle; }
+  .plat svg { width: 11px; height: 11px; flex: none; fill: currentColor; }
+  .plat-v { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 4px;
+    background: var(--text); color: var(--card); font-weight: 800; font-size: .75rem; }
+  .plat:active { transform: scale(.96); }
   .head-actions { display: flex; gap: 6px; }
   .sheet { position: fixed; inset: 0; z-index: 1000; background: var(--card); display: flex; flex-direction: column; }
   .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px;
@@ -262,7 +268,7 @@
       platform: 'Platform {p}', track: 'Track {p}', nextStopsUnavailable: 'Next stops not available',
       justNow: 'just now', updatedAgo: 'updated {n} ago', loading: 'loading…',
       loadFailed: 'Could not load departures.', retry: 'Retry',
-      stopMap: 'Map of the stop', allPlatforms: 'All platforms', close: 'Close', walkThere: '🚶 Walk there',
+      stopMap: 'Map of the stop', allPlatforms: 'All platforms', showOnMap: '{p} — show on map', close: 'Close', walkThere: '🚶 Walk there',
       distance: '{d} away · about {min} min on foot (straight line)', locatingYou: 'Locating you…',
       noLocation: 'Allow location to see how far it is.', platformUnknown: 'Exact position not available for {p} — showing the stop.',
       noPlatforms: 'Platform positions not available for this stop — showing the stop.', mapFailed: 'The map could not be loaded (network?).',
@@ -286,7 +292,7 @@
       platform: 'Quai {p}', track: 'Voie {p}', nextStopsUnavailable: 'Prochains arrêts non disponibles',
       justNow: 'à l’instant', updatedAgo: 'mis à jour il y a {n}', loading: 'chargement…',
       loadFailed: 'Impossible de charger les départs.', retry: 'Réessayer',
-      stopMap: 'Plan de l\u2019arrêt', allPlatforms: 'Tous les quais', close: 'Fermer', walkThere: '🚶 Y aller à pied',
+      stopMap: 'Plan de l\u2019arrêt', allPlatforms: 'Tous les quais', showOnMap: '{p} — voir sur le plan', close: 'Fermer', walkThere: '🚶 Y aller à pied',
       distance: 'à {d} · environ {min} min à pied (à vol d\u2019oiseau)', locatingYou: 'Localisation…',
       noLocation: 'Autorisez la localisation pour voir la distance.', platformUnknown: 'Position exacte inconnue pour : {p} — affichage de l\u2019arrêt.',
       noPlatforms: 'Position des quais non disponible pour cet arrêt — affichage de l\u2019arrêt.', mapFailed: 'Impossible de charger le plan (réseau ?).',
@@ -728,8 +734,7 @@
       return;
     }
     ul.innerHTML = list.map(d => {
-      const plat = d.platform ? `<button class="quay-link" data-quay="${esc(d.platform)}" data-mode="${d.mode}">📍 ` +
-        `${t(d.mode === 'train' ? 'track' : 'platform', { p: esc(d.platform) })}</button>` : '';
+      const plat = d.platform ? platformChip(d.platform, d.mode) : '';
       const late = d.delay > 0 ? `<span class="late">+${d.delay} min</span>` : '';
       const meta = [plat, late].filter(Boolean).join(' · ');
       const id = depId(d), open = id === expanded;
@@ -848,6 +853,14 @@
     return 2 * R * Math.asin(Math.sqrt(h));
   }
   const fmtDistance = m => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+  // "Platform F" chip in a departure row: pin, kind (platform / track) and the official designation
+  const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
+  function platformChip(p, mode) {
+    const kind = mode === 'train' ? 'track' : 'platform';
+    const word = t(kind, { p: '' }).trim();
+    return `<button class="plat" data-quay="${esc(p)}" data-mode="${mode}" aria-label="${esc(t('showOnMap', { p: t(kind, { p }) }))}">` +
+      `${PIN}<span class="plat-k">${esc(word)}</span><span class="plat-v">${esc(p)}</span></button>`;
+  }
   const walkUrl = pos => `https://www.google.com/maps/dir/?api=1&destination=${pos[0]},${pos[1]}&travelmode=walking`;
 
   async function openMap(platform, mode) {
@@ -990,7 +1003,7 @@
   });
   $('departures').addEventListener('click', e => {
     if (e.target.id === 'peekEmpty') { peekAll = true; renderLines(); renderDepartures(); return; }
-    const q = e.target.closest('.quay-link');
+    const q = e.target.closest('.plat');
     if (q) { openMap(q.dataset.quay, q.dataset.mode); return; }   // the platform link does not expand the row
     const li = e.target.closest('.dep'); if (!li) return;
     const opening = expanded !== li.dataset.dep;
