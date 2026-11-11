@@ -11,7 +11,8 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGES = {"sprint3": (ROOT / "prototypes/sprint-03-habitudes/index.html").as_uri(),
-         "sprint4": (ROOT / "prototypes/sprint-04-identity/index.html").as_uri()}
+         "sprint4": (ROOT / "prototypes/sprint-04-identity/index.html").as_uri(),
+         "sprint5": (ROOT / "prototypes/sprint-05-platforms/index.html").as_uri()}
 tz = ZoneInfo("Europe/Zurich"); now = dt.datetime.now(tz).replace(second=0, microsecond=0)
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 HERE = {"id": "8587057", "name": "Genève, Bel-Air"}
@@ -55,7 +56,7 @@ with sync_playwright() as p:
         pg.goto(page); pg.fill("#q", "Bel-Air"); pg.wait_for_selector("#results button[data-id]")
         pg.locator("#results button[data-id]").first.click(); pg.wait_for_selector(".dep")
         shown[name] = [li.get_attribute("data-dir").split("|")[1].split(">")[0] for li in pg.locator(".dep").all()]
-        if name == "sprint4":
+        if name != "sprint3":
             row = pg.locator(".dep[data-dir^='bus|3>']")
             assert "+8 min" in row.inner_text(), row.inner_text()
             assert row.locator(".when b").inner_text() in ("2′", "3′"), row.locator(".when b").inner_text()
@@ -64,10 +65,11 @@ with sync_playwright() as p:
     b.close()
 
 print("sprint3 (bug):  ", shown["sprint3"])
-print("sprint4 (fixed):", shown["sprint4"])
+print("sprint4 (fixed):", shown["sprint4"]); print("sprint5 (fixed):", shown["sprint5"])
 assert "3" not in shown["sprint3"], "mock should reproduce the bug on Sprint 3"
 assert shown["sprint4"] == ["7", "10", "3", "22"] or sorted(shown["sprint4"]) == ["10", "22", "3", "7"], shown["sprint4"]
 assert "5" not in shown["sprint4"] and "19" not in shown["sprint4"]
+assert shown["sprint5"] == shown["sprint4"]
 board = [u for u in requests if "/stationboard" in u]
 q4 = parse_qs(urlparse(board[-1]).query)
 lookback = (now - dt.datetime.strptime(q4["datetime"][0], "%Y-%m-%d %H:%M").replace(tzinfo=tz)).total_seconds() / 60
