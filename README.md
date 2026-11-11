@@ -34,12 +34,14 @@ Live on GitHub Pages: https://tiagsant.github.io/swissPublicTransport/
 
 Real-data findings (category codes, operators, fields) are in [`docs/real-data-validation.md`](docs/real-data-validation.md).
 
+**Availability.** transport.opendata.ch is a free community service: it has outages and per-user daily limits (reported as about 1,000 journey and 10,080 departure-board queries). The Sprint 6 prototype times out after 10 s and shows a banner explaining the problem until a call succeeds again. A production app needs its own backend with caching, or a direct opentransportdata.swiss access.
+
 ## Visual identity
 
 - **Pictograms**: Swiss public transport pictograms and SBB timetable icons, copied unmodified into [`assets/sbb/`](assets/sbb/). They may only be used by a Swiss public transport project, unmodified and non-commercially — see [`assets/sbb/NOTICE.md`](assets/sbb/NOTICE.md). **A commercial release requires prior approval from SBB Brand Management.**
 - **Platform positions**: [`assets/quays.js`](assets/quays.js), built from the official **ATLAS traffic points** (opentransportdata.swiss, open use with attribution) by [`scripts/build_quays.py`](scripts/build_quays.py). A GitHub Actions workflow ([`update-quays.yml`](.github/workflows/update-quays.yml)) rebuilds it every Monday and commits any change.
 - **Maps**: [Leaflet](https://leafletjs.com) with © OpenStreetMap tiles. Fine for prototypes; a public release needs its own tile provider (OSM's tile usage policy).
-- **Journeys**: `/v1/connections` between stops. A map point or the rider's position is linked to its 3 nearest stops (2 at the destination, within 1.2 km); every combination is searched and the walk is added at the rider's speed (straight line × 1.3 for the street detour).
+- **Journeys**: `/v1/connections` between stops. A map point or the rider's position is linked to its 2 nearest stops (within 1.2 km); every combination is searched and the walk is added at the rider's speed (straight line × 1.3 for the street detour).
 - **Alarms (web prototype)**: they ring only while the page is open (service-worker notification, sound, vibration, banner). Background alarms need the Android app (alarm manager).
 - **Line colours**: [`assets/line-colors.js`](assets/line-colors.js), surveyed from tpg.ch, lemanexpress.com and mouettesgenevoises.ch. Unknown lines fall back to a neutral badge.
 
@@ -60,6 +62,7 @@ python tests/test_delayed_departures.py  # BUG-01 regression (reproduces the bug
 python tests/test_sprint05.py            # LEAFLET_DIR / TILE_PNG serve Leaflet and tiles locally (optional)
 python tests/test_build_quays.py         # platform data builder, synthetic CSV
 python tests/test_sprint06.py            # journeys and alarms, with a frozen browser clock
+python tests/test_api_outage.py          # API down / 503 / 429 / no answer → banner, 10 s timeout
 python tests/test_favorites.py           # remove one stop / clear all, with undo
 ```
 

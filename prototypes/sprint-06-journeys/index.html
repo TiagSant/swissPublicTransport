@@ -217,6 +217,9 @@
   .ab-actions button { flex: 1; }
   .pick-pin { display: block; width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
     background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+  .api-status { background: #fff4e5; color: #8a4b00; border: 1px solid #f5c27a; border-radius: 12px; padding: 10px 12px;
+    font-size: .85rem; margin-bottom: 12px; }
+  @media (prefers-color-scheme: dark) { .api-status { background: #3a2a10; color: #ffd8a8; border-color: #8a5a1a; } }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -230,6 +233,8 @@
       <button id="settingsBtn" class="lang" type="button" data-i18n-title="settingsTitle" data-i18n-aria="settingsTitle">⚙</button>
     </div>
   </header>
+
+  <div id="apiStatus" class="api-status" role="status" hidden></div>
 
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="departures" data-i18n="tabDepartures"></button>
@@ -464,6 +469,10 @@
       resetLearning: 'Reset', notifications: 'Notifications', enableNotif: 'Enable', notifOn: 'enabled', notifOff: 'blocked or unavailable',
       simTitle: 'Simulation (web prototype)', simWalk: 'Simulate a 600 m walk at',
       webNote: 'Web prototype: alarms only ring while this page is open. The Android app will ring in the background.',
+      api_timeout: 'transport.opendata.ch is not responding — the data service may be down. Departures reload automatically; try a search again in a moment.',
+      api_network: 'transport.opendata.ch cannot be reached (service down, no network, or too many requests). Departures reload automatically.',
+      api_server: 'transport.opendata.ch reports an internal error (service partly down). Departures reload automatically.',
+      api_rate: 'Too many requests to transport.opendata.ch (the free service limits each user). Wait a moment and try again.',
       mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Boat', funicular: 'Funicular', cableway: 'Cable car', other: 'Other' }
     },
     fr: {
@@ -512,6 +521,10 @@
       resetLearning: 'Réinitialiser', notifications: 'Notifications', enableNotif: 'Activer', notifOn: 'activées', notifOff: 'bloquées ou indisponibles',
       simTitle: 'Simulation (prototype web)', simWalk: 'Simuler une marche de 600 m à',
       webNote: 'Prototype web : les alarmes ne sonnent que si cette page est ouverte. L\u2019app Android sonnera en arrière-plan.',
+      api_timeout: 'transport.opendata.ch ne répond pas — le service de données est peut-être en panne. Les départs se rechargent automatiquement ; relancez une recherche dans un moment.',
+      api_network: 'transport.opendata.ch est injoignable (service en panne, pas de réseau ou trop de requêtes). Les départs se rechargent automatiquement.',
+      api_server: 'transport.opendata.ch signale une erreur interne (service en partie en panne). Les départs se rechargent automatiquement.',
+      api_rate: 'Trop de requêtes vers transport.opendata.ch (le service gratuit limite chaque utilisateur). Patientez un moment puis réessayez.',
       mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Bateau', funicular: 'Funiculaire', cableway: 'Téléphérique', other: 'Autre' }
     }
   };
@@ -542,10 +555,47 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const enc = encodeURIComponent;
 
+  // ---------- API calls: timeout, error kinds, service status ----------
+  // transport.opendata.ch is a free community service: it can be down, slow or rate-limited.
+  // Every call times out, says why it failed, and a banner tells the rider until a call succeeds again.
+  const API_TIMEOUT_MS = 10000;
+  class ApiError extends Error {
+    constructor(kind, status, message) { super(message || kind); this.name = 'ApiError'; this.kind = kind; this.status = status; }
+  }
   async function getJSON(url, signal) {
-    const r = await fetch(url, { signal });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
+    const forward = () => ctrl.abort();
+    if (signal) { if (signal.aborted) ctrl.abort(); else signal.addEventListener('abort', forward, { once: true }); }
+    try {
+      let r;
+      try { r = await fetch(url, { signal: ctrl.signal }); }
+      catch (e) {
+        if (signal && signal.aborted) throw e;                       // cancelled by the app (newer search): not an outage
+        throw new ApiError(ctrl.signal.aborted ? 'timeout' : 'network');
+      }
+      if (!r.ok) {
+        let message = '';
+        try { const body = await r.json(); message = (body.errors && body.errors[0] && body.errors[0].message) || ''; } catch { /* no body */ }
+        throw new ApiError(r.status === 429 ? 'rate' : r.status >= 500 ? 'server' : 'client', r.status, message);
+      }
+      const data = await r.json();
+      setApiStatus(null);
+      return data;
+    } catch (e) {
+      if (e.name === 'ApiError' && e.kind !== 'client') setApiStatus(e.kind);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', forward);
+    }
+  }
+  let apiProblem = null;
+  function setApiStatus(kind) { if (apiProblem !== kind) { apiProblem = kind; renderApiStatus(); } }
+  function renderApiStatus() {
+    const el = $('apiStatus');
+    el.hidden = !apiProblem;
+    if (apiProblem) el.textContent = '⚠ ' + t('api_' + apiProblem);
   }
 
   // "2026-11-09T23:41:00+0100" → Date (the +0100 offset without a colon is not parsed everywhere, e.g. Safari)
@@ -1336,7 +1386,8 @@
     $('journeyDetail').hidden = true;
     try {
       const when = readWhen();
-      const [fromC, toC] = await Promise.all([candidates(from, 3, signal), candidates(to, 2, signal)]);
+      // 2 × 2 stops at most: each pair is one /connections call, and the free API allows about 1000 per day
+      const [fromC, toC] = await Promise.all([candidates(from, 2, signal), candidates(to, 2, signal)]);
       if (!fromC.length || !toC.length) {
         status.textContent = t('noStopNear', { name: placeLabel(!fromC.length ? from : to) }); $('journeyResults').hidden = true; return;
       }
@@ -1708,6 +1759,7 @@
     renderAlarms(); renderJourneys(); if (shownJourney && !$('journeyDetail').hidden) renderJourneyDetail(shownJourney);
     renderRecent();
     if (!$('settingsSheet').hidden) renderSettings();
+    renderApiStatus();
   }
 
   // ---------- Events ----------
