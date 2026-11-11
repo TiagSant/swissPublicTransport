@@ -8,6 +8,7 @@ The backlog lives in **GitHub Issues**:
 Conventions:
 - Issue title prefix: `US-xx` for a user story, `TECH-xx` for a technical task.
 - User story format: *As a… I want… so that…*, followed by acceptance criteria as checkboxes.
-- Labels: `user-story`, `tech`, `to validate` (delivered, awaiting PO validation).
+- Labels: `user-story`, `tech`, `bug`, `mvp` (in scope for the first Android release).
+- MVP scope: Geneva (Unireso) and Lausanne (tl). Prototype pull requests are merged once their tests pass; the PO reviews APK releases.
 - One milestone per sprint; one pull request per sprint, referencing its issues (`Closes #n`).
 - Everything on GitHub is written in English.
