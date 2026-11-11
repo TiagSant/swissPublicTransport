@@ -60,6 +60,7 @@ python tests/test_delayed_departures.py  # BUG-01 regression (reproduces the bug
 python tests/test_sprint05.py            # LEAFLET_DIR / TILE_PNG serve Leaflet and tiles locally (optional)
 python tests/test_build_quays.py         # platform data builder, synthetic CSV
 python tests/test_sprint06.py            # journeys and alarms, with a frozen browser clock
+python tests/test_favorites.py           # remove one stop / clear all, with undo
 ```
 
 ## Workflow
