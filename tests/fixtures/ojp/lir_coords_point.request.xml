@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0">
+<OJPRequest>
+  <siri:ServiceRequest>
+    <siri:ServiceRequestContext>
+      <siri:Language>fr</siri:Language>
+    </siri:ServiceRequestContext>
+    <siri:RequestTimestamp>2026-11-11T18:48:36.212Z</siri:RequestTimestamp>
+    <siri:RequestorRef>swissPublicTransport_prototype</siri:RequestorRef>
+    <OJPLocationInformationRequest>
+      <siri:RequestTimestamp>2026-11-11T18:48:36.212Z</siri:RequestTimestamp>
+      <PlaceRef>
+        <GeoPosition>
+          <siri:Longitude>6.115</siri:Longitude>
+          <siri:Latitude>46.189</siri:Latitude>
+          <Properties/>
+        </GeoPosition>
+        <Name>
+          <Text>46.189000,6.115000</Text>
+        </Name>
+      </PlaceRef>
+      <Restrictions>
+        <Type>stop</Type>
+        <NumberOfResults>10</NumberOfResults>
+        <IncludePtModes>true</IncludePtModes>
+      </Restrictions>
+    </OJPLocationInformationRequest>
+  </siri:ServiceRequest>
+</OJPRequest>
+
+</OJP>
