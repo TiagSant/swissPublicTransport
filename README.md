@@ -63,6 +63,7 @@ python tests/test_sprint05.py            # LEAFLET_DIR / TILE_PNG serve Leaflet 
 python tests/test_build_quays.py         # platform data builder, synthetic CSV
 python tests/test_sprint06.py            # journeys and alarms, with a frozen browser clock
 python tests/test_api_outage.py          # API down / 503 / 429 / no answer → banner, 10 s timeout
+python tests/test_favorites.py           # remove one stop / clear all, with undo
 ```
 
 ## Workflow

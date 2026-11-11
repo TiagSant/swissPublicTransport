@@ -63,8 +63,17 @@
   .results .dist { margin-left: auto; color: var(--muted); font-size: .8rem; }
   .section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .stop-chip { border-radius: 999px; padding: 7px 12px; font-size: .9rem; background: var(--bg); }
+  /* "Your stops" chip: open the stop, or ✕ to remove it from the list */
+  .stop-chip { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); overflow: hidden; }
+  .stop-chip button { border: none; background: none; border-radius: 0; font-size: .9rem; }
+  .stop-chip .stop-open { padding: 7px 4px 7px 12px; }
+  .stop-chip .stop-del { padding: 0 11px 0 7px; color: var(--muted); font-size: .8rem; }
+  .stop-chip .stop-del:hover { color: var(--accent); }
   .stop-chip .n { color: var(--muted); font-size: .75rem; margin-left: 4px; }
+  .toast { position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 1500; max-width: 616px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 10px 10px 14px;
+    background: var(--text); color: var(--card); border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.3); font-size: .9rem; }
+  .toast button { border: none; background: none; color: inherit; font-weight: 800; padding: 6px 8px; text-transform: uppercase; font-size: .8rem; }
   .board-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .board-head h2 { margin: 0; font-size: 1.2rem; }
   .status { color: var(--muted); font-size: .78rem; margin-top: 2px; }
@@ -257,7 +266,7 @@
 
   <!-- Most visited stops -->
   <section id="recentCard" class="card" hidden>
-    <p class="section-title"><span data-i18n="yourStops"></span> <button id="clearRecent" class="ghost" data-i18n="clear"></button></p>
+    <p class="section-title"><span data-i18n="yourStops"></span> <button id="clearRecent" class="ghost" data-i18n="clearAll"></button></p>
     <div id="recent" class="chips"></div>
   </section>
 
@@ -339,6 +348,8 @@
     </section>
   </div>
 
+  <div id="toast" class="toast" role="status" hidden><span id="toastText"></span><button id="toastUndo" data-i18n="undo"></button></div>
+
   <footer>
     <span data-i18n="dataSource"></span>
     <a href="https://transport.opendata.ch" target="_blank" rel="noopener">transport.opendata.ch</a>
@@ -415,7 +426,8 @@
     en: {
       title: 'Departures', prototype: 'Prototype · Sprint 6', switchTo: 'FR', switchToLabel: 'Afficher en français',
       searchSection: 'Stop search', searchPlaceholder: 'Stop: Bel-Air, Cornavin, Pâquis…', nearMe: 'Stops near me',
-      allSwitzerland: 'Include all of Switzerland', yourStops: 'Your stops', clear: 'Clear', refresh: 'Refresh',
+      allSwitzerland: 'Include all of Switzerland', yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
+      removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
       lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
       dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators',
       noStopInZone: 'No stop found in the Unireso area. Tick "Include all of Switzerland" to widen the search.',
@@ -466,7 +478,8 @@
     fr: {
       title: 'Départs', prototype: 'Prototype · Sprint 6', switchTo: 'EN', switchToLabel: 'Show in English',
       searchSection: 'Recherche d’arrêt', searchPlaceholder: 'Arrêt : Bel-Air, Cornavin, Pâquis…', nearMe: 'Arrêts autour de moi',
-      allSwitzerland: 'Inclure toute la Suisse', yourStops: 'Vos arrêts', clear: 'Effacer', refresh: 'Rafraîchir',
+      allSwitzerland: 'Inclure toute la Suisse', yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
+      removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
       lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
       dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants',
       noStopInZone: 'Aucun arrêt trouvé dans la zone Unireso. Cochez « Inclure toute la Suisse » pour élargir.',
@@ -707,8 +720,35 @@
       .slice(0, 8);
     $('recentCard').hidden = list.length === 0;
     $('recent').innerHTML = list.map(s =>
-      `<button class="stop-chip" data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${esc(s.mode)}">` +
-      `${esc(s.name)}<span class="n">${s.count}×</span></button>`).join('');
+      `<span class="stop-chip"><button class="stop-open" data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${esc(s.mode)}">` +
+      `${esc(s.name)}<span class="n">${s.count}×</span></button>` +
+      `<button class="stop-del" data-del="${esc(s.id)}" aria-label="${esc(t('removeStop', { name: s.name }))}" title="${esc(t('removeStop', { name: s.name }))}">✕</button></span>`).join('');
+  }
+
+  // Remove one stop, or all of them, with a few seconds to undo. Line and direction settings of a stop are kept,
+  // so they come back if the stop is visited again.
+  let toastTimer = null, undoStops = null;
+  function changeStops(next, message) {
+    undoStops = { stops: getStops(), lastStop: store.get('lastStop', null) };
+    store.set('stops', next);
+    if (!next[store.get('lastStop', null)]) store.set('lastStop', null);   // don't reopen a removed stop at start-up
+    renderRecent();
+    $('toastText').textContent = message;
+    $('toast').hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $('toast').hidden = true; undoStops = null; }, 6000);
+  }
+  function removeStop(id) {
+    const stops = getStops(), s = stops[id];
+    if (!s) return;
+    delete stops[id];
+    changeStops(stops, t('stopRemoved', { name: s.name }));
+  }
+  function undoStopChange() {
+    if (!undoStops) return;
+    store.set('stops', undoStops.stops); store.set('lastStop', undoStops.lastStop);
+    undoStops = null; clearTimeout(toastTimer); $('toast').hidden = true;
+    renderRecent();
   }
 
   // ---------- Search ----------
@@ -1717,6 +1757,7 @@
     if (current && lastLoad) { renderLines(); renderDepartures(); renderStatus(); }
     for (const w of ['from', 'to']) if (places[w]) $(w + 'Q').value = placeLabel(places[w]);
     renderAlarms(); renderJourneys(); if (shownJourney && !$('journeyDetail').hidden) renderJourneyDetail(shownJourney);
+    renderRecent();
     if (!$('settingsSheet').hidden) renderSettings();
     renderApiStatus();
   }
@@ -1742,7 +1783,9 @@
   };
   $('results').addEventListener('click', pick);
   $('recent').addEventListener('click', pick);
-  $('clearRecent').addEventListener('click', () => { store.set('stops', {}); renderRecent(); });
+  $('clearRecent').addEventListener('click', () => changeStops({}, t('stopsCleared')));
+  $('recent').addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) removeStop(d.dataset.del); });
+  $('toastUndo').addEventListener('click', undoStopChange);
 
   $('lines').addEventListener('click', e => {
     const b = e.target.closest('.line-chip');
