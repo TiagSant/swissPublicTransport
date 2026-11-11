@@ -40,7 +40,8 @@ with sync_playwright() as p:
         print(f"{mode:8} → {banner.inner_text()[:70]}…")
         state["mode"] = "ok"; search("Bel-Air")                      # service back: banner disappears
         pg.wait_for_function("document.getElementById('apiStatus').hidden")
-        assert "Genève, Bel-Air" in pg.locator("#results").inner_text()
+        # the banner hides as soon as the answer arrives, the list is drawn right after
+        pg.wait_for_function("document.getElementById('results').innerText.includes('Genève, Bel-Air')")
 
     # No answer at all: the call gives up after 10 s instead of waiting forever
     state["mode"] = "hang"; search("Bel-Air")
