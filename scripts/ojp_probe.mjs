@@ -25,11 +25,21 @@ mkdirSync(OUT, { recursive: true });
 const KEEP_HEADERS = /^(x-)?rate|^retry-after|^access-control|^content-type|^x-request-id|^date$/i;
 const report = { probedAt: new Date().toISOString(), endpoint: URL_OJP, sdk: OJP.SDK_VERSION, requests: {}, cors: {} };
 
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+const SPACING_MS = 1500;   // free tier: 50 requests per minute → stay well below
+
 async function post(name, body, extraHeaders = {}) {
-  const t0 = Date.now();
-  const r = await fetch(URL_OJP, { method: 'POST', body,
-    headers: { 'Content-Type': 'application/xml', Authorization: `Bearer ${TOKEN}`, ...extraHeaders } });
-  const text = await r.text();
+  await sleep(SPACING_MS);
+  let r, text, t0, lastError;
+  for (let attempt = 1; attempt <= 3 && !r; attempt++) {   // the server sometimes closes the socket: retry
+    t0 = Date.now();
+    try {
+      r = await fetch(URL_OJP, { method: 'POST', body,
+        headers: { 'Content-Type': 'application/xml', Authorization: `Bearer ${TOKEN}`, ...extraHeaders } });
+      text = await r.text();
+    } catch (e) { r = null; lastError = e; console.log(`${name.padEnd(22)} attempt ${attempt} failed: ${e.cause?.message || e.message}`); await sleep(3000 * attempt); }
+  }
+  if (!r) { report.requests[name] = { error: String(lastError?.cause?.message || lastError) }; return ''; }
   const headers = Object.fromEntries([...r.headers].filter(([k]) => KEEP_HEADERS.test(k)));
   report.requests[name] = { status: r.status, ms: Date.now() - t0, bytes: text.length, headers };
   writeFileSync(join(OUT, `${name}.request.xml`), body);
