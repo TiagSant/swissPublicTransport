@@ -60,8 +60,9 @@ with sync_playwright() as p:
 
     ctx, pg = page("en-US")
     # 1. The official letter stays visible, as a link
-    link = pg.locator(".dep[data-dir^='tram|12>'] .quay-link")
-    assert link.inner_text() == "📍 Platform F", link.inner_text()
+    link = pg.locator(".dep[data-dir^='tram|12>'] .plat")
+    assert link.inner_text().split() == ["Platform", "F"], link.inner_text()
+    assert link.get_attribute("aria-label") == "Platform F — show on map"
     link.click()
     pg.wait_for_selector(".qm.target")
     assert pg.locator(".dep[aria-expanded='true']").count() == 0          # the row did not expand
@@ -95,7 +96,7 @@ with sync_playwright() as p:
 
     # 4. Close, then a platform missing from ATLAS falls back to the stop
     pg.click("#mapClose"); assert pg.locator("#mapSheet").is_hidden()
-    pg.locator(".dep[data-dir^='bus|3>'] .quay-link").click()
+    pg.locator(".dep[data-dir^='bus|3>'] .plat").click()
     pg.wait_for_function("document.getElementById('mapInfo').textContent.includes('Exact position not available')")
     assert pg.locator(".qm.target").count() == 0
     c = STATION["coordinate"]
@@ -111,7 +112,9 @@ with sync_playwright() as p:
 
     # 6. French
     ctx, pg = page("fr-CH")
-    pg.locator(".dep[data-dir^='tram|12>'] .quay-link").click(); pg.wait_for_selector(".qm.target")
+    chip = pg.locator(".dep[data-dir^='tram|12>'] .plat")
+    assert chip.inner_text().split() == ["Quai", "F"] and chip.get_attribute("aria-label") == "Quai F — voir sur le plan"
+    chip.click(); pg.wait_for_selector(".qm.target")
     pg.wait_for_function("document.getElementById('mapInfo').textContent.includes('min à pied')")
     assert pg.locator("#mapTitle").inner_text() == "Quai F" and "Y aller à pied" in pg.locator("#walkThere").inner_text()
     print("6 FR:", pg.locator("#mapInfo").inner_text())
