@@ -1,0 +1,172 @@
+{
+  "probedAt": "2026-11-11T18:49:14.348Z",
+  "endpoint": "https://api.opentransportdata.swiss/ojp20",
+  "sdk": "0.23.5",
+  "requests": {
+    "lir_name_belair": {
+      "status": 200,
+      "ms": 856,
+      "bytes": 7605,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:16 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "46",
+        "x-ratelimit-reset": "1794422956"
+      }
+    },
+    "lir_name_esserts": {
+      "status": 200,
+      "ms": 173,
+      "bytes": 7509,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:18 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "45",
+        "x-ratelimit-reset": "1794422958"
+      }
+    },
+    "lir_coords_point": {
+      "status": 200,
+      "ms": 166,
+      "bytes": 1224,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:19 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "44",
+        "x-ratelimit-reset": "1794422959"
+      }
+    },
+    "lir_bbox_point": {
+      "status": 200,
+      "ms": 168,
+      "bytes": 3213,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:21 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "43",
+        "x-ratelimit-reset": "1794422961"
+      }
+    },
+    "ser_belair": {
+      "status": 200,
+      "ms": 369,
+      "bytes": 335216,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:23 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "42",
+        "x-ratelimit-reset": "1794422963"
+      }
+    },
+    "ser_geneve_gare": {
+      "status": 200,
+      "ms": 207,
+      "bytes": 232637,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:25 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "41",
+        "x-ratelimit-reset": "1794422965"
+      }
+    },
+    "ser_paquis_lac": {
+      "status": 200,
+      "ms": 182,
+      "bytes": 31004,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:26 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "40",
+        "x-ratelimit-reset": "1794422966"
+      }
+    },
+    "ser_esserts": {
+      "status": 200,
+      "ms": 215,
+      "bytes": 334894,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:28 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "39",
+        "x-ratelimit-reset": "1794422968"
+      }
+    },
+    "tr_stops": {
+      "status": 200,
+      "ms": 372,
+      "bytes": 61581,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:30 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "38",
+        "x-ratelimit-reset": "1794422970"
+      }
+    },
+    "tr_coords": {
+      "status": 200,
+      "ms": 547,
+      "bytes": 355404,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:32 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "37",
+        "x-ratelimit-reset": "1794422972"
+      }
+    },
+    "tir_from_belair": {
+      "status": 200,
+      "ms": 201,
+      "bytes": 49693,
+      "headers": {
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:34 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "36",
+        "x-ratelimit-reset": "1794422974"
+      }
+    },
+    "cors_post_with_origin": {
+      "status": 200,
+      "ms": 171,
+      "bytes": 2229,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "content-type": "application/xml",
+        "date": "Wed, 11 Nov 2026 18:49:36 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "35",
+        "x-ratelimit-reset": "1794422976"
+      }
+    }
+  },
+  "cors": {
+    "preflight": {
+      "status": 204,
+      "headers": {
+        "access-control-allow-headers": "authorization,content-type",
+        "access-control-allow-methods": "POST",
+        "access-control-allow-origin": "*",
+        "access-control-max-age": "24"
+      }
+    },
+    "post": {
+      "access-control-allow-origin": "*",
+      "content-type": "application/xml",
+      "date": "Wed, 11 Nov 2026 18:49:36 GMT",
+      "x-ratelimit-limit": "50",
+      "x-ratelimit-remaining": "35",
+      "x-ratelimit-reset": "1794422976"
+    },
+    "browserCanCall": true
+  }
+}
