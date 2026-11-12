@@ -7,6 +7,7 @@
   - US-27: removing the stop on screen shows the next most-used stop.
   - US-33: departure alarms adapt to when they are set (on board: cancelled; less time: ring at once with the time left).
   - US-35: get-off reminders follow the live time of each ride, and my position (GPS) while the page is open.
+  - US-36: finish on foot — the last ride compared with walking; learned per place; the bus always stays as an alternative.
   Sprint 8: journey details
   - US-28: the details of a journey open inside the result, one at a time.
   - US-29: each ride is drawn in the colour of its line.
@@ -218,6 +219,13 @@
   .walk-map { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; padding: 4px 9px; }
   .walk-map svg { width: 14px; height: 14px; fill: currentColor; }
   .ride-meta { color: var(--muted); font-size: .82rem; }
+  .foot-alt { list-style: none; margin: 2px 0 6px 6px; }
+  .foot-toggle { width: 100%; text-align: left; border: 1px dashed var(--line); background: var(--bg); color: var(--text); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: .86rem; cursor: pointer; display: grid; gap: 2px; }
+  .foot-toggle small { color: var(--muted); font-size: .76rem; }
+  .foot-toggle.better { border: 1px solid #1a7f37; background: rgba(26,127,55,.08); }
+  .foot-toggle .d.better { color: #1a7f37; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .foot-toggle.better { border-color: #6fdc8c; background: rgba(111,220,140,.08); } .foot-toggle .d.better { color: #6fdc8c; } }
+  .tag.foot { background: rgba(26,127,55,.12); color: inherit; }
   .via-toggle { border: none; background: none; padding: 2px 0; color: var(--muted); font: inherit; font-size: .82rem; cursor: pointer; justify-self: start; }
   .via-toggle::after { content: ' ▾'; } .via-toggle[aria-expanded="true"]::after { content: ' ▴'; }
   .via { margin: 0 0 2px; padding: 0; list-style: none; display: grid; gap: 3px; font-size: .84rem; }
@@ -489,6 +497,7 @@
     <div class="set-info"><span id="speedInfo" class="status"></span> <button id="resetLearning" class="ghost" data-i18n="resetLearning"></button></div>
     <label class="set-row"><span data-i18n="margin"></span><span><input id="setMargin" type="number" min="0" max="15" step="1" inputmode="numeric"> min</span></label>
     <label class="set-row"><span data-i18n="alightSetting"></span><input id="setAlight" type="checkbox"></label>
+    <label class="set-row"><span data-i18n="footSetting"></span><span><input id="setFootMax" type="number" min="0" max="30" step="1" inputmode="numeric"> min</span></label>
     <div class="set-row"><span data-i18n="notifications"></span><span><button id="enableNotif" class="ghost" data-i18n="enableNotif"></button> <span id="notifState" class="status"></span></span></div>
     <h4 data-i18n="simTitle"></h4>
     <div class="set-row"><span data-i18n="simWalk"></span><span><input id="simSpeed" type="number" min="1" max="10" step="0.1" value="5.5"> km/h <button id="simWalk" class="ghost">▶</button></span></div>
@@ -576,6 +585,10 @@
       readyBody: 'Leave at {leave} (in {left} min) to catch {line} at {dep} from {stop}.',
       readyShortBody: 'Less time than planned: {left} min left to get ready. Leave at {leave} to catch {line} at {dep} from {stop}.',
       onBoard: 'Already on board: departure alarms cancelled, only the get-off reminders remain.',
+      footSetting: 'Suggest finishing on foot up to', footOffer: '🚶 Finish on foot from {from}', footAll: '🚶 Walk all the way',
+      footDetail: '{min} min · {dist} · arrive {arr}', footDelta: '{d}', footSame: 'same time', footBetter: 'faster than waiting for the {line}',
+      busAlt: '🚌 Take the {line} instead', busAltDetail: 'arrive {arr} · {d}', footLearned: 'You often finish on foot here.',
+      tagFootPossible: '🚶 Finish on foot?', tagFootBetter: '🚶 Faster on foot', tagOnFoot: '🚶 On foot at the end',
       liveShort: 'live', gpsOn: '📍 Following your position: the reminder rings when you leave the stop before.',
       gpsWaiting: '📍 Waiting for a precise position… until then the live time decides.',
       gpsDenied: 'Position not allowed: reminders follow the live time only.',
@@ -656,6 +669,10 @@
       readyBody: 'Partez à {leave} (dans {left} min) pour prendre le {line} de {dep} à {stop}.',
       readyShortBody: 'Moins de temps que prévu : il vous reste {left} min pour vous préparer. Partez à {leave} pour prendre le {line} de {dep} à {stop}.',
       onBoard: 'Déjà à bord : alarmes de départ annulées, seuls les rappels de descente restent.',
+      footSetting: 'Proposer de finir à pied jusqu\u2019à', footOffer: '🚶 Finir à pied depuis {from}', footAll: '🚶 Tout à pied',
+      footDetail: '{min} min · {dist} · arrivée {arr}', footDelta: '{d}', footSame: 'même heure', footBetter: 'plus rapide qu\u2019attendre le {line}',
+      busAlt: '🚌 Prendre plutôt le {line}', busAltDetail: 'arrivée {arr} · {d}', footLearned: 'Vous finissez souvent à pied ici.',
+      tagFootPossible: '🚶 Fin à pied ?', tagFootBetter: '🚶 Plus rapide à pied', tagOnFoot: '🚶 Fin à pied',
       liveShort: 'direct', gpsOn: '📍 Position suivie : le rappel sonne quand vous quittez l\u2019arrêt précédent.',
       gpsWaiting: '📍 En attente d\u2019une position précise… en attendant, l\u2019horaire en direct décide.',
       gpsDenied: 'Position non autorisée : les rappels suivent seulement l\u2019horaire en direct.',
@@ -1596,7 +1613,7 @@
   // ---------- Settings (US-18) ----------
   // Walking time = straight-line distance × DETOUR / walking speed (streets are rarely straight).
   const DETOUR = 1.3;
-  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true };
+  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true, footMaxMin: 15 };
   const getSettings = () => Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {}));
   const saveSettings = s => store.set('settings', s);
   const speedMPerMin = () => getSettings().speedKmh * 1000 / 60;
@@ -1608,7 +1625,7 @@
   const MAX_ACCESS_M = 1200;          // stops further than this from a map point are not tried
   const DEFAULT_CENTER = [46.2044, 6.1432];
   const places = { from: null, to: null };
-  let journeys = [], journeyCtrl = null;
+  let journeys = [], journeyBase = [], journeyCtrl = null;   // journeyBase: as found; journeys: as shown (US-36)
   const journeySearchCtrl = { from: null, to: null };
 
   // Stop search shared by the departure board and the journey planner
@@ -1862,13 +1879,95 @@
         const prev = best.get(j.key);
         if (!prev || j.walkMin < prev.walkMin) best.set(j.key, j);   // same vehicles from another stop: keep the shorter walk
       }
-      journeys = [...best.values()];
-      status.textContent = journeys.length ? '' : t('noJourney');
+      journeyBase = [...best.values()];
+      footChoice.clear();
+      for (const k of new Set(journeyBase.map(footAlternative).filter(Boolean).map(x => x.key))) recordFoot(k, 'shown');
+      status.textContent = journeyBase.length ? '' : t('noJourney');
       renderJourneys();
     } catch (e) {
       if (e.name === 'AbortError') return;
       status.textContent = t('journeyFailed');
     }
+  }
+
+  // ---------- Finish on foot (US-36) ----------
+  // The last ride compared with walking from where it would be taken (the previous get-off stop, or the start)
+  // to the destination. Offered for short walks only; the rider's choices are learned per place, and the bus
+  // always stays one tap away.
+  const FOOT_MAX_LATER = 5;     // offered when walking arrives at most 5 min later than the bus
+  const FOOT_LEARN = 3;         // finished on foot 3 times here (and not less often than by bus) → on foot first
+  const FOOT_IGNORED = 6;       // offered 6 times here and never chosen → no longer offered
+  const footChoice = new Map(); // this search: journey key → true (on foot) / false (bus)
+  const placeKey = p => !p ? '' : p.kind === 'stop' ? p.id : p.kind === 'saved' ? 'p:' + p.placeId : p.coord ? p.coord.map(v => v.toFixed(3)).join(',') : '';
+  function footAlternative(j) {
+    const maxMin = getSettings().footMaxMin;
+    const dest = places.to && places.to.coord;
+    if (!maxMin || !dest || !j.rides.length) return null;
+    const last = j.rides[j.rides.length - 1], prev = j.rides.length > 1 ? j.rides[j.rides.length - 2] : null;
+    const start = prev
+      ? { name: prev.toStop.name, stopId: prev.toStop.id, coord: prev.toStop.coord, platform: prev.arrPlatform, mode: prev.mode }
+      : { name: ['saved', 'addr', 'stop'].includes(places.from && places.from.kind) ? placeLabel(places.from) : t('yourStart'), coord: places.from && places.from.coord };
+    if (!start.coord) return null;
+    const straight = distanceM(start.coord, dest), min = walkMinutes(straight);
+    if (min > maxMin) return null;
+    const startAt = prev ? (prev.arrReal || prev.arr) : j.leaveAt;
+    if (!startAt) return null;
+    const arriveAt = new Date(startAt.getTime() + min * 60000);
+    const delta = Math.round((arriveAt - j.arriveAt) / 60000);
+    if (delta > FOOT_MAX_LATER) return null;
+    return { start, startAt, min, meters: straight * DETOUR, arriveAt, delta, line: `${modeName(last.mode)} ${last.label}`,
+             key: (prev ? prev.toStop.id : 'from:' + placeKey(places.from)) + '>' + placeKey(places.to) };
+  }
+  // The same journey, the last ride replaced by the walk
+  function onFootVariant(j, alt) {
+    const prev = j.rides.length > 1 ? j.rides[j.rides.length - 2] : null;
+    const end = { name: ['saved', 'addr', 'stop'].includes(places.to.kind) ? placeLabel(places.to) : t('yourDestination'), coord: places.to.coord };
+    const legs = [...j.legs.slice(0, prev ? j.legs.indexOf(prev) + 1 : 0),
+                  { type: 'walk', min: alt.min, meters: alt.meters, edge: 'egress', start: alt.start, end, to: '', foot: true }];
+    const rides = j.rides.slice(0, -1);
+    const leaveAt = rides.length ? j.leaveAt : alt.startAt;
+    return Object.assign({}, j, { legs, rides, leaveAt, arriveAt: alt.arriveAt, durationMin: (alt.arriveAt - leaveAt) / 60000,
+      transfers: Math.max(0, rides.length - 1), walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0),
+      live: rides.some(r => r.live), key: j.key + '|foot', base: j, alt, onFoot: true });
+  }
+  const footRecords = () => store.get('foot', {});
+  function footPref(key) {
+    const r = footRecords()[key] || { foot: 0, bus: 0, shown: 0 };
+    if (r.foot >= FOOT_LEARN && r.foot >= r.bus) return 'foot';
+    if (!r.foot && r.shown > FOOT_IGNORED) return 'hidden';   // counted before display: hidden from the 7th time
+    return 'offer';
+  }
+  function recordFoot(key, what) {
+    const all = footRecords(), r = all[key] || { foot: 0, bus: 0, shown: 0, t: 0 }, now = Date.now();
+    if (what === 'shown') { if (now - (r.t || 0) < DEBOUNCE_MS) return; r.shown++; r.t = now; }
+    else r[what]++;
+    all[key] = r; store.set('foot', all);
+  }
+  // What the list shows for each journey found: the bus, or the walk when chosen or learned
+  function displayJourney(j) {
+    const alt = footAlternative(j);
+    if (!alt) return j;
+    const pref = footPref(alt.key);
+    if (pref === 'hidden' && !footChoice.has(j.key)) return j;
+    const foot = footChoice.has(j.key) ? footChoice.get(j.key) : pref === 'foot';
+    if (foot) return onFootVariant(j, alt);
+    return Object.assign({}, j, { footOffer: alt, base: j });
+  }
+  const signed = d => d === 0 ? t('footSame') : (d > 0 ? '+' : '−') + Math.abs(d) + ' min';
+  function footRowHtml(j, i) {
+    if (j.onFoot) {
+      const d = Math.round((j.base.arriveAt - j.arriveAt) / 60000);
+      const learned = footPref(j.alt.key) === 'foot' && !footChoice.has(j.base.key) ? `<small>${esc(t('footLearned'))}</small>` : '';
+      return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-foot="0"><span>${esc(t('busAlt', { line: j.alt.line }))}</span>` +
+        `<small>${esc(t('busAltDetail', { arr: hhmm(j.base.arriveAt), d: signed(d) }))}</small>${learned}</button></li>`;
+    }
+    const a = j.footOffer;
+    if (!a) return '';
+    const title = a.start.stopId ? t('footOffer', { from: a.start.name }) : t('footAll');
+    const better = a.delta < 0;
+    return `<li class="foot-alt"><button class="foot-toggle${better ? ' better' : ''}" data-i="${i}" data-foot="1"><span>${esc(title)}</span>` +
+      `<small>${esc(t('footDetail', { min: fmtMin(a.min), dist: fmtDistance(a.meters), arr: hhmm(a.arriveAt) }))} · ` +
+      `<span class="d${better ? ' better' : ''}">${esc(signed(a.delta))}${better ? ' — ' + esc(t('footBetter', { line: a.line })) : ''}</span></small></button></li>`;
   }
 
   function getPrio() { return store.get('prio', 'fast'); }
@@ -1886,7 +1985,8 @@
   let openJourney = null;   // key of the journey whose details are open (US-28)
   function renderJourneys() {
     const box = $('journeyResults');
-    if (!journeys.length) { box.hidden = true; return; }
+    if (!journeyBase.length) { box.hidden = true; return; }
+    journeys = journeyBase.map(displayJourney);
     const mode = readWhen().mode;
     const ranked = rankJourneys(journeys, getPrio(), mode);
     const fastest = rankJourneys(journeys, 'fast', mode)[0], leastWalk = rankJourneys(journeys, 'walk', mode)[0];
@@ -1894,22 +1994,29 @@
     box.hidden = false;
     const openVia = new Set([...document.querySelectorAll('#journeyList .via-toggle[aria-expanded="true"]')].map(b => b.dataset.key));
     $('journeyList').innerHTML = ranked.slice(0, 8).map((j, i) => {
+      const footTag = j.onFoot ? t('tagOnFoot') : j.footOffer ? t(j.footOffer.delta < 0 ? 'tagFootBetter' : 'tagFootPossible') : '';
       const tags = [j === fastest ? `<span class="tag">${esc(t('fastest'))}</span>` : '',
-                    j === leastWalk && Math.round(j.walkMin) < Math.round(fastest.walkMin) ? `<span class="tag walk">${esc(t('leastWalking'))}</span>` : ''].join('');
+                    j === leastWalk && Math.round(j.walkMin) < Math.round(fastest.walkMin) ? `<span class="tag walk">${esc(t('leastWalking'))}</span>` : '',
+                    footTag ? `<span class="tag foot">${esc(footTag)}</span>` : ''].join('');
       const first = j.rides[0];
-      const live = first.live ? ` · <span class="${first.delay > 0 ? 'late' : 'ok'}">${first.delay > 0 ? '+' + first.delay + ' min' : esc(t('onTime'))}</span>` : '';
-      const open = j.key === openJourney;
+      const live = first && first.live ? ` · <span class="${first.delay > 0 ? 'late' : 'ok'}">${first.delay > 0 ? '+' + first.delay + ' min' : esc(t('onTime'))}</span>` : '';
+      const open = (j.base || j).key === openJourney;
       return `<li class="jr-item"><button class="jr" data-i="${i}" aria-expanded="${open}">
         <div class="jr-top"><b>${hhmm(j.leaveAt)} → ${hhmm(j.arriveAt)}</b><span class="jr-dur">${fmtDuration(j.durationMin)}</span></div>
         <div class="jr-segs">${rideIds(j)}</div>
-        <div class="jr-meta">${esc(transfersText(j.transfers))} · ${esc(t('walkTotal', { min: fmtMin(j.walkMin) }))}${live}${tags}</div>
+        <div class="jr-meta">${j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(t('walkTotal', { min: fmtMin(j.walkMin) }))}${live}${tags}</div>
       </button>${open ? journeyDetailHtml(j, i, openVia) : ''}</li>`;
     }).join('');
   }
 
   const MAP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5.1 9 3 3 5v16l6-2.1 6 2.1 6-2V3l-6 2.1zM14 18.6l-4-1.4V5.4l4 1.4v11.8z"/></svg>';
   function journeyDetailHtml(j, i, openVia) {
+    const footAt = j.legs.length - 1;   // the alternative (walk or bus) comes after the whole plan
     const rows = j.legs.map((l, k) => {
+      const extra = k === footAt ? footRowHtml(j, i) : '';
+      return legHtml(l, k) + extra;
+    }).join('');
+    function legHtml(l, k) {
       if (l.type === 'walk') {
         const where = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: l.to || (l.end && l.end.name) || '' });
         const dist = l.meters ? ` · ${fmtDistance(l.meters)}` : '';
@@ -1938,10 +2045,10 @@
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
         <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)}</div></li>`;
-    }).join('');
+    }
     return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
       <ul class="legs">${rows}</ul>
-      <button class="btn-primary set-alarms" data-i="${i}">${esc(t('setAlarms'))}</button></div>`;
+      ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('setAlarms'))}</button>` : ''}</div>`;
   }
 
   // US-32: one walk on the map, from its start to its end (platform positions when known)
@@ -2453,6 +2560,7 @@
     const s = getSettings();
     $('setPrep').value = s.prepMin; $('setSpeed').value = s.speedKmh.toFixed(1); $('setMargin').value = s.marginMin;
     $('setAlight').checked = s.alightReminder !== false;
+    $('setFootMax').value = s.footMaxMin;
     const last = s.samples && s.samples.length ? s.samples[s.samples.length - 1].kmh.toFixed(1) : null;
     $('speedInfo').textContent = s.learned ? t('learnedFrom', { n: s.learned, last }) : t('notLearned');
     renderNotifState();
@@ -2469,6 +2577,7 @@
     s.speedKmh = Math.round(num('setSpeed', 2, 8, s.speedKmh) * 10) / 10;
     s.marginMin = Math.round(num('setMargin', 0, 15, s.marginMin));
     s.alightReminder = $('setAlight').checked;
+    s.footMaxMin = Math.round(num('setFootMax', 0, 30, s.footMaxMin));
     saveSettings(s); renderAlarms(); tickAlarms();
   }
 
@@ -2669,12 +2778,20 @@
     if (w) { const j = journeys[+w.dataset.i]; if (j) openWalkMap(j.legs[+w.dataset.leg]); return; }
     const v = e.target.closest('.via-toggle');
     if (v) { const open = v.getAttribute('aria-expanded') !== 'true'; v.setAttribute('aria-expanded', String(open)); v.nextElementSibling.hidden = !open; return; }
+    const ft = e.target.closest('.foot-toggle');
+    if (ft) {
+      const j = journeys[+ft.dataset.i]; if (!j) return;
+      const base = j.base || j, foot = ft.dataset.foot === '1';
+      const key = (j.alt || j.footOffer).key;
+      footChoice.set(base.key, foot); recordFoot(key, foot ? 'foot' : 'bus');
+      renderJourneys(); return;
+    }
     const al = e.target.closest('.set-alarms');
     if (al) { const j = journeys[+al.dataset.i]; if (j) createAlarm(j); return; }
     const b = e.target.closest('.jr');
     if (!b) return;
-    const j = journeys[+b.dataset.i];
-    openJourney = openJourney === j.key ? null : j.key;
+    const j = journeys[+b.dataset.i], k = (j.base || j).key;
+    openJourney = openJourney === k ? null : k;
     renderJourneys();
     const opened = document.querySelector('#journeyList .jr[aria-expanded="true"]');
     if (opened && opened.scrollIntoView) opened.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2696,7 +2813,7 @@
   $('walkStop').addEventListener('click', () => { finishWalkTracking(); $('walkStatus').hidden = true; });
   $('settingsBtn').addEventListener('click', () => { unlockAudio(); renderSettings(); $('settingsSheet').hidden = false; });
   $('settingsClose').addEventListener('click', () => { $('settingsSheet').hidden = true; });
-  ['setPrep', 'setSpeed', 'setMargin', 'setAlight'].forEach(id => $(id).addEventListener('change', readSettingsForm));
+  ['setPrep', 'setSpeed', 'setMargin', 'setAlight', 'setFootMax'].forEach(id => $(id).addEventListener('change', readSettingsForm));
   $('resetLearning').addEventListener('click', () => {
     const s = getSettings(); s.speedKmh = DEFAULT_SETTINGS.speedKmh; s.learned = 0; s.samples = [];
     saveSettings(s); renderSettings(); renderAlarms();

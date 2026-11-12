@@ -79,6 +79,7 @@ python tests/test_sprint07_ojp.py        # OJP key in Settings, departures / sea
 python tests/test_sprint08.py            # journey details, line colours, intermediate stops, get-off reminders, walk map
 python tests/test_sprint09.py            # my places, address search, next stop after removal, alarms set late
 python tests/test_alight_gps.py          # get-off reminders: live time of each ride, position, tunnel fallback
+python tests/test_finish_on_foot.py      # finish on foot: offer, switch both ways, learning, limits
 ```
 
 ## Workflow
