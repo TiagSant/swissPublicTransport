@@ -22,22 +22,25 @@ COMMUNES = st("8592887", "Lancy, Communes-Réunies", 46.174500, 6.121900)
 PLAINPALAIS = st("8587391", "Genève, Plainpalais", 46.198300, 6.141600)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 DEST = (46.2047, 6.1470)                     # ~300 m east of Bel-Air
+START = (46.1965, 6.1395)                    # ~250 m from Plainpalais
+UNIMAIL = st("8592999", "Genève, Uni-Mail", 46.195300, 6.139800)   # ~140 m from START
 
-def connection(base):
+def connection(base, origin=COMMUNES):
     at = lambda m: base + dt.timedelta(minutes=m)
     def end(s, m, kind): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": "", "prognosis": {}, "delay": None}
     def ride(cat, num, a, b, ma, mb): return {"journey": {"category": cat, "number": num, "to": b["name"], "operator": "TPG",
         "passList": [{"station": a, "departure": fmt(at(ma))}, {"station": b, "arrival": fmt(at(mb))}]}, "walk": None,
         "departure": end(a, ma, "departure"), "arrival": end(b, mb, "arrival")}
-    return {"sections": [ride("B", "21", COMMUNES, PLAINPALAIS, 10, 22), ride("T", "12", PLAINPALAIS, BELAIR, 28, 33)]}
+    return {"sections": [ride("B", "21", origin, PLAINPALAIS, 10, 22), ride("T", "12", PLAINPALAIS, BELAIR, 28, 33)]}
 
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"):
         asked = dt.datetime.strptime(q["date"][0] + " " + q["time"][0], "%Y-%m-%d %H:%M").replace(tzinfo=tz)
-        body = {"connections": [connection(asked)]}
+        body = {"connections": [connection(asked, UNIMAIL if q["from"][0] == UNIMAIL["id"] else COMMUNES)]}
     elif u.path.endswith("/locations"):
-        body = {"stations": [dict(BELAIR, distance=300)]}
+        near_start = "x" in q and abs(float(q["x"][0]) - START[0]) < 0.002
+        body = {"stations": [dict(UNIMAIL, distance=140)] if near_start else [dict(BELAIR, distance=300)]}
     else:
         body = {"station": BELAIR, "stationboard": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
@@ -130,10 +133,35 @@ with sync_playwright() as p:
     assert item().locator(".foot-toggle").count() == 0, "no longer offered after being ignored 6 times"
     print("ignored     → no longer offered after 6 searches")
 
+    # Start on foot: from a point near Plainpalais, walk there instead of taking bus 21 first; same arrival, leave later
+    pg.evaluate("localStorage.removeItem('tpp:foot')")
+    pg.evaluate(f"localStorage.setItem('tpp:journey:from', JSON.stringify({{ kind: 'point', coord: [{START[0]}, {START[1]}], near: null }}))")
+    pg.reload()
+    pg.click("#searchJourney"); pg.wait_for_timeout(1500); print("DBG", pg.inner_text("#journeyStatus"), pg.input_value("#fromQ"), pg.is_hidden("#journeyResults"))
+    search()
+    rows = item().locator(".foot-toggle")
+    assert rows.count() == 2, rows.all_inner_texts()
+    start_row = item().locator(".foot-toggle[data-side=start]").inner_text()
+    assert start_row.startswith("🚶 Start on foot to Genève, Plainpalais") and re.search(r"leave \d+ min later — no wait for the Bus 21", start_row), start_row
+    assert "Leave later on foot" in item().locator(".jr-meta").first.inner_text() or "Faster on foot" in item().locator(".jr-meta").first.inner_text()
+    arrival = item().locator(".jr-top b").inner_text().split("→")[1].strip()
+    item().locator(".foot-toggle[data-side=start]").click()
+    assert legs() == ["walk", "ride", "walk"], legs()
+    assert item().locator(".jr-top b").inner_text().split("→")[1].strip() == arrival, "same arrival"
+    assert "On foot at the start" in item().locator(".jr-meta").first.inner_text()
+    assert item().locator(".foot-toggle").count() == 1, "one end on foot at a time"
+    back = item().locator(".foot-toggle").inner_text()
+    assert back.startswith("🚌 Take the Bus 21 first instead") and "−" in back, back
+    print("start       →", start_row.replace("\n", " | "), "|", item().locator(".jr-top b").inner_text())
+    pg.screenshot(path=str(OUT / "foot-start.png"), full_page=True)
+    item().locator(".foot-toggle").click()
+    assert legs() == ["walk", "ride", "ride", "walk"], legs()
+
     # French
     pg.evaluate("localStorage.removeItem('tpp:foot')"); search()
     pg.click("#lang")
-    assert "Finir à pied depuis Genève, Plainpalais" in item().locator(".foot-toggle").inner_text()
+    assert "Finir à pied depuis Genève, Plainpalais" in item().locator(".foot-toggle[data-side=end]").inner_text()
+    assert "Partir à pied jusqu’à Genève, Plainpalais" in item().locator(".foot-toggle[data-side=start]").inner_text()
     pg.click("#lang")
     b.close()
 
