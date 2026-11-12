@@ -6,6 +6,7 @@
   - US-23: address search (stops, addresses, places of interest) in the From / To fields and when saving a place.
   - US-27: removing the stop on screen shows the next most-used stop.
   - US-33: departure alarms adapt to when they are set (on board: cancelled; less time: ring at once with the time left).
+  - US-35: get-off reminders follow the live time of each ride, and my position (GPS) while the page is open.
   Sprint 8: journey details
   - US-28: the details of a journey open inside the result, one at a time.
   - US-29: each ride is drawn in the colour of its line.
@@ -575,6 +576,9 @@
       readyBody: 'Leave at {leave} (in {left} min) to catch {line} at {dep} from {stop}.',
       readyShortBody: 'Less time than planned: {left} min left to get ready. Leave at {leave} to catch {line} at {dep} from {stop}.',
       onBoard: 'Already on board: departure alarms cancelled, only the get-off reminders remain.',
+      liveShort: 'live', gpsOn: '📍 Following your position: the reminder rings when you leave the stop before.',
+      gpsWaiting: '📍 Waiting for a precise position… until then the live time decides.',
+      gpsDenied: 'Position not allowed: reminders follow the live time only.',
       setAlarms: '⏰ Set departure alarms', pickStart: 'Choose the start', pickEnd: 'Choose the destination',
       tapMap: 'Tap the map to place the point', usePoint: 'Use this point',
       alarmsTitle: 'Departure alarms', getReady: 'Get ready', leaveHome: 'Leave', departs: 'Departs',
@@ -652,6 +656,9 @@
       readyBody: 'Partez à {leave} (dans {left} min) pour prendre le {line} de {dep} à {stop}.',
       readyShortBody: 'Moins de temps que prévu : il vous reste {left} min pour vous préparer. Partez à {leave} pour prendre le {line} de {dep} à {stop}.',
       onBoard: 'Déjà à bord : alarmes de départ annulées, seuls les rappels de descente restent.',
+      liveShort: 'direct', gpsOn: '📍 Position suivie : le rappel sonne quand vous quittez l\u2019arrêt précédent.',
+      gpsWaiting: '📍 En attente d\u2019une position précise… en attendant, l\u2019horaire en direct décide.',
+      gpsDenied: 'Position non autorisée : les rappels suivent seulement l\u2019horaire en direct.',
       setAlarms: '⏰ Programmer les alarmes de départ', pickStart: 'Choisir le départ', pickEnd: 'Choisir l\u2019arrivée',
       tapMap: 'Touchez le plan pour placer le point', usePoint: 'Utiliser ce point',
       alarmsTitle: 'Alarmes de départ', getReady: 'Préparez-vous', leaveHome: 'Partir', departs: 'Départ',
@@ -1749,7 +1756,7 @@
       const pr = p.prognosis || {};
       const live = parseTime(pr.arrival) || parseTime(pr.departure);
       const depAt = parseTime(pr.departure) || tsOr(p.departureTimestamp, p.departure) || live || planned;
-      return { name: st.name || '', id: st.id || null, time: live || planned, live: !!live, depAt };
+      return { name: st.name || '', id: st.id || null, coord: coordOf(st), time: live || planned, live: !!live, depAt };
     }).filter(v => v.name);
   }
   // Where each walk starts and ends (US-32): a place, or a stop and its platform
@@ -2037,14 +2044,107 @@
       const next = j.rides[n + 1];
       const after = j.legs.slice(j.legs.indexOf(r) + 1);
       const walkEnd = !next ? after.filter(l => l.type === 'walk').reduce((s, l) => s + l.min, 0) : 0;
-      return { at: at ? at.getTime() : null, stop: r.toStop.name, mode: r.mode, label: r.label,
+      // `at`: when the vehicle leaves the stop before the get-off stop (planned when the alarm was set);
+      // `prev*`: that stop, watched live (its departure board) and by position (US-35)
+      const prevStop = prev || { id: r.from.id, name: r.from.name, coord: r.from.coord };
+      return { at: at ? at.getTime() : null, boardAt: (r.real || r.dep).getTime(), stop: r.toStop.name, stopId: r.toStop.id, stopCoord: r.toStop.coord || null,
+               prevId: prevStop.id || null, prevName: prevStop.name, prevCoord: prevStop.coord || null,
+               category: r.category, number: r.number, mode: r.mode, label: r.label,
                next: next ? { mode: next.mode, label: next.label, platform: next.platform, dep: (next.real || next.dep).getTime() } : null,
                walkEnd };
     }).filter(x => x.at);
   }
-  // Live delay of the first vehicle since the alarm was set, applied to the get-off times
+  // Live delay of the first vehicle since the alarm was set: used for rides not yet followed live
   const alightShift = a => a.live && a.created0 ? a.live.dep - a.created0 : 0;
-  const lastAlightAt = a => (a.alights || []).reduce((m, x) => Math.max(m, x.at), 0) + alightShift(a);
+  // Reminder time: the live departure from the stop before, else the planned one shifted by the first vehicle's delay
+  const alightAt = (a, x) => x.liveAt || (x.at + alightShift(a));
+  const lastAlightAt = a => (a.alights || []).reduce((m, x) => Math.max(m, alightAt(a, x)), 0);
+
+  // ---------- Get-off reminders by position (US-35) ----------
+  // While a followed ride is under way and the page is open, the position decides: the reminder rings when I
+  // leave the stop before my get-off stop. Without a recent, precise fix (tunnel, permission refused, phone
+  // asleep) the live time above decides.
+  const NEAR_M = 60;              // "at the stop before"
+  const LEFT_M = 90;              // "has left it"
+  const GPS_MAX_ACC = 50;         // fixes less precise than this are ignored
+  const GPS_FRESH_MS = 30000;     // a fix older than this does not count
+  const GPS_WAIT_MAX_MS = 5 * 60000;   // the position may hold a reminder back at most this long after its time
+  const gps = { watch: null, fix: null, denied: false };
+  const gpsFresh = now => gps.fix && now - gps.fix.t < GPS_FRESH_MS;
+
+  // Followed rides whose reminder is still to come: from 5 min before the first departure
+  function pendingAlights(now = Date.now()) {
+    const s = getSettings();
+    if (s.alightReminder === false) return [];
+    const out = [];
+    for (const a of getAlarms()) {
+      const start = alarmTimes(a, s).dep - 5 * 60000;
+      if (now < start) continue;
+      const n = (a.alights || []).findIndex((x, k) => !a.fired['alight' + k]);   // the current ride only
+      if (n >= 0 && now - alightAt(a, a.alights[n]) < GPS_WAIT_MAX_MS + 60000) out.push({ a, x: a.alights[n], n });
+    }
+    return out;
+  }
+  function updateGpsWatch() {
+    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord);
+    if (need && !gps.watch && !gps.denied && navigator.geolocation) {
+      gps.watch = navigator.geolocation.watchPosition(onGpsFix, err => {
+        if (err && err.code === 1) { gps.denied = true; stopGpsWatch(); renderAlarms(); }
+      }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    } else if (!need && gps.watch) stopGpsWatch();
+  }
+  function stopGpsWatch() {
+    if (gps.watch != null) { try { navigator.geolocation.clearWatch(gps.watch); } catch { /* already stopped */ } }
+    gps.watch = null;
+  }
+  function onGpsFix(pos) {
+    if (pos.coords.accuracy > GPS_MAX_ACC) return;
+    const first = !gpsFresh(Date.now());
+    gps.fix = { p: [pos.coords.latitude, pos.coords.longitude], t: Date.now() };
+    checkGpsAlights();
+    if (first) renderAlarms();
+  }
+  function checkGpsAlights() {
+    if (!gps.fix) return;
+    const now = Date.now(), p = gps.fix.p;
+    const list = getAlarms();
+    let changed = false;
+    for (const a of list) {
+      const n = (a.alights || []).findIndex((x, k) => !a.fired['alight' + k]);
+      if (n < 0) continue;
+      const x = a.alights[n];
+      if (!x.prevCoord || !x.stopCoord || !pendingAlights(now).some(q => q.a.id === a.id)) continue;
+      const dPrev = distanceM(p, x.prevCoord), dStop = distanceM(p, x.stopCoord), span = distanceM(x.prevCoord, x.stopCoord);
+      a.gpsSeen = a.gpsSeen || {};
+      if (dPrev <= NEAR_M && !a.gpsSeen[n]) { a.gpsSeen[n] = now; changed = true; }
+      // left the stop before, heading for the get-off stop; or already more than halfway there without a fix at the stop
+      // only once this ride may have started (a 1-stop ride's stop before is where I wait for it)
+      const started = now >= (x.boardAt || 0) + (n === 0 ? alightShift(a) : 0) - 60000;
+      const left = started && a.gpsSeen[n] && dPrev >= LEFT_M && dStop < span + 30;
+      const halfway = started && !a.gpsSeen[n] && span > 150 && dStop < span * 0.5;
+      if (left || halfway) {
+        a.fired['alight' + n] = now;
+        a.gpsFired = Object.assign(a.gpsFired || {}, { [n]: now });
+        changed = true;
+        saveAlarms(list);
+        fireAlight(a, n);
+      }
+    }
+    if (changed) { saveAlarms(list); renderAlarms(); }
+  }
+  // The live time says "now", but a recent precise position says the vehicle is not there yet or still at the stop
+  function gpsHolds(a, x, n, now) {
+    if (!gpsFresh(now) || !x.prevCoord || now - alightAt(a, x) > GPS_WAIT_MAX_MS) return false;
+    const dPrev = distanceM(gps.fix.p, x.prevCoord);
+    const seen = a.gpsSeen && a.gpsSeen[n];
+    return dPrev < LEFT_M || (!seen && dPrev > 150);
+  }
+  function gpsStatusText(a) {
+    if (gps.denied) return (a.alights || []).some((x, n) => !a.fired['alight' + n]) ? t('gpsDenied') : '';
+    if (!pendingAlights().some(q => q.a.id === a.id)) return '';
+    if (gpsFresh(Date.now())) return t('gpsOn');
+    return gps.watch ? t('gpsWaiting') : '';
+  }
 
   function createAlarm(j) {
     const f = j.rides[0];
@@ -2065,6 +2165,8 @@
     else if (now0 >= tm0.leave) alarm.fired.ready = now0;
     saveAlarms([alarm, ...getAlarms()].slice(0, 5));
     unlockAudio(); askNotificationPermission();
+    if (getSettings().alightReminder !== false && navigator.geolocation && alarm.alights.length)
+      navigator.geolocation.getCurrentPosition(() => { gps.denied = false; updateGpsWatch(); }, err => { if (err.code === 1) gps.denied = true; }, { maximumAge: 60000, timeout: 15000 });
     renderAlarms(); tickAlarms();
     $('alarmCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -2106,12 +2208,13 @@
       else if (!a.fired.ready && now >= tm.ready) { a.fired.ready = now; changed = true; fireAlarm(a, 'ready'); }
       // get-off reminders: only the latest one due rings (no burst after the phone slept); while they are
       // switched off, due reminders are marked as passed so they don't ring when switched back on
-      const due = (a.alights || []).map((x, n) => ({ x, n })).filter(({ x, n }) => !a.fired['alight' + n] && now >= x.at + alightShift(a));
+      const due = (a.alights || []).map((x, n) => ({ x, n }))
+        .filter(({ x, n }) => !a.fired['alight' + n] && now >= alightAt(a, x) && !(s.alightReminder !== false && gpsHolds(a, x, n, now)));
       if (due.length) {
         due.forEach(({ n }) => { a.fired['alight' + n] = now; });
         changed = true;
         const last = due[due.length - 1];
-        if (s.alightReminder !== false && now - (last.x.at + alightShift(a)) < 3 * 60000) fireAlight(a, last.n);
+        if (s.alightReminder !== false && now - alightAt(a, last.x) < GPS_WAIT_MAX_MS + 60000) fireAlight(a, last.n);
       }
     }
     // forget alarms 10 min after the departure, or after the last get-off reminder
@@ -2123,11 +2226,24 @@
   async function refreshAlarmsLive() {
     const list = getAlarms();
     let changed = false;
+    const boards = new Map();   // one departure board per stop and refresh
+    const boardOf = (id, from) => { if (!boards.has(id)) boards.set(id, data.board(id, from).catch(() => null)); return boards.get(id); };
+    const schedOf = j => { const st = j.stop || {}; const d = st.departureTimestamp ? new Date(st.departureTimestamp * 1000) : parseTime(st.departure); return d ? d.getTime() : 0; };
+    const now = Date.now();
     for (const a of list) {
+      // US-35: each ride followed live at the stop before its get-off stop, during the hour before
+      for (const [n, x] of (a.alights || []).entries()) {
+        if (a.fired['alight' + n] || !x.prevId || x.at - now > 3600000 || now - alightAt(a, x) > 15 * 60000) continue;
+        const r = await boardOf(x.prevId, new Date(Math.min(x.at, now) - LOOKBACK_MIN * 60000));
+        const m = r && (r.stationboard || []).find(j => String(j.category) === String(x.category) && String(j.number) === String(x.number)
+          && Math.abs(schedOf(j) - x.at) < 90000);
+        if (!m) continue;
+        const nm = normalize(m), liveAt = nm.real ? nm.real.getTime() : x.at;
+        if (x.liveAt !== liveAt) { x.liveAt = liveAt; changed = true; }
+      }
       if (a.fired.leave) continue;
       try {
         const r = await data.board(a.first.stopId, new Date(a.first.sched - LOOKBACK_MIN * 60000));
-        const schedOf = j => { const st = j.stop || {}; const d = st.departureTimestamp ? new Date(st.departureTimestamp * 1000) : parseTime(st.departure); return d ? d.getTime() : 0; };
         const m = (r.stationboard || []).find(j => String(j.category) === String(a.first.category) && String(j.number) === String(a.first.number)
           && Math.abs(schedOf(j) - a.first.sched) < 60000);
         if (!m) continue;
@@ -2169,8 +2285,10 @@
   function alightLine(a, s) {
     if (!(a.alights || []).length) return '';
     if (s.alightReminder === false) return `<div class="status">${esc(t('alightOff'))}</div>`;
-    const list = a.alights.map((x, n) => `${x.stop} ${hhmm(new Date(x.at + alightShift(a)))}${a.fired['alight' + n] ? ' ✓' : ''}`).join(' · ');
-    return `<div class="status" data-k="alights">${esc(t('alightPlan', { list }))}</div>`;
+    const list = a.alights.map((x, n) => `${x.stop} ${hhmm(new Date(alightAt(a, x)))}${x.liveAt ? ' (' + t('liveShort') + ')' : ''}` +
+      `${a.fired['alight' + n] ? (a.gpsFired && a.gpsFired[n] ? ' ✓📍' : ' ✓') : ''}`).join(' · ');
+    const gpsText = gpsStatusText(a);
+    return `<div class="status" data-k="alights">${esc(t('alightPlan', { list }))}</div>${gpsText ? `<div class="status" data-k="gps">${esc(gpsText)}</div>` : ''}`;
   }
   function fireAlight(a, n) {
     const x = a.alights[n];
@@ -2597,6 +2715,7 @@
     $('simResult').textContent = learnFromTrack(simulatedTrack(parseFloat($('simSpeed').value) || 5, start));
   });
   setInterval(tickAlarms, 5000);
+  setInterval(updateGpsWatch, 5000);
   setInterval(refreshAlarmsLive, LIVE_REFRESH_MS);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tickAlarms(); });
   document.addEventListener('visibilitychange', () => {
@@ -2612,6 +2731,8 @@
   renderSaveButtons();
   tickAlarms();
   refreshAlarmsLive();
+  // follow the position only if it was already allowed (no prompt at start-up)
+  try { navigator.permissions && navigator.permissions.query({ name: 'geolocation' }).then(r => { if (r.state === 'granted') updateGpsWatch(); }).catch(() => {}); } catch { /* no Permissions API */ }
   renderRecent();
   const lastId = store.get('lastStop', null);
   const last = lastId && getStops()[lastId];
