@@ -1,267 +1,267 @@
 {
-  "probedAt": "2026-11-11T19:14:59.142Z",
+  "probedAt": "2026-11-12T12:41:30.126Z",
   "endpoint": "https://api.opentransportdata.swiss/ojp20",
   "sdk": "0.23.5",
   "requests": {
     "lir_name_belair": {
       "status": 200,
-      "ms": 528,
+      "ms": 531,
       "bytes": 7605,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:01 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:32 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "44",
-        "x-ratelimit-reset": "1794424501"
+        "x-ratelimit-remaining": "49",
+        "x-ratelimit-reset": "1794487292"
       }
     },
     "lir_name_esserts": {
       "status": 200,
-      "ms": 108,
-      "bytes": 7508,
+      "ms": 138,
+      "bytes": 7509,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:02 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:33 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "44",
-        "x-ratelimit-reset": "1794424502"
+        "x-ratelimit-remaining": "48",
+        "x-ratelimit-reset": "1794487293"
       }
     },
     "lir_coords_point": {
       "status": 200,
-      "ms": 113,
-      "bytes": 1224,
+      "ms": 125,
+      "bytes": 1223,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:04 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:35 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "43",
-        "x-ratelimit-reset": "1794424504"
+        "x-ratelimit-remaining": "47",
+        "x-ratelimit-reset": "1794487295"
       }
     },
     "lir_bbox_point": {
       "status": 200,
-      "ms": 108,
+      "ms": 122,
       "bytes": 3213,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:05 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:36 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "43",
-        "x-ratelimit-reset": "1794424505"
+        "x-ratelimit-remaining": "46",
+        "x-ratelimit-reset": "1794487296"
       }
     },
     "ser_belair": {
       "status": 200,
-      "ms": 273,
-      "bytes": 394338,
+      "ms": 321,
+      "bytes": 400233,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:07 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:38 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "43",
-        "x-ratelimit-reset": "1794424507"
+        "x-ratelimit-remaining": "45",
+        "x-ratelimit-reset": "1794487298"
       }
     },
     "ser_geneve_gare": {
       "status": 200,
-      "ms": 150,
-      "bytes": 239662,
+      "ms": 176,
+      "bytes": 245454,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:09 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:40 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "43",
-        "x-ratelimit-reset": "1794424509"
+        "x-ratelimit-remaining": "44",
+        "x-ratelimit-reset": "1794487300"
       }
     },
     "ser_paquis_lac": {
       "status": 200,
-      "ms": 117,
-      "bytes": 31003,
+      "ms": 136,
+      "bytes": 30978,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:11 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:42 GMT",
         "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "42",
-        "x-ratelimit-reset": "1794424510"
+        "x-ratelimit-remaining": "43",
+        "x-ratelimit-reset": "1794487302"
       }
     },
     "ser_esserts": {
       "status": 200,
-      "ms": 157,
-      "bytes": 310445,
+      "ms": 201,
+      "bytes": 311887,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:12 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:43 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "42",
-        "x-ratelimit-reset": "1794424512"
+        "x-ratelimit-reset": "1794487303"
       }
     },
     "tr_stops": {
       "status": 200,
-      "ms": 312,
-      "bytes": 62536,
+      "ms": 344,
+      "bytes": 82202,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:14 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:45 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "41",
-        "x-ratelimit-reset": "1794424514"
+        "x-ratelimit-reset": "1794487305"
       }
     },
     "tr_coords": {
       "status": 200,
-      "ms": 418,
-      "bytes": 171537,
+      "ms": 450,
+      "bytes": 176832,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:16 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:47 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "40",
-        "x-ratelimit-reset": "1794424516"
+        "x-ratelimit-reset": "1794487307"
       }
     },
     "tir_from_belair": {
       "status": 200,
-      "ms": 140,
-      "bytes": 48781,
+      "ms": 161,
+      "bytes": 72061,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:18 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:49 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "39",
-        "x-ratelimit-reset": "1794424518"
+        "x-ratelimit-reset": "1794487309"
       }
     },
     "app_lir_name_zone_belair": {
       "status": 200,
-      "ms": 123,
+      "ms": 143,
       "bytes": 12783,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:19 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:50 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "38",
-        "x-ratelimit-reset": "1794424519"
+        "x-ratelimit-reset": "1794487310"
       }
     },
     "app_lir_name_zone_gare": {
       "status": 200,
-      "ms": 120,
+      "ms": 143,
       "bytes": 12783,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:21 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:52 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "37",
-        "x-ratelimit-reset": "1794424521"
+        "x-ratelimit-reset": "1794487312"
       }
     },
     "app_lir_zone_esserts": {
       "status": 200,
-      "ms": 109,
+      "ms": 128,
       "bytes": 3805,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:22 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:54 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "36",
-        "x-ratelimit-reset": "1794424522"
+        "x-ratelimit-reset": "1794487314"
       }
     },
     "app_ser_esserts_full": {
       "status": 200,
-      "ms": 846,
-      "bytes": 1505916,
+      "ms": 902,
+      "bytes": 1529189,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:25 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:56 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "35",
-        "x-ratelimit-reset": "1794424524"
+        "x-ratelimit-reset": "1794487315"
       }
     },
     "app_ser_esserts_light": {
       "status": 200,
-      "ms": 793,
-      "bytes": 332931,
+      "ms": 705,
+      "bytes": 333969,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:27 GMT",
+        "date": "Thu, 12 Nov 2026 12:41:58 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "34",
-        "x-ratelimit-reset": "1794424526"
+        "x-ratelimit-reset": "1794487318"
       }
     },
     "app_ser_belair_light": {
       "status": 200,
-      "ms": 808,
-      "bytes": 336933,
+      "ms": 955,
+      "bytes": 336748,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:29 GMT",
+        "date": "Thu, 12 Nov 2026 12:42:01 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "33",
-        "x-ratelimit-reset": "1794424529"
+        "x-ratelimit-reset": "1794487320"
       }
     },
     "app_tr_depart": {
       "status": 200,
-      "ms": 272,
-      "bytes": 42558,
+      "ms": 300,
+      "bytes": 50425,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:31 GMT",
+        "date": "Thu, 12 Nov 2026 12:42:03 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "32",
-        "x-ratelimit-reset": "1794424531"
+        "x-ratelimit-reset": "1794487322"
       }
     },
     "app_tr_arrive": {
       "status": 200,
-      "ms": 260,
-      "bytes": 59264,
+      "ms": 259,
+      "bytes": 43110,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:33 GMT",
+        "date": "Thu, 12 Nov 2026 12:42:04 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "31",
-        "x-ratelimit-reset": "1794424533"
+        "x-ratelimit-reset": "1794487324"
       }
     },
     "cors_post_with_origin": {
       "status": 200,
-      "ms": 106,
+      "ms": 133,
       "bytes": 2230,
       "headers": {
         "access-control-allow-origin": "*",
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Wed, 11 Nov 2026 19:15:35 GMT",
+        "date": "Thu, 12 Nov 2026 12:42:06 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "30",
-        "x-ratelimit-reset": "1794424535"
+        "x-ratelimit-reset": "1794487326"
       }
     }
   },
@@ -279,10 +279,10 @@
       "access-control-allow-origin": "*",
       "content-encoding": "gzip",
       "content-type": "application/xml",
-      "date": "Wed, 11 Nov 2026 19:15:35 GMT",
+      "date": "Thu, 12 Nov 2026 12:42:06 GMT",
       "x-ratelimit-limit": "50",
       "x-ratelimit-remaining": "30",
-      "x-ratelimit-reset": "1794424535"
+      "x-ratelimit-reset": "1794487326"
     },
     "browserCanCall": true
   }
