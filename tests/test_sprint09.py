@@ -185,6 +185,13 @@ with sync_playwright() as p:
     pg.locator("#journeyList .jr").first.click()
     meta = pg.inner_text("#journeyList .jr-detail .jr-meta")
     assert meta == "💼 Work → 🏠 Home", meta
+    # time on board next to the number of stops; arrival written like the departure
+    ride_leg = pg.locator("#journeyList .jr-detail .leg.ride").first
+    assert ride_leg.locator(".via-toggle").inner_text().startswith("2 stops · 18 min"), ride_leg.locator(".via-toggle").inner_text()
+    style = "e => [getComputedStyle(e).color, getComputedStyle(e).fontSize, getComputedStyle(e).fontWeight]"
+    stops_lines = ride_leg.locator(".leg-stop")
+    assert stops_lines.count() == 2 and stops_lines.first.evaluate(style) == stops_lines.last.evaluate(style), [stops_lines.first.evaluate(style), stops_lines.last.evaluate(style)]
+    print("ride        →", ride_leg.inner_text().replace("\n", " | "))
     assert "to Home" in pg.inner_text("#journeyList .jr-detail .leg.walk >> nth=-1") or "destination" in pg.inner_text("#journeyList .jr-detail")
 
     # ---------- US-27: removing the stop on screen

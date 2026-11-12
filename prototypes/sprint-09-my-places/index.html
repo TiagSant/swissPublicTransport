@@ -216,6 +216,7 @@
   .leg.walk > div { flex: 1; }
   .walk-map { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; padding: 4px 9px; }
   .walk-map svg { width: 14px; height: 14px; fill: currentColor; }
+  .ride-meta { color: var(--muted); font-size: .82rem; }
   .via-toggle { border: none; background: none; padding: 2px 0; color: var(--muted); font: inherit; font-size: .82rem; cursor: pointer; justify-self: start; }
   .via-toggle::after { content: ' ▾'; } .via-toggle[aria-expanded="true"]::after { content: ' ▴'; }
   .via { margin: 0 0 2px; padding: 0; list-style: none; display: grid; gap: 3px; font-size: .84rem; }
@@ -1913,7 +1914,9 @@
       const plat = l.platform ? platformChip(l.platform, l.mode, l.from) : '';
       const arr = l.arrReal || l.arr;
       const key = `${j.key}#${k}`, unfolded = openVia && openVia.has(key);
-      const count = l.stops === 1 ? t('stops1') : t('stopsCount', { n: l.stops });
+      // number of stops and time spent on board (live times when known)
+      const rideMin = arr ? Math.max(0, Math.round((arr - (l.real || l.dep)) / 60000)) : null;
+      const count = (l.stops === 1 ? t('stops1') : t('stopsCount', { n: l.stops })) + (rideMin != null ? ' · ' + fmtDuration(rideMin) : '');
       let via = '';
       if (l.via.length) {
         via = `<button class="via-toggle" data-key="${esc(key)}" aria-expanded="${unfolded}">${esc(count)}</button>` +
@@ -1926,8 +1929,8 @@
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
-        ${via}
-        <div class="leg-stop muted">${!l.via.length && l.stops ? esc(count) + ' · ' : ''}<b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)}</div></li>`;
+        ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
+        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)}</div></li>`;
     }).join('');
     return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
       <ul class="legs">${rows}</ul>
