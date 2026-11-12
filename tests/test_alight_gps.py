@@ -98,6 +98,7 @@ with sync_playwright() as p:
     # 1. No position allowed: the live time of the stop before decides (08:01, not the planned 07:58)
     ctx, pg = session(b, gps=False)
     pg.clock.run_for(65000)                                        # one live refresh
+    pg.wait_for_function("document.querySelector('#alarmList [data-k=alights]').textContent.includes('(live)')")
     plan = pg.inner_text("#alarmList [data-k=alights]")
     assert plan == "Get-off reminders: Genève, gare Cornavin 08:01 (live)", plan
     assert BELAIR["id"] in board_calls, "the stop before the get-off stop is followed live"

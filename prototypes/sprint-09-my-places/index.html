@@ -9,6 +9,8 @@
   - US-35: get-off reminders follow the live time of each ride, and my position (GPS) while the page is open.
   - US-36: finish on foot — the last ride compared with walking; learned per place; the bus always stays as an alternative.
            Same at the start: walk to where the second ride leaves instead of taking the first one.
+  - US-38: a followed journey shows every step live (delays, platforms, progress); a missed connection is detected
+           and alternatives are offered: the next run of the same line, another route, or finishing on foot.
   Sprint 8: journey details
   - US-28: the details of a journey open inside the result, one at a time.
   - US-29: each ride is drawn in the colour of its line.
@@ -256,6 +258,28 @@
   .al-times .done { opacity: .5; }
   .al-line { display: flex; align-items: center; gap: 8px; font-size: .88rem; }
   .al-actions { display: flex; flex-wrap: wrap; gap: 2px; }
+  .trip { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: grid; gap: 6px; }
+  .trip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .9rem; }
+  .trip-head b { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .trip-now { font-size: .82rem; color: var(--muted); }
+  .trip-legs { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .tl { padding: 6px 0 6px 12px; margin-left: 6px; border-left: 4px solid var(--lc, var(--text)); display: grid; gap: 2px; font-size: .86rem; }
+  .tl.walk { border-left: 3px dotted var(--muted); margin-left: 6.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .tl.walk > span { flex: 1; }
+  .tl.done { opacity: .45; }
+  .tl.now { background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 0 8px 8px 0; }
+  .tl .tl-line { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  .tl .chip { margin-left: auto; font-size: .7rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+  .tl.now .chip { border-color: var(--accent); color: var(--accent); }
+  .tl time { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .tl .was { text-decoration: line-through; color: var(--muted); font-weight: 400; margin-right: 3px; }
+  .tl .changed { color: #c62828; font-weight: 600; }
+  .trip-warn { border: 1px solid #c62828; background: rgba(198,40,40,.07); border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; font-size: .86rem; }
+  .trip-warn.tight { border-color: #b26a00; background: rgba(178,106,0,.08); }
+  .trip-alt { text-align: left; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; padding: 7px 10px; font: inherit; font-size: .85rem; cursor: pointer; display: grid; gap: 1px; }
+  .trip-alt small { color: var(--muted); }
+  .trip-alt.best { border-color: #1a7f37; }
+  @media (prefers-color-scheme: dark) { .tl .changed { color: #ff8a80; } .trip-warn { border-color: #ff8a80; } .trip-alt.best { border-color: #6fdc8c; } }
   .note { color: var(--muted); font-size: .72rem; margin: 6px 0 0; }
   .walk-status { background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: .82rem; margin-top: 6px; }
   .settings-body { padding: 12px; overflow: auto; display: grid; gap: 12px; align-content: start; }
@@ -313,7 +337,7 @@
 
   <!-- Departure alarms (US-16) — visible on both tabs -->
   <section id="alarmCard" class="card" hidden>
-    <p class="section-title"><span data-i18n="alarmsTitle"></span></p>
+    <p class="section-title"><span data-i18n="followTitle"></span></p>
     <ul id="alarmList"></ul>
     <div id="walkStatus" class="walk-status" hidden><span id="walkStatusText"></span> <button id="walkStop" class="ghost" data-i18n="stopMeasuring"></button></div>
     <p class="note" data-i18n="webNote"></p>
@@ -594,6 +618,16 @@
       startEarlier: 'leave {d} earlier', startSame: 'leave at the same time', busStartAlt: '🚌 Take the {line} first instead', busStartDetail: 'leave {leave} · {d}',
       startLearned: 'You often start on foot here.', minSooner: '{n} min sooner', minLater: '{n} min later',
       leaveEarlierBy: 'leave {n} min earlier', leaveLaterBy: 'leave {n} min later', tagStartPossible: '🚶 Start on foot?', tagStartBetter: '🚶 Leave later on foot', tagOnFootStart: '🚶 On foot at the start',
+      followTitle: 'Followed journeys', followJourney: '▶ Follow this journey (alarms included)', arriveAt: 'Arrive {t}',
+      tripLive: 'live', tripPlanned: 'timetable', chipDone: 'done', chipOnBoard: 'on board', chipNext: 'next', chipWalk: 'walking',
+      tripNowRide: 'On board: {line} — get off at {stop} at {t}', tripNowWait: 'Next: {line} at {t} from {stop}{plat}', tripNowWalk: 'Walking to {to}',
+      tripDone: 'Journey finished', wasPlat: 'was {p}', arrivalLost: 'connection missed: choose an alternative', notLive: 'not in the live data (cancelled?)', platChanged: 'now {p}',
+      missedTitle: '⚠ Connection missed at {stop}', missedBody: 'You arrive at {arr}, the {line} leaves at {dep}.',
+      tightTitle: '⚠ Tight connection at {stop}', tightBody: '{n} min to change ({arr} → {dep}).',
+      altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
+      altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
+      altApplied: 'Journey updated: {what}.', platformNotify: 'Platform change', platformBody: '{line} now leaves from {p} at {stop}.',
+      missedNotify: 'Connection missed', missedNotifyBody: 'At {stop}: {line} leaves at {dep}, you arrive at {arr}. Alternatives in the app.',
       liveShort: 'live', gpsOn: '📍 Following your position: the reminder rings when you leave the stop before.',
       gpsWaiting: '📍 Waiting for a precise position… until then the live time decides.',
       gpsDenied: 'Position not allowed: reminders follow the live time only.',
@@ -682,6 +716,16 @@
       startEarlier: 'partez {d} plus tôt', startSame: 'départ à la même heure', busStartAlt: '🚌 Prendre plutôt le {line} au départ', busStartDetail: 'départ {leave} · {d}',
       startLearned: 'Vous partez souvent à pied ici.', minSooner: '{n} min plus tôt', minLater: '{n} min plus tard',
       leaveEarlierBy: 'partez {n} min plus tôt', leaveLaterBy: 'partez {n} min plus tard', tagStartPossible: '🚶 Départ à pied ?', tagStartBetter: '🚶 Partir plus tard à pied', tagOnFootStart: '🚶 Départ à pied',
+      followTitle: 'Trajets suivis', followJourney: '▶ Suivre ce trajet (alarmes comprises)', arriveAt: 'Arrivée {t}',
+      tripLive: 'en direct', tripPlanned: 'horaire', chipDone: 'fait', chipOnBoard: 'à bord', chipNext: 'suivant', chipWalk: 'à pied',
+      tripNowRide: 'À bord : {line} — descendez à {stop} à {t}', tripNowWait: 'Prochain : {line} à {t} depuis {stop}{plat}', tripNowWalk: 'À pied jusqu\u2019à {to}',
+      tripDone: 'Trajet terminé', wasPlat: 'avant : {p}', arrivalLost: 'correspondance manquée : choisissez une alternative', notLive: 'absent des données en direct (supprimé ?)', platChanged: 'maintenant {p}',
+      missedTitle: '⚠ Correspondance manquée à {stop}', missedBody: 'Vous arrivez à {arr}, le {line} part à {dep}.',
+      tightTitle: '⚠ Correspondance serrée à {stop}', tightBody: '{n} min pour changer ({arr} → {dep}).',
+      altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
+      altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
+      altApplied: 'Trajet mis à jour : {what}.', platformNotify: 'Changement de quai', platformBody: '{line} part maintenant du {p} à {stop}.',
+      missedNotify: 'Correspondance manquée', missedNotifyBody: 'À {stop} : le {line} part à {dep}, vous arrivez à {arr}. Alternatives dans l\u2019app.',
       liveShort: 'direct', gpsOn: '📍 Position suivie : le rappel sonne quand vous quittez l\u2019arrêt précédent.',
       gpsWaiting: '📍 En attente d\u2019une position précise… en attendant, l\u2019horaire en direct décide.',
       gpsDenied: 'Position non autorisée : les rappels suivent seulement l\u2019horaire en direct.',
@@ -1150,6 +1194,7 @@
   let toastTimer = null, undoAction = null;
   function showToast(message, undo) {
     undoAction = undo;
+    $('toastUndo').hidden = !undo;
     $('toastText').textContent = message;
     $('toast').hidden = false;
     clearTimeout(toastTimer);
@@ -1750,12 +1795,12 @@
     return { mode, at: isNaN(at) ? new Date() : at };
   }
 
-  async function fetchConnections(a, b, when, signal) {
+  async function fetchConnections(a, b, when, signal, ctx) {
     const access = walkMinutes(a.meters), egress = walkMinutes(b.meters);
     // Ask from the moment the rider can actually be at the first stop (or by when they must leave the last one)
     const ref = when.mode === 'arrive' ? new Date(when.at - egress * 60000) : new Date(Math.max(when.at, Date.now()) + access * 60000);
     const r = await data.connections(a.id, b.id, ref, when.mode === 'arrive', signal);
-    return (r.connections || []).map(c => buildJourney(c, a, b)).filter(Boolean);
+    return (r.connections || []).map(c => buildJourney(c, a, b, ctx)).filter(Boolean);
   }
 
   const tsOr = (ts, s) => ts ? new Date(ts * 1000) : parseTime(s);
@@ -1786,10 +1831,11 @@
     }).filter(v => v.name);
   }
   // Where each walk starts and ends (US-32): a place, or a stop and its platform
-  function placeWalks(legs, a, b) {
+  function placeWalks(legs, a, b, ctx) {
+    const P = ctx || places;   // the journey's own start and destination (a re-plan starts at a change stop)
     const named = (p, fallback) => ['saved', 'addr'].includes(p.kind) ? p.name : t(fallback);
-    const startPlace = places.from && places.from.kind !== 'stop' ? { name: named(places.from, 'yourStart'), coord: places.from.coord } : null;
-    const endPlace = places.to && places.to.kind !== 'stop' ? { name: named(places.to, 'yourDestination'), coord: places.to.coord } : null;
+    const startPlace = P.from && P.from.kind !== 'stop' ? { name: named(P.from, 'yourStart'), coord: P.from.coord } : null;
+    const endPlace = P.to && P.to.kind !== 'stop' ? { name: named(P.to, 'yourDestination'), coord: P.to.coord } : null;
     const stopEnd = (st, platform, mode) => st && st.name ? { name: st.name, stopId: st.id, coord: st.coord, platform, mode } : null;
     legs.forEach((l, i) => {
       if (l.type !== 'walk') return;
@@ -1815,7 +1861,7 @@
     }
   }
 
-  function buildJourney(c, a, b) {
+  function buildJourney(c, a, b, ctx) {
     const legs = [];
     if (a.meters > 30) legs.push({ type: 'walk', min: walkMinutes(a.meters), meters: a.meters, to: a.name, edge: 'access' });
     for (const s of c.sections || []) {
@@ -1841,7 +1887,7 @@
       }
     }
     if (b.meters > 30) legs.push({ type: 'walk', min: walkMinutes(b.meters), meters: b.meters, from: b.name, to: '', edge: 'egress' });
-    placeWalks(legs, a, b);
+    placeWalks(legs, a, b, ctx);
     mergeWalks(legs);
     const rides = legs.filter(l => l.type === 'ride');
     if (!rides.length || !rides[0].dep) return null;
@@ -2116,7 +2162,7 @@
     }
     return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
       <ul class="legs">${rows}</ul>
-      ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('setAlarms'))}</button>` : ''}</div>`;
+      ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('followJourney'))}</button>` : ''}</div>`;
   }
 
   // US-32: one walk on the map, from its start to its end (platform positions when known)
@@ -2232,7 +2278,7 @@
   // Live delay of the first vehicle since the alarm was set: used for rides not yet followed live
   const alightShift = a => a.live && a.created0 ? a.live.dep - a.created0 : 0;
   // Reminder time: the live departure from the stop before, else the planned one shifted by the first vehicle's delay
-  const alightAt = (a, x) => x.liveAt || (x.at + alightShift(a));
+  const alightAt = (a, x) => x.liveAt || (x.at + (x.noShift ? 0 : alightShift(a)));
   const lastAlightAt = a => (a.alights || []).reduce((m, x) => Math.max(m, alightAt(a, x)), 0);
 
   // ---------- Get-off reminders by position (US-35) ----------
@@ -2331,7 +2377,9 @@
                mode: f.mode, label: f.label, style: f.style, to: f.to, sched: f.dep.getTime(), platform: f.platform },
       live: f.real ? { dep: f.real.getTime(), at: Date.now() } : null,
       created0: (f.real || f.dep).getTime(),   // first departure when the alarm was set, to shift the get-off times with live data
-      alights: alightPlan(j)
+      alights: alightPlan(j),
+      // US-38: the whole journey, followed live
+      plan: planOf(j), dest: places.to, rev: 0
     };
     // US-33: set after the first vehicle left → already on board: no departure alarms, only get-off reminders.
     // Set after the leave time → only "Leave" rings (at once). Set after the get-ready time → "Get ready" rings at once.
@@ -2364,6 +2412,7 @@
         <div class="status" data-k="src">${esc(src)} · ${esc(t('walkInfo', { min: fmtMin(tm.walk), speed: s.speedKmh.toFixed(1), margin: s.marginMin, prep: s.prepMin }))}</div>
         ${a.onBoard ? `<div class="status" data-k="onboard">${esc(t('onBoard'))}</div>` : tight}
         ${alightLine(a, s)}
+        ${tripHtml(a)}
         <div class="al-actions">
           <button class="ghost" data-act="test-ready">${esc(t('testReady'))}</button>
           <button class="ghost" data-act="test-leave">${esc(t('testLeave'))}</button>
@@ -2393,7 +2442,7 @@
       }
     }
     // forget alarms 10 min after the departure, or after the last get-off reminder
-    const kept = list.filter(a => now <= Math.max(alarmTimes(a, s).dep, lastAlightAt(a)) + 10 * 60000);
+    const kept = list.filter(a => now <= Math.max(alarmTimes(a, s).dep, lastAlightAt(a), (a.plan && tripArrival(a.plan)) || 0) + 10 * 60000);
     if (changed || kept.length !== list.length) { saveAlarms(kept); renderAlarms(); }
   }
 
@@ -2426,7 +2475,281 @@
         if (n.real) { a.live = { dep: n.real.getTime(), at: Date.now() }; changed = true; }
       } catch { /* keep the last known time */ }
     }
-    if (changed) { saveAlarms(list); renderAlarms(); tickAlarms(); }
+    // US-38: every ride of the followed journeys, at its boarding stop
+    for (const a of list) {
+      if (!a.plan) continue;
+      if (await refreshTrip(a, boardOf, schedOf)) changed = true;
+    }
+    if (changed) { saveAlarmsMerged(list); renderAlarms(); tickAlarms(); }
+  }
+  // Save the live updates without undoing a change the rider made meanwhile (an alternative chosen: rev changed)
+  function saveAlarmsMerged(updated) {
+    const current = getAlarms();
+    saveAlarms(current.map(c => { const u = updated.find(x => x.id === c.id); return u && (u.rev || 0) === (c.rev || 0) ? u : c; }));
+  }
+
+  // ---------- Followed journey (US-38) ----------
+  // The plan of the journey is kept with its alarms (times in ms). Each ride is followed at its boarding stop:
+  // live departure, platform, live arrival at the get-off stop. Connections are checked; when one is missed,
+  // alternatives are looked for: the next run of the same line, another route from the change stop, or walking.
+  const ms = d => d ? new Date(d).getTime() : null;
+  function planOf(j) {
+    return j.legs.map(l => l.type === 'ride'
+      ? { type: 'ride', mode: l.mode, label: l.label, style: l.style, color: l.color, category: l.category, number: l.number, to: l.to,
+          from: l.from, toStop: l.toStop, dep: ms(l.dep), real: ms(l.real), arr: ms(l.arr), arrReal: ms(l.arrReal),
+          platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops,
+          via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), depAt: ms(v.depAt), live: !!v.live })) }
+      : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '' });
+  }
+  // Back to a journey with Date objects, for the helpers shared with the planner (get-off reminders)
+  function hydrate(plan) {
+    const D = v => v != null ? new Date(v) : null;
+    const legs = plan.map(l => l.type !== 'ride' ? Object.assign({}, l) : Object.assign({}, l, {
+      dep: D(l.dep), real: D(l.real), arr: D(l.arr), arrReal: D(l.arrReal),
+      via: l.via.map(v => Object.assign({}, v, { time: D(v.time), depAt: D(v.depAt) })) }));
+    return { legs, rides: legs.filter(l => l.type === 'ride') };
+  }
+  const depOf = r => r.real || r.dep, arrOf = r => r.arrReal || r.arr;
+  const walkBetween = (plan, i, k) => plan.slice(i + 1, k).filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0);
+  // Arrival at the destination: last ride + the walks after it (or a walk-only end)
+  function tripArrival(plan) {
+    let last = -1; plan.forEach((l, k) => { if (l.type === 'ride') last = k; });
+    if (last < 0) return null;
+    return arrOf(plan[last]) + walkBetween(plan, last, plan.length) * 60000;
+  }
+  // Changes: from ride at index i to the next ride at index k
+  function tripConnections(plan) {
+    const idx = plan.map((l, k) => l.type === 'ride' ? k : -1).filter(k => k >= 0);
+    return idx.slice(0, -1).map((i, n) => {
+      const k = idx[n + 1], cur = plan[i], next = plan[k];
+      const ready = arrOf(cur) + walkBetween(plan, i, k) * 60000;
+      const slack = Math.floor((depOf(next) - ready) / 60000);
+      return { i, k, cur, next, ready, slack, state: slack < 0 ? 'missed' : slack < 2 ? 'tight' : 'ok' };
+    });
+  }
+
+  async function refreshTrip(a, boardOf, schedOf) {
+    const now = Date.now();
+    let changed = false;
+    for (const r of a.plan) {
+      if (r.type !== 'ride' || arrOf(r) < now - 120000 || r.dep - now > 90 * 60000 || !r.from.id) continue;
+      const board = await boardOf(r.from.id, new Date(Math.min(r.dep, now) - LOOKBACK_MIN * 60000));
+      if (!board) continue;
+      const list = board.stationboard || [];
+      const m = list.find(j => String(j.category) === String(r.category) && String(j.number) === String(r.number) && Math.abs(schedOf(j) - r.dep) < 90000);
+      const before = JSON.stringify([r.real, r.arrReal, r.platformLive, r.missing]);
+      if (!m) {
+        // the board covers that time but the run is not there: probably cancelled
+        r.missing = list.some(j => schedOf(j) > r.dep + 5 * 60000) && r.dep > now;
+      } else {
+        const nm = normalize(m), shift = nm.real ? nm.real.getTime() - r.dep : 0;
+        r.missing = false;
+        r.real = nm.real ? nm.real.getTime() : null;
+        const plat = (m.stop && ((m.stop.prognosis && m.stop.prognosis.platform) || m.stop.platform)) || '';
+        r.platformLive = plat && plat !== r.platform ? plat : null;
+        const at = id => (m.passList || []).find(x => x.station && x.station.id === id);
+        const p = at(r.toStop.id);
+        const live = p && (parseTime(p.prognosis && p.prognosis.arrival) || null);
+        r.arrReal = live ? live.getTime() : (shift ? r.arr + shift : null);
+        for (const v of r.via) {
+          const q = at(v.id), lv = q && parseTime(q.prognosis && (q.prognosis.departure || q.prognosis.arrival));
+          if (lv) { v.time = lv.getTime(); v.live = true; } else if (shift) { v.time = v.time + shift - (v.shift || 0); v.shift = shift; v.live = true; }
+        }
+        // a platform change for a ride still to take rings once
+        if (r.platformLive && r.dep > now && !(a.fired['plat' + r.dep] === r.platformLive)) {
+          a.fired['plat' + r.dep] = r.platformLive;
+          fireTrip(t('platformNotify'), t('platformBody', { line: `${modeName(r.mode)} ${r.label}`, p: t(r.mode === 'train' ? 'track' : 'platform', { p: r.platformLive }), stop: r.from.name }));
+        }
+      }
+      if (JSON.stringify([r.real, r.arrReal, r.platformLive, r.missing]) !== before) changed = true;
+    }
+    // get-off reminders follow the new live times of the rides
+    const h = hydrate(a.plan);
+    a.alights.forEach((x, n) => {
+      const r = h.rides[n]; if (!r || a.fired['alight' + n]) return;
+      const prev = r.via.length ? r.via[r.via.length - 1] : null;
+      const liveAt = prev ? (prev.live ? prev.time : null) : r.real;
+      if (liveAt && x.liveAt !== liveAt.getTime()) { x.liveAt = liveAt.getTime(); changed = true; }
+    });
+    // a missed (or now impossible) connection: warn once, then look for alternatives
+    for (const c of tripConnections(a.plan)) {
+      if (c.state !== 'missed' && !c.next.missing) continue;
+      if (depOf(c.next) < now - 10 * 60000) continue;   // long past
+      const key = 'miss' + c.next.dep;
+      if (!a.fired[key]) {
+        a.fired[key] = now; changed = true;
+        fireTrip(t('missedNotify'), t('missedNotifyBody', { stop: c.cur.toStop.name, line: `${modeName(c.next.mode)} ${c.next.label}`,
+          dep: hhmm(new Date(depOf(c.next))), arr: hhmm(new Date(c.ready)) }));
+      }
+      if (!a.alts || a.alts.for !== c.next.dep || now - a.alts.at > 2 * 60000) {
+        a.alts = { for: c.next.dep, at: now, list: null };
+        a.alts.list = await findAlternatives(a, c, boardOf, schedOf);
+        changed = true;
+      }
+      break;   // the first broken change decides what comes next
+    }
+    return changed;
+  }
+
+  async function findAlternatives(a, c, boardOf, schedOf) {
+    const out = [], T = c.cur.toStop, dest = a.dest;
+    // 1. the next run of the same line, same direction, that can still be caught
+    try {
+      const board = await boardOf(c.next.from.id, new Date(c.ready - 5 * 60000));
+      const runs = ((board && board.stationboard) || []).filter(j => String(j.category) === String(c.next.category) && String(j.number) === String(c.next.number)
+        && (j.passList || []).some(p => p.station && p.station.id === c.next.toStop.id))
+        .map(j => ({ j, n: normalize(j) })).filter(({ n }) => n.sched && (n.real || n.sched).getTime() >= c.ready && n.sched.getTime() > c.next.dep + 30000)
+        .sort((x, y) => (x.n.real || x.n.sched) - (y.n.real || y.n.sched));
+      if (runs.length) {
+        const { j, n } = runs[0], dep = (n.real || n.sched).getTime();
+        const p = (j.passList || []).find(x => x.station && x.station.id === c.next.toStop.id);
+        const arrStop = (p && (parseTime(p.prognosis && p.prognosis.arrival) || parseTime(p.arrival))) || null;
+        const arrNext = arrStop ? arrStop.getTime() : dep + (arrOf(c.next) - depOf(c.next));
+        const shiftAfter = arrNext - arrOf(c.next);
+        out.push({ kind: 'next', dep, sched: n.sched.getTime(), real: n.real ? n.real.getTime() : null, arrNext,
+                   arrive: tripArrival(a.plan) + shiftAfter, line: `${modeName(c.next.mode)} ${c.next.label}`, mode: c.next.mode, style: c.next.style, label: c.next.label });
+      }
+    } catch { /* no board */ }
+    // 2. another route from the change stop to the destination
+    try {
+      if (dest && T.id) {
+        const ctx = { from: { kind: 'stop', id: T.id, name: T.name, coord: T.coord }, to: dest };
+        const toC = await candidates(dest, 2);
+        const lists = await Promise.all(toC.filter(b => b.id !== T.id).map(b => fetchConnections({ id: T.id, name: T.name, coord: T.coord, meters: 0 }, b,
+          { mode: 'depart', at: new Date(c.ready) }, null, ctx).catch(() => [])));
+        const sameAsNext = jj => jj.rides[0].label === c.next.label && Math.abs(jj.rides[0].dep - c.next.dep) < 90000;
+        lists.flat().filter(jj => jj.leaveAt.getTime() >= c.ready - 60000 && !sameAsNext(jj))
+          .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 2)
+          .forEach(jj => out.push({ kind: 'replan', dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), arrive: jj.arriveAt.getTime(),
+            lines: jj.rides.map(r => `${modeName(r.mode)} ${r.label}`).join(' › '), first: jj.rides[0], plan: planOf(jj) }));
+      }
+    } catch { /* no route */ }
+    // 3. finishing on foot from the change stop
+    if (dest && dest.coord && T.coord) {
+      const straight = distanceM(T.coord, dest.coord), min = walkMinutes(straight);
+      if (min <= Math.max(25, getSettings().footMaxMin)) {
+        const end = { name: ['saved', 'addr', 'stop'].includes(dest.kind) ? placeLabel(dest) : t('yourDestination'), coord: dest.coord };
+        out.push({ kind: 'foot', min, meters: straight * DETOUR, arrive: arrOf(c.cur) + min * 60000, stop: T.name,
+                   start: { name: T.name, stopId: T.id, coord: T.coord, platform: c.cur.arrPlatform, mode: c.cur.mode }, end });
+      }
+    }
+    // the same alternative twice (same first ride): keep one
+    const seen = new Set();
+    return out.filter(o => { const k = o.kind + (o.dep || '') + (o.lines || ''); if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((x, y) => x.arrive - y.arrive);
+  }
+
+  // The rider picks an alternative: the rest of the journey after the missed change is replaced
+  function applyAlternative(id, n) {
+    const list = getAlarms(), a = list.find(x => x.id === id);
+    if (!a || !a.alts || !a.alts.list || !a.alts.list[n]) return;
+    const o = a.alts.list[n];
+    const c = tripConnections(a.plan).find(x => x.next.dep === a.alts.for);
+    if (!c) return;
+    let what;
+    if (o.kind === 'next') {
+      const r = a.plan[c.k], shift = o.sched - r.dep;
+      Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrNext, platformLive: null, missing: false });
+      r.via.forEach(v => { v.time += shift; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
+      // later rides are followed live again as they are
+      what = `${o.line} ${hhmm(new Date(o.dep))}`;
+    } else if (o.kind === 'replan') {
+      a.plan = [...a.plan.slice(0, c.i + 1), ...o.plan];
+      what = o.lines;
+    } else {
+      a.plan = [...a.plan.slice(0, c.i + 1), { type: 'walk', min: o.min, meters: o.meters, start: o.start, end: o.end, edge: 'egress', to: '' }];
+      what = t('altFoot', { stop: o.stop }).replace(/^🚶\s*/, '');
+    }
+    // get-off reminders: rides already done keep theirs, the new ones are planned afresh
+    const nDone = a.plan.slice(0, c.i + 1).filter(l => l.type === 'ride').length;
+    const fresh = alightPlan(hydrate(a.plan)).map((x, k) => k < nDone ? Object.assign(a.alights[k] || x, {}) : Object.assign(x, { noShift: true }));
+    Object.keys(a.fired).filter(k => /^alight\d+$/.test(k) && +k.slice(6) >= nDone).forEach(k => delete a.fired[k]);
+    if (a.gpsSeen) Object.keys(a.gpsSeen).filter(k => +k >= nDone).forEach(k => delete a.gpsSeen[k]);
+    a.alights = fresh;
+    a.alts = null; a.rev = (a.rev || 0) + 1;
+    saveAlarms(list); renderAlarms(); tickAlarms();
+    showToast(t('altApplied', { what }), null);
+  }
+
+  function fireTrip(title, body) {
+    $('abTitle').textContent = '🔔 ' + title;
+    $('abBody').textContent = body;
+    $('abTrack').hidden = true;
+    $('alarmBanner').dataset.kind = 'trip';
+    $('alarmBanner').hidden = false;
+    beep();
+    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch { /* no vibration */ }
+    notify(title, body);
+  }
+
+  function tripHtml(a) {
+    if (!a.plan) return '';
+    const now = Date.now(), plan = a.plan;
+    const arrive = tripArrival(plan);
+    const live = plan.some(l => l.type === 'ride' && (l.real || l.arrReal));
+    const rides = plan.filter(l => l.type === 'ride');
+    // where am I: on board, waiting for the next ride, walking, or done
+    let state;
+    const onBoard = rides.find(r => depOf(r) <= now && arrOf(r) > now);
+    const nextRide = rides.find(r => depOf(r) > now);
+    if (arrive && now > arrive) state = t('tripDone');
+    else if (onBoard) state = t('tripNowRide', { line: `${modeName(onBoard.mode)} ${onBoard.label}`, stop: onBoard.toStop.name, t: hhmm(new Date(arrOf(onBoard))) });
+    else if (nextRide) {
+      const p = nextRide.platformLive || nextRide.platform;
+      state = t('tripNowWait', { line: `${modeName(nextRide.mode)} ${nextRide.label}`, t: hhmm(new Date(depOf(nextRide))), stop: nextRide.from.name,
+        plat: p ? ` (${t(nextRide.mode === 'train' ? 'track' : 'platform', { p })})` : '' });
+    } else state = t('tripNowWalk', { to: placeLabel(a.dest) || t('yourDestination') });
+    const tm = v => hhmm(new Date(v));
+    const timeHtml = (planned, real) => real && Math.floor(real / 60000) !== Math.floor(planned / 60000)
+      ? `<span class="was">${tm(planned)}</span><time class="late">${tm(real)}</time>` : `<time>${tm(planned)}</time>`;
+    const curIdx = plan.findIndex(l => l.type === 'ride' ? arrOf(l) > now : false);
+    const rows = plan.map((l, k) => {
+      if (l.type === 'walk') {
+        const map = l.start && l.end && (l.start.coord || l.start.stopId) && (l.end.coord || l.end.stopId)
+          ? `<button class="ghost walk-map" data-act="walk-map" data-leg="${k}">${MAP_ICON}${esc(t('walkOnMap'))}</button>` : '';
+        const to = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: (l.end && l.end.name) || l.to || '' });
+        return `<li class="tl walk"><span>🚶 ${esc(t('walkMin', { min: fmtMin(l.min) }))} — ${esc(to)}</span>${map}</li>`;
+      }
+      const done = arrOf(l) < now - 30000, boarded = depOf(l) <= now && !done, isNext = k === curIdx && !boarded;
+      const cls = done ? ' done' : boarded ? ' now' : isNext ? ' now' : '';
+      const chip = done ? t('chipDone') : boarded ? t('chipOnBoard') : isNext ? t('chipNext') : '';
+      const plat = l.platformLive
+        ? ` · <span class="changed">${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platformLive }))}</span> <small>(${esc(t('wasPlat', { p: l.platform }))})</small>`
+        : l.platform ? ` · ${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platform }))}` : '';
+      const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
+      return `<li class="tl ride${cls}"${colour}><div class="tl-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span>→ ${esc(l.to)}</span>` +
+        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` +
+        `<div>${timeHtml(l.dep, l.real)} ${esc(l.from.name)}${plat}</div>` +
+        (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') +
+        `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}</div></li>`;
+    }).join('');
+    // a broken or tight connection, with what can be done
+    let warn = '';
+    const broken = tripConnections(plan).find(c => (c.state !== 'ok' || c.next.missing) && depOf(c.next) > now - 10 * 60000);
+    if (broken) {
+      const missed = broken.state === 'missed' || broken.next.missing;
+      const vars = { stop: broken.cur.toStop.name, line: `${modeName(broken.next.mode)} ${broken.next.label}`, arr: tm(broken.ready), dep: tm(depOf(broken.next)), n: broken.slack };
+      let alts = '';
+      if (missed) {
+        const list = a.alts && a.alts.for === broken.next.dep ? a.alts.list : null;
+        alts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? `<small>${esc(t('altNone'))}</small>` :
+          list.map((o, n) => {
+            const title = o.kind === 'next' ? t('altNext', { line: o.line, dep: tm(o.dep) })
+              : o.kind === 'replan' ? t('altReplan', { lines: o.lines, dep: tm(o.dep) })
+              : t('altFoot', { stop: o.stop }) + ` · ${fmtMin(o.min)} min`;
+            return `<button class="trip-alt${n === 0 ? ' best' : ''}" data-act="alt" data-n="${n}"><span>${esc(title)}</span>` +
+              `<small>${esc(t('altArrive', { t: tm(o.arrive) }))}${n === 0 && list.length > 1 ? esc(t('altBest')) : ''}</small></button>`;
+          }).join('');
+      }
+      warn = `<div class="trip-warn${missed ? '' : ' tight'}"><b>${esc(t(missed ? 'missedTitle' : 'tightTitle', vars))}</b>` +
+        `<span>${esc(t(missed ? 'missedBody' : 'tightBody', vars))}</span>${alts}</div>`;
+    }
+    // with a missed connection, the planned arrival no longer holds
+    const lost = broken && (broken.state === 'missed' || broken.next.missing);
+    const head = lost ? `${esc(t('arriveAt', { t: '' }))}<span class="was">${arrive ? tm(arrive) : ''}</span> <span class="changed">${esc(t('arrivalLost'))}</span>`
+      : `${esc(t('arriveAt', { t: arrive ? tm(arrive) : '—' }))} · <small>${esc(t(live ? 'tripLive' : 'tripPlanned'))}</small>`;
+    return `<div class="trip"><div class="trip-head"><span>${head}</span></div>` +
+      `<div class="trip-now">${esc(state)}</div>${warn}<ol class="trip-legs">${rows}</ol></div>`;
   }
 
   // ---------- Ringing: banner, sound, vibration, notification ----------
@@ -2871,6 +3194,8 @@
     const id = b.closest('.alarm').dataset.id, a = getAlarms().find(x => x.id === id); if (!a) return;
     unlockAudio();
     if (b.dataset.act === 'cancel') { saveAlarms(getAlarms().filter(x => x.id !== id)); renderAlarms(); }
+    else if (b.dataset.act === 'alt') applyAlternative(a.id, +b.dataset.n);
+    else if (b.dataset.act === 'walk-map') { const l = a.plan && a.plan[+b.dataset.leg]; if (l) openWalkMap(l); }
     else if (b.dataset.act === 'test-alight') fireAlight(a, 0);
     else fireAlarm(a, b.dataset.act === 'test-ready' ? 'ready' : 'leave');   // test: rings without marking the alarm as done
   });
@@ -2903,6 +3228,7 @@
   });
   setInterval(tickAlarms, 5000);
   setInterval(updateGpsWatch, 5000);
+  setInterval(() => { if (getAlarms().some(a => a.plan)) renderAlarms(); }, 20000);   // progress of followed journeys
   setInterval(refreshAlarmsLive, LIVE_REFRESH_MS);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tickAlarms(); });
   document.addEventListener('visibilitychange', () => {
