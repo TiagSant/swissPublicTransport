@@ -5,10 +5,10 @@
     <siri:ServiceRequestContext>
       <siri:Language>fr</siri:Language>
     </siri:ServiceRequestContext>
-    <siri:RequestTimestamp>2026-11-12T12:42:52.546Z</siri:RequestTimestamp>
+    <siri:RequestTimestamp>2026-11-12T15:16:00.193Z</siri:RequestTimestamp>
     <siri:RequestorRef>swissPublicTransport_prototype</siri:RequestorRef>
     <OJPTripRequest>
-      <siri:RequestTimestamp>2026-11-12T12:42:52.546Z</siri:RequestTimestamp>
+      <siri:RequestTimestamp>2026-11-12T15:16:00.193Z</siri:RequestTimestamp>
       <Origin>
         <PlaceRef>
           <GeoPosition>
@@ -20,7 +20,7 @@
             <Text>46.189000,6.115000</Text>
           </Name>
         </PlaceRef>
-        <DepArrTime>2026-11-12T12:42:52.546Z</DepArrTime>
+        <DepArrTime>2026-11-12T15:16:00.193Z</DepArrTime>
       </Origin>
       <Destination>
         <PlaceRef>

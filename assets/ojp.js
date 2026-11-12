@@ -36,14 +36,15 @@
     `<LowerRight><siri:Longitude>${z.lonMax}</siri:Longitude><siri:Latitude>${z.latMin}</siri:Latitude></LowerRight>` +
     '</Rectangle></GeoRestriction>';
 
-  const lirRestrictions = limit =>
-    `<Restrictions><Type>stop</Type><NumberOfResults>${limit}</NumberOfResults><IncludePtModes>true</IncludePtModes></Restrictions>`;
+  // types: 'stop' (default), 'address', 'poi' — several allowed
+  const lirRestrictions = (limit, types) =>
+    `<Restrictions>${(types || ['stop']).map(x => `<Type>${x}</Type>`).join('')}<NumberOfResults>${limit}</NumberOfResults><IncludePtModes>true</IncludePtModes></Restrictions>`;
 
   // Stop search by name, optionally limited to an area
   function locationsByName(name, o = {}) {
     return envelope('<OJPLocationInformationRequest><siri:RequestTimestamp>{TS}</siri:RequestTimestamp>' +
       `<InitialInput><Name>${xesc(name)}</Name>${o.zone ? rectangle(o.zone) : ''}</InitialInput>` +
-      lirRestrictions(o.limit || 20) + '</OJPLocationInformationRequest>', o.lang, o.now);
+      lirRestrictions(o.limit || 20, o.types) + '</OJPLocationInformationRequest>', o.lang, o.now);
   }
 
   // Stops inside an area (used for "stops near me" and around a map point)
@@ -164,6 +165,29 @@
                       icon: MODE_ICON[mode] || null });
     }
     return { stations, error: errorCondition(doc) };
+  }
+
+  // Stop search mixing stops, addresses and places of interest (US-23)
+  function toPlaces(xml) {
+    const doc = parse(xml);
+    const out = [];
+    for (const r of all(doc, 'PlaceResult')) {
+      const place = el(r, 'Place'), coordinate = geo(place);
+      const sp = el(place, 'StopPlace'), ad = el(place, 'Address'), poi = el(place, 'PointOfInterest');
+      if (sp) {
+        const id = stopId7(txt(sp, 'StopPlaceRef'));
+        if (id) out.push({ type: 'stop', id, name: txt(sp, 'StopPlaceName') || txt(place, 'Name'), coordinate, icon: MODE_ICON[txt(place, 'Mode/PtMode')] || null });
+      } else if (ad && coordinate) {
+        out.push({ type: 'address', id: null, name: txt(ad, 'Name') || txt(place, 'Name'), coordinate,
+                   street: txt(ad, 'Street'), number: txt(ad, 'HouseNumber'), town: txt(ad, 'TopographicPlaceName') });
+      } else if (poi && coordinate) {
+        out.push({ type: 'poi', id: null, name: txt(poi, 'PointOfInterestName') || txt(place, 'Name'), coordinate });
+      }
+    }
+    // Building entrances ("60.1", "60.2"…) come with the main number: keep the main one
+    const mains = new Set(out.filter(x => x.type === 'address' && x.number && !x.number.includes('.')).map(x => x.street + '|' + x.number + '|' + x.town));
+    return { places: out.filter(x => !(x.type === 'address' && /\./.test(x.number || '') && mains.has(x.street + '|' + x.number.split('.')[0] + '|' + x.town))),
+             error: errorCondition(doc) };
   }
 
   function serviceInfo(service) {
@@ -288,7 +312,7 @@
   }
 
   const api = { ENDPOINT, REQUESTOR, locationsByName, locationsInZone, stopEvents, trip,
-                stopId7, splitTrainName, toLocations, toStationboard, toConnections, durationHMS };
+                stopId7, splitTrainName, toLocations, toPlaces, toStationboard, toConnections, durationHMS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.OJP_ADAPTER = api;
 })(typeof window !== 'undefined' ? window : globalThis);

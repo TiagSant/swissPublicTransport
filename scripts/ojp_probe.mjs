@@ -80,6 +80,9 @@ await post('app_lir_zone_esserts', APP.locationsInZone({ latMin: 46.1836, latMax
 await post('app_ser_esserts_full', APP.stopEvents('8587418', { from: ago(30), limit: 150 }));
 await post('app_ser_esserts_light', APP.stopEvents('8587418', { from: ago(30), limit: 150, onward: false }));
 await post('app_ser_belair_light', APP.stopEvents('8587387', { from: ago(30), limit: 150, onward: false }));
+await post('app_lir_address_rhone', APP.locationsByName('Rue du Rhône 10 Genève', { types: ['stop', 'address', 'poi'], limit: 10 }));
+await post('app_lir_poi_palexpo', APP.locationsByName('Palexpo', { types: ['stop', 'address', 'poi'], limit: 10 }));
+await post('app_lir_address_lancy', APP.locationsByName('Avenue des Communes-Réunies 60 Lancy', { types: ['address'], limit: 5 }));
 await post('app_tr_depart', APP.trip('8587418', '8587057', { at: new Date() }));
 await post('app_tr_arrive', APP.trip('8587418', '8587057', { at: new Date(Date.now() + 3600000), arrive: true }));
 
