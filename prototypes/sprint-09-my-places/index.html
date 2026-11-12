@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <!--
-  swissPublicTransport — Sprint 8 prototype: journey details
+  swissPublicTransport — Sprint 9 prototype: my places
+  - US-21: save Home, Work and other named places (from an address, a stop, my position or the map); rename, remove, undo.
+  - US-22: my places as one-tap chips on the Journey page, ordered by use, also suggested while typing.
+  - US-23: address search (stops, addresses, places of interest) in the From / To fields and when saving a place.
+  - US-27: removing the stop on screen shows the next most-used stop.
+  - US-33: departure alarms adapt to when they are set (on board: cancelled; less time: ring at once with the time left).
+  Sprint 8: journey details
   - US-28: the details of a journey open inside the result, one at a time.
   - US-29: each ride is drawn in the colour of its line.
   - US-30: unfold the intermediate stops of a ride, with their times.
@@ -38,7 +44,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1220">
-<title>Unireso departures — Sprint 8 prototype</title>
+<title>Unireso departures — Sprint 9 prototype</title>
 <script src="../../assets/line-colors.js"></script>
 <script src="../../assets/ojp.js"></script>
 <style>
@@ -263,6 +269,16 @@
   .src-badge.official { border-color: var(--accent); }
   .key-status.ok { color: #1a7f37; } .key-status.bad { color: #c62828; }
   @media (prefers-color-scheme: dark) { .key-status.ok { color: #6fdc8c; } .key-status.bad { color: #ff8a80; } }
+  .myplaces { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .mp-actions { display: inline-flex; gap: 4px; }
+  .place-chip .place-open { padding: 7px 4px 7px 11px; }
+  .place-chip .place-edit { padding: 0 4px; color: var(--muted); font-size: .85rem; }
+  .place-save { color: var(--muted); }
+  .results .kind { margin-left: auto; color: var(--muted); font-size: .72rem; }
+  .results .ico { width: 22px; text-align: center; flex: none; }
+  .place-chosen { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: .9rem; }
+  #placeKind { margin-bottom: 0; }
+  #mapSheet { z-index: 1100; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -346,10 +362,18 @@
   <!-- Journey planner (US-14, US-15, US-07, US-08, US-09) -->
   <div id="tab-journey" hidden>
     <section class="card">
+      <!-- My places (US-21, US-22) -->
+      <div id="myPlaces" class="myplaces">
+        <p class="section-title"><span data-i18n="myPlaces"></span>
+          <span class="mp-actions"><button id="addPlace" class="ghost" data-i18n="addPlace"></button><button id="clearPlaces" class="ghost" data-i18n="clearAll"></button></span></p>
+        <div id="placeChips" class="chips"></div>
+        <p id="placesHint" class="note" data-i18n="placesHint"></p>
+      </div>
       <div class="place">
         <label class="place-label" for="fromQ" data-i18n="from"></label>
         <div class="search-row">
           <input id="fromQ" type="search" autocomplete="off" data-i18n-placeholder="stopOrPlace">
+          <button class="place-save" data-which="from" data-i18n-title="savePlace" data-i18n-aria="savePlace" hidden>☆</button>
           <button class="place-me" data-which="from" data-i18n-title="myPosition" data-i18n-aria="myPosition">◎</button>
           <button class="place-map" data-which="from" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
         </div>
@@ -360,6 +384,7 @@
         <label class="place-label" for="toQ" data-i18n="to"></label>
         <div class="search-row">
           <input id="toQ" type="search" autocomplete="off" data-i18n-placeholder="stopOrPlace">
+          <button class="place-save" data-which="to" data-i18n-title="savePlace" data-i18n-aria="savePlace" hidden>☆</button>
           <button class="place-map" data-which="to" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
         </div>
         <ul id="toResults" class="results" hidden></ul>
@@ -396,6 +421,33 @@
 </main>
 
 <!-- Platform map (US-13) -->
+<!-- Save or edit a place (US-21) -->
+<div id="placeSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="placeTitle">
+  <div class="sheet-head">
+    <h3 id="placeTitle"></h3>
+    <button id="placeClose" data-i18n-aria="close" data-i18n-title="close">✕</button>
+  </div>
+  <div class="settings-body">
+    <div id="placeKind" class="seg" role="group">
+      <button data-kind="home" data-i18n="kindHome"></button>
+      <button data-kind="work" data-i18n="kindWork"></button>
+      <button data-kind="other" data-i18n="kindOther"></button>
+    </div>
+    <label class="key-row"><span data-i18n="placeName"></span><input id="placeName" type="text" maxlength="40" autocomplete="off"></label>
+    <div class="key-row"><span data-i18n="placeWhere"></span>
+      <div class="search-row">
+        <input id="placeQ" type="search" autocomplete="off" data-i18n-placeholder="addressOrStop">
+        <button id="placeMe" data-i18n-title="myPosition" data-i18n-aria="myPosition">◎</button>
+        <button id="placeMap" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
+      </div>
+      <ul id="placeResults" class="results" hidden></ul>
+      <div id="placeChosen" class="place-chosen" hidden><span id="placeChosenText"></span><button id="placeAdjust" class="ghost" data-i18n="adjustOnMap"></button></div>
+    </div>
+    <div id="placeMsg" class="status" role="status"></div>
+    <button id="placeSave" class="btn-primary" data-i18n="save"></button>
+  </div>
+</div>
+
 <div id="mapSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="mapTitle">
   <div class="sheet-head">
     <div><h3 id="mapTitle"></h3><div id="mapSub" class="status"></div></div>
@@ -476,7 +528,7 @@
   // The switch label names the target language in that language (standard practice), hence French in the EN block.
   const STRINGS = {
     en: {
-      title: 'Departures', prototype: 'Prototype · Sprint 8', switchTo: 'FR', switchToLabel: 'Afficher en français',
+      title: 'Departures', prototype: 'Prototype · Sprint 9', switchTo: 'FR', switchToLabel: 'Afficher en français',
       searchSection: 'Stop search', searchPlaceholder: 'Stop: Bel-Air, Cornavin, Pâquis…', nearMe: 'Stops near me',
       allSwitzerland: 'Include all of Switzerland', yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
       removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
@@ -498,7 +550,7 @@
       noLocation: 'Allow location to see how far it is.', platformUnknown: 'Exact position not available for {p} — showing the stop.',
       noPlatforms: 'Platform positions not available for this stop — showing the stop.', mapFailed: 'The map could not be loaded (network?).',
       mapSource: 'Platforms: ATLAS, opentransportdata.swiss · Map © OpenStreetMap contributors',
-      tabDepartures: 'Departures', tabJourney: 'Journey', from: 'From', to: 'To', stopOrPlace: 'Stop — or ◎ / 🗺',
+      tabDepartures: 'Departures', tabJourney: 'Journey', from: 'From', to: 'To', stopOrPlace: 'Stop, address, my place — or ◎ / 🗺',
       myPosition: 'My position', pickOnMap: 'Pick on the map', swap: 'Swap start and destination', pointOnMap: 'Point on the map',
       nearStop: '{d} from {name}', leaveNow: 'Leave now', departAt: 'Depart at', arriveBy: 'Arrive by',
       fastest: 'Fastest', leastWalking: 'Least walking', searchJourney: 'Search', chooseBoth: 'Choose a start and a destination.',
@@ -512,13 +564,23 @@
       alightBodyChange: 'Get off at {stop} and change to {line}{plat} at {dep}.', alightBodyEnd: 'Get off at {stop}, then {walk}.',
       alightBodyLast: 'Get off at {stop}.', alightWalkEnd: 'walk {min} min to your destination', testAlight: 'Test "Get off"',
       alightPlan: 'Get-off reminders: {list}', alightOff: 'Get-off reminders are off (Settings ⚙)',
+      myPlaces: 'My places', addPlace: '+ Add', placesHint: 'Save Home, Work or any address to plan your usual journeys in one tap.',
+      savePlace: 'Save this place', newPlace: 'Save a place', editPlace: 'Edit place', kindHome: 'Home', kindWork: 'Work', kindOther: 'Other',
+      placeName: 'Name', placeWhere: 'Where', addressOrStop: 'Address, stop or place', adjustOnMap: 'Adjust on map', save: 'Save',
+      pickPlace: 'Choose the place', needName: 'Give this place a name.', needWhere: 'Choose where this place is.',
+      replaceKind: 'This replaces your current {kind} ({name}). Tap Save again to confirm.', editPlaceOf: 'Edit {name}',
+      placeRemoved: '{name} removed', placesCleared: 'All places removed', kAddress: 'Address', kPoi: 'Place', kSaved: 'My place', kStop: 'Stop',
+      noPlaceFound: 'Nothing found in the Geneva area.',
+      readyBody: 'Leave at {leave} (in {left} min) to catch {line} at {dep} from {stop}.',
+      readyShortBody: 'Less time than planned: {left} min left to get ready. Leave at {leave} to catch {line} at {dep} from {stop}.',
+      onBoard: 'Already on board: departure alarms cancelled, only the get-off reminders remain.',
       setAlarms: '⏰ Set departure alarms', pickStart: 'Choose the start', pickEnd: 'Choose the destination',
       tapMap: 'Tap the map to place the point', usePoint: 'Use this point',
       alarmsTitle: 'Departure alarms', getReady: 'Get ready', leaveHome: 'Leave', departs: 'Departs',
       timetable: 'Timetable', liveDelay: 'Live {d}', liveOnTime: 'Live · on time',
       walkInfo: '{min} min walk at {speed} km/h · margin {margin} min · getting ready {prep} min',
       testReady: 'Test "Get ready"', testLeave: 'Test "Leave"', cancel: 'Cancel', mayMiss: 'It is tight — leave now!',
-      readyTitle: 'Time to get ready', readyBody: 'Leave at {leave} to catch {line} at {dep} from {stop}.',
+      readyTitle: 'Time to get ready',
       leaveTitle: 'Leave now', leaveBody: '{walk} min walk to {stop}. {line} leaves at {dep}.', ok: 'OK',
       measureWalk: 'Measure my walk', measuring: 'Measuring your walk to {stop}… {d} so far', stopMeasuring: 'Stop',
       learnedSpeed: 'You walked {d} in {time} → {kmh} km/h. Your walking speed is now {speed} km/h ({n} walks).',
@@ -543,7 +605,7 @@
       mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Boat', funicular: 'Funicular', cableway: 'Cable car', other: 'Other' }
     },
     fr: {
-      title: 'Départs', prototype: 'Prototype · Sprint 8', switchTo: 'EN', switchToLabel: 'Show in English',
+      title: 'Départs', prototype: 'Prototype · Sprint 9', switchTo: 'EN', switchToLabel: 'Show in English',
       searchSection: 'Recherche d’arrêt', searchPlaceholder: 'Arrêt : Bel-Air, Cornavin, Pâquis…', nearMe: 'Arrêts autour de moi',
       allSwitzerland: 'Inclure toute la Suisse', yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
       removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
@@ -565,7 +627,7 @@
       noLocation: 'Autorisez la localisation pour voir la distance.', platformUnknown: 'Position exacte inconnue pour : {p} — affichage de l\u2019arrêt.',
       noPlatforms: 'Position des quais non disponible pour cet arrêt — affichage de l\u2019arrêt.', mapFailed: 'Impossible de charger le plan (réseau ?).',
       mapSource: 'Quais : ATLAS, opentransportdata.swiss · Plan © contributeurs OpenStreetMap',
-      tabDepartures: 'Départs', tabJourney: 'Itinéraire', from: 'Départ', to: 'Arrivée', stopOrPlace: 'Arrêt — ou ◎ / 🗺',
+      tabDepartures: 'Départs', tabJourney: 'Itinéraire', from: 'Départ', to: 'Arrivée', stopOrPlace: 'Arrêt, adresse, mon lieu — ou ◎ / 🗺',
       myPosition: 'Ma position', pickOnMap: 'Choisir sur le plan', swap: 'Inverser départ et arrivée', pointOnMap: 'Point sur le plan',
       nearStop: 'à {d} de {name}', leaveNow: 'Partir maintenant', departAt: 'Départ à', arriveBy: 'Arrivée avant',
       fastest: 'Le plus rapide', leastWalking: 'Le moins de marche', searchJourney: 'Rechercher', chooseBoth: 'Choisissez un départ et une arrivée.',
@@ -579,13 +641,23 @@
       alightBodyChange: 'Descendez à {stop} et prenez le {line}{plat} à {dep}.', alightBodyEnd: 'Descendez à {stop}, puis {walk}.',
       alightBodyLast: 'Descendez à {stop}.', alightWalkEnd: 'marchez {min} min jusqu\u2019à votre destination', testAlight: 'Tester « Descendez »',
       alightPlan: 'Rappels de descente : {list}', alightOff: 'Rappels de descente désactivés (Réglages ⚙)',
+      myPlaces: 'Mes lieux', addPlace: '+ Ajouter', placesHint: 'Enregistrez Domicile, Travail ou toute adresse pour planifier vos trajets habituels en un geste.',
+      savePlace: 'Enregistrer ce lieu', newPlace: 'Enregistrer un lieu', editPlace: 'Modifier le lieu', kindHome: 'Domicile', kindWork: 'Travail', kindOther: 'Autre',
+      placeName: 'Nom', placeWhere: 'Où', addressOrStop: 'Adresse, arrêt ou lieu', adjustOnMap: 'Ajuster sur le plan', save: 'Enregistrer',
+      pickPlace: 'Choisir le lieu', needName: 'Donnez un nom à ce lieu.', needWhere: 'Choisissez où se trouve ce lieu.',
+      replaceKind: 'Ceci remplace votre {kind} actuel ({name}). Touchez Enregistrer à nouveau pour confirmer.', editPlaceOf: 'Modifier {name}',
+      placeRemoved: '{name} supprimé', placesCleared: 'Tous les lieux supprimés', kAddress: 'Adresse', kPoi: 'Lieu', kSaved: 'Mon lieu', kStop: 'Arrêt',
+      noPlaceFound: 'Rien trouvé dans la région genevoise.',
+      readyBody: 'Partez à {leave} (dans {left} min) pour prendre le {line} de {dep} à {stop}.',
+      readyShortBody: 'Moins de temps que prévu : il vous reste {left} min pour vous préparer. Partez à {leave} pour prendre le {line} de {dep} à {stop}.',
+      onBoard: 'Déjà à bord : alarmes de départ annulées, seuls les rappels de descente restent.',
       setAlarms: '⏰ Programmer les alarmes de départ', pickStart: 'Choisir le départ', pickEnd: 'Choisir l\u2019arrivée',
       tapMap: 'Touchez le plan pour placer le point', usePoint: 'Utiliser ce point',
       alarmsTitle: 'Alarmes de départ', getReady: 'Préparez-vous', leaveHome: 'Partir', departs: 'Départ',
       timetable: 'Horaire', liveDelay: 'En direct {d}', liveOnTime: 'En direct · à l\u2019heure',
       walkInfo: '{min} min de marche à {speed} km/h · marge {margin} min · préparation {prep} min',
       testReady: 'Tester « Préparez-vous »', testLeave: 'Tester « Partir »', cancel: 'Annuler', mayMiss: 'C\u2019est juste — partez maintenant !',
-      readyTitle: 'Préparez-vous', readyBody: 'Partez à {leave} pour prendre le {line} de {dep} à {stop}.',
+      readyTitle: 'Préparez-vous',
       leaveTitle: 'Partez maintenant', leaveBody: '{walk} min de marche jusqu\u2019à {stop}. Le {line} part à {dep}.', ok: 'OK',
       measureWalk: 'Mesurer ma marche', measuring: 'Mesure de votre marche vers {stop}… {d} parcourus', stopMeasuring: 'Arrêter',
       learnedSpeed: 'Vous avez marché {d} en {time} → {kmh} km/h. Votre vitesse de marche est maintenant de {speed} km/h ({n} trajets).',
@@ -704,6 +776,14 @@
     async locations(q, signal) {
       if (!useOjp()) return (await getJSON(`${API}/locations?type=station&query=${enc(q)}`, signal)).stations || [];
       return OJP.toLocations(await ojpPost(OJP.locationsByName(q, { lang, limit: 40 }), signal)).stations;
+    },
+    // Stops, addresses and places of interest by name: [{ type: 'stop'|'address'|'poi', id, name, coordinate, icon }]
+    async places(q, signal) {
+      if (useOjp()) return OJP.toPlaces(await ojpPost(OJP.locationsByName(q, { lang, limit: 30, types: ['stop', 'address', 'poi'] }), signal)).places;
+      const r = await getJSON(`${API}/locations?query=${enc(q)}&type=all`, signal);
+      return [...(r.stations || []), ...(r.addresses || []), ...(r.poi || [])].filter(x => x.coordinate && x.coordinate.x != null).map(x => ({
+        type: x.id && /^\d{7}$/.test(String(x.id)) ? 'stop' : (x.type === 'poi' || x.icon === 'poi' ? 'poi' : 'address'),
+        id: x.id && /^\d{7}$/.test(String(x.id)) ? String(x.id) : null, name: x.name, coordinate: x.coordinate, icon: x.icon || null }));
     },
     // Stops around a point, with their distance in metres
     async around(pos, signal) {
@@ -887,16 +967,26 @@
 
   // Remove one stop, or all of them, with a few seconds to undo. Line and direction settings of a stop are kept,
   // so they come back if the stop is visited again.
-  let toastTimer = null, undoStops = null;
+  let undoStops = null;
+  // US-27: removing the stop on screen shows the most-used remaining stop (or nothing when none is left)
+  const topStop = stops => Object.values(stops).sort((a, b) => b.count - a.count || b.last - a.last)[0] || null;
   function changeStops(next, message) {
-    undoStops = { stops: getStops(), lastStop: store.get('lastStop', null) };
+    undoStops = { stops: getStops(), lastStop: store.get('lastStop', null), shown: current ? { id: current.id, name: current.name } : null };
     store.set('stops', next);
     if (!next[store.get('lastStop', null)]) store.set('lastStop', null);   // don't reopen a removed stop at start-up
+    if (current && !next[current.id]) {
+      const top = topStop(next);
+      if (top) { openStop(top, { record: false }); store.set('lastStop', top.id); }
+      else closeBoard();
+    }
     renderRecent();
-    $('toastText').textContent = message;
-    $('toast').hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { $('toast').hidden = true; undoStops = null; }, 6000);
+    showToast(message, undoStopChange);
+  }
+  function closeBoard() {
+    current = null;
+    clearInterval(refreshTimer); clearInterval(tickTimer);
+    if (boardCtrl) boardCtrl.abort();
+    $('board').hidden = true;
   }
   function removeStop(id) {
     const stops = getStops(), s = stops[id];
@@ -906,10 +996,132 @@
   }
   function undoStopChange() {
     if (!undoStops) return;
-    store.set('stops', undoStops.stops); store.set('lastStop', undoStops.lastStop);
-    undoStops = null; clearTimeout(toastTimer); $('toast').hidden = true;
+    const u = undoStops; undoStops = null;
+    store.set('stops', u.stops); store.set('lastStop', u.lastStop);
+    if (u.shown && (!current || current.id !== u.shown.id)) openStop(u.stops[u.shown.id] || u.shown, { record: false });
     renderRecent();
   }
+
+  // ---------- My places (US-21, US-22) ----------
+  const PLACE_ICON = { home: '🏠', work: '💼', other: '📍' };
+  const DEFAULT_NAMES = { home: ['Home', 'Domicile'], work: ['Work', 'Travail'] };
+  function getPlaces() { return store.get('places', {}); }
+  // Home and Work keep their name in the current language unless the rider renamed them
+  const placeName = p => p.kind !== 'other' && (!p.name || DEFAULT_NAMES[p.kind].includes(p.name)) ? t('kind' + cap(p.kind)) : p.name;
+  const savedRef = p => ({ kind: 'saved', placeId: p.id, name: placeName(p), icon: PLACE_ICON[p.kind], coord: p.coord });
+  // Ordered by use with the habit model of stops; Home and Work first once used
+  function sortedPlaces() {
+    const now = Date.now(), order = { home: 0, work: 1, other: 2 };
+    const sc = p => decayed(p.usage, now);
+    return Object.values(getPlaces()).sort((a, b) =>
+      ((b.kind !== 'other' && sc(b) > 0) - (a.kind !== 'other' && sc(a) > 0)) || sc(b) - sc(a) || order[a.kind] - order[b.kind] || a.created - b.created);
+  }
+  function recordPlaceUse(id) {
+    const all = getPlaces(), p = all[id], now = Date.now();
+    if (!p || (p.usage && now - p.usage.t < DEBOUNCE_MS)) return;
+    p.usage = { s: decayed(p.usage, now) + 1, t: now };
+    store.set('places', all); renderPlaceChips();
+  }
+  function renderPlaceChips() {
+    const list = sortedPlaces();
+    $('placesHint').hidden = list.length > 0;
+    $('clearPlaces').hidden = list.length === 0;
+    $('placeChips').innerHTML = list.map(p => {
+      const name = placeName(p);
+      return `<span class="stop-chip place-chip"><button class="place-open" data-pid="${esc(p.id)}">${PLACE_ICON[p.kind]} ${esc(name)}</button>` +
+        `<button class="place-edit" data-pedit="${esc(p.id)}" aria-label="${esc(t('editPlaceOf', { name }))}" title="${esc(t('editPlaceOf', { name }))}">✎</button>` +
+        `<button class="stop-del" data-pdel="${esc(p.id)}" aria-label="${esc(t('removeStop', { name }))}" title="${esc(t('removeStop', { name }))}">✕</button></span>`;
+    }).join('');
+  }
+  // One tap: fills To, or From when To is already set and From is empty; searches when both are set
+  function usePlace(id) {
+    const p = getPlaces()[id]; if (!p) return;
+    const target = !places.to ? 'to' : !places.from ? 'from' : 'to';
+    setPlace(target, savedRef(p));
+    if (places.from && places.to) searchJourneys();
+  }
+  function changePlaces(next, message) {
+    const before = getPlaces();
+    store.set('places', next); renderPlaceChips();
+    showToast(message, () => { store.set('places', before); renderPlaceChips(); });
+  }
+
+  // Save / edit sheet
+  let placeDraft = null;   // { id?, kind, name, coord, where, confirmReplace }
+  function openPlaceSheet(draft) {
+    placeDraft = Object.assign({ kind: 'other', name: '', coord: null, where: '' }, draft);
+    placeDraft.autoName = placeDraft.id ? null : placeDraft.name;   // a suggested name, replaced when the kind changes
+    placeDraft.touched = !!placeDraft.id;
+    $('placeQ').value = ''; $('placeResults').hidden = true; $('placeMsg').textContent = '';
+    $('placeSheet').hidden = false;
+    renderPlaceSheet();
+    if (!placeDraft.coord) $('placeQ').focus();
+  }
+  function renderPlaceSheet() {
+    if (!placeDraft) return;
+    $('placeTitle').textContent = t(placeDraft.id ? 'editPlace' : 'newPlace');
+    document.querySelectorAll('#placeKind button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.kind === placeDraft.kind)));
+    $('placeName').value = placeDraft.kind !== 'other' && (!placeDraft.name || DEFAULT_NAMES[placeDraft.kind].includes(placeDraft.name))
+      ? t('kind' + cap(placeDraft.kind)) : placeDraft.name;
+    $('placeChosen').hidden = !placeDraft.coord;
+    $('placeChosenText').textContent = placeDraft.coord ? '📍 ' + (placeDraft.where || t('pointOnMap')) : '';
+  }
+  function setPlaceKind(kind) {
+    const typed = $('placeName').value.trim();
+    const keep = placeDraft.touched && typed && !Object.values(DEFAULT_NAMES).flat().includes(typed);
+    placeDraft.kind = kind; placeDraft.confirmReplace = false;
+    placeDraft.name = keep ? typed : (kind === 'other' ? (placeDraft.autoName || '') : t('kind' + cap(kind)));
+    renderPlaceSheet();
+    if (kind === 'other' && !placeDraft.name) $('placeName').focus();
+  }
+  function savePlaceDraft() {
+    const d = placeDraft, all = getPlaces();
+    d.name = $('placeName').value.trim() || (d.kind !== 'other' ? t('kind' + cap(d.kind)) : '');
+    if (!d.name) { $('placeMsg').textContent = t('needName'); return; }
+    if (!d.coord) { $('placeMsg').textContent = t('needWhere'); return; }
+    const clash = d.kind !== 'other' && Object.values(all).find(p => p.kind === d.kind && p.id !== d.id);
+    if (clash && !d.confirmReplace) {
+      d.confirmReplace = true;
+      $('placeMsg').textContent = t('replaceKind', { kind: t('kind' + cap(d.kind)), name: clash.where || placeName(clash) });
+      return;
+    }
+    const id = d.id || 'p' + Date.now().toString(36);
+    const old = all[id] || (clash || null);
+    if (clash) delete all[clash.id];
+    all[id] = { id, kind: d.kind, name: d.name, coord: d.coord, where: d.where || '', created: (all[id] && all[id].created) || Date.now(),
+                usage: old ? old.usage : undefined };
+    store.set('places', all);
+    // a journey field showing this place follows its new name
+    ['from', 'to'].forEach(w => { if (places[w] && places[w].kind === 'saved' && places[w].placeId === id) setPlace(w, savedRef(all[id])); });
+    closePlaceSheet(); renderPlaceChips(); renderSaveButtons();
+  }
+  function closePlaceSheet() { $('placeSheet').hidden = true; placeDraft = null; }
+  let placeSearchCtrl = null;
+  async function searchPlaceSheet(q) {
+    if (placeSearchCtrl) placeSearchCtrl.abort();
+    const ctrl = placeSearchCtrl = new AbortController();
+    try {
+      const found = await findPlaces(q, ctrl.signal);
+      $('placeResults').hidden = false;
+      $('placeResults').innerHTML = found.length ? placeRowsHtml('\u0000', found) : `<li class="empty">${esc(t('noPlaceFound'))}</li>`;
+    } catch (e) { if (e.name !== 'AbortError') { $('placeResults').hidden = false; $('placeResults').innerHTML = `<li class="empty">${esc(t('searchFailed'))}</li>`; } }
+  }
+  // A journey field → a draft for the sheet (☆ next to the field)
+  function draftFrom(p) {
+    const named = p.kind === 'stop' || p.kind === 'addr';
+    return { kind: 'other', name: named ? p.name : '', coord: p.coord, where: placeLabel(p) };
+  }
+
+  // Toast with undo, shared by stops and places
+  let toastTimer = null, undoAction = null;
+  function showToast(message, undo) {
+    undoAction = undo;
+    $('toastText').textContent = message;
+    $('toast').hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+  function hideToast() { $('toast').hidden = true; undoAction = null; clearTimeout(toastTimer); }
 
   // ---------- Search ----------
   function renderResults(stations, noteKey) {
@@ -1227,9 +1439,9 @@
     tickTimer = setInterval(() => { renderDepartures(); renderStatus(); }, TICK_MS);
   }
 
-  function openStop(st) {
+  function openStop(st, opts = {}) {
     current = { id: st.id, name: st.name };
-    recordVisit(st);
+    if (opts.record !== false) recordVisit(st);
     renderRecent();
     $('results').hidden = true; lastResults = null;
     $('q').value = '';
@@ -1404,6 +1616,16 @@
   }
   const coordOf = s => s && s.coordinate && s.coordinate.x != null ? [s.coordinate.x, s.coordinate.y] : null;
 
+  // Stops, addresses and places of interest; those in the area first (US-23)
+  async function findPlaces(q, signal) {
+    const key = x => x.id || `${x.name}|${x.coordinate.x.toFixed(5)}`;
+    const dedupe = list => [...new Map(list.map(x => [key(x), x])).values()];
+    let found = dedupe(await data.places(q, signal));
+    if (found.filter(inZone).length < 3 && !/gen[eè]v/i.test(q)) found = dedupe([...found, ...(await data.places('Genève ' + q, signal))]);
+    const inside = found.filter(inZone);
+    return [...inside, ...found.filter(x => !inZone(x))].slice(0, 10);
+  }
+
   // Stops around a point, nearest first, with their straight-line distance
   async function stopsNear(pos, n, signal) {
     return uniqueById(await data.around(pos, signal)).map(s => {
@@ -1414,7 +1636,8 @@
 
   function placeLabel(p) {
     if (!p) return '';
-    if (p.kind === 'stop') return p.name;
+    if (p.kind === 'stop' || p.kind === 'addr') return p.name;
+    if (p.kind === 'saved') return `${p.icon || ''} ${p.name}`.trim();
     const base = t(p.kind === 'me' ? 'myPosition' : 'pointOnMap');
     return p.near ? `${base} · ${t('nearStop', { d: fmtDistance(p.near.meters), name: p.near.name })}` : base;
   }
@@ -1423,24 +1646,50 @@
     $(which + 'Q').value = placeLabel(p);
     $(which + 'Results').hidden = true;
     store.set('journey:' + which, p);
+    renderSaveButtons();
   }
+  // ☆ next to a field holding something that is not yet one of my places
+  function renderSaveButtons() {
+    document.querySelectorAll('.place-save').forEach(b => { const p = places[b.dataset.which]; b.hidden = !p || p.kind === 'saved'; });
+  }
+
+  // Result rows for a place search: my places first, then stops, addresses and places of interest
+  const fold = x => String(x).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  function placeRowsHtml(q, found) {
+    const mine = sortedPlaces().filter(p => fold(placeName(p)).includes(fold(q)) || fold(t('kind' + cap(p.kind))).includes(fold(q)));
+    const rows = mine.map(p => `<li><button data-pid="${esc(p.id)}"><span class="ico">${PLACE_ICON[p.kind]}</span><span>${esc(placeName(p))}</span><span class="kind">${esc(t('kSaved'))}</span></button></li>`);
+    for (const x of found) {
+      const c = coordOf(x);
+      if (x.type === 'stop') {
+        const m = modeOfIcon(x.icon, x.name);
+        rows.push(`<li><button data-id="${esc(x.id)}" data-name="${esc(x.name)}" data-lat="${c ? c[0] : ''}" data-lon="${c ? c[1] : ''}">${pictoHtml(m)}<span>${esc(x.name)}</span></button></li>`);
+      } else rows.push(`<li><button data-addr="${esc(x.name)}" data-lat="${c[0]}" data-lon="${c[1]}"><span class="ico">${x.type === 'poi' ? '⭐' : '📍'}</span>` +
+        `<span>${esc(x.name)}</span><span class="kind">${esc(t(x.type === 'poi' ? 'kPoi' : 'kAddress'))}</span></button></li>`);
+    }
+    return rows.length ? rows.join('') : `<li class="empty">${esc(t('noPlaceFound'))}</li>`;
+  }
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
 
   async function searchPlace(which, q) {
     if (journeySearchCtrl[which]) journeySearchCtrl[which].abort();
     const ctrl = journeySearchCtrl[which] = new AbortController();
     const ul = $(which + 'Results');
     try {
-      const { inside } = await findStops(q, ctrl.signal);
+      const found = await findPlaces(q, ctrl.signal);
       ul.hidden = false;
-      ul.innerHTML = inside.length ? inside.slice(0, 8).map(s => {
-        const m = modeOfIcon(s.icon, s.name), c = coordOf(s);
-        return `<li><button data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-lat="${c ? c[0] : ''}" data-lon="${c ? c[1] : ''}">` +
-               `${pictoHtml(m)}<span>${esc(s.name)}</span></button></li>`;
-      }).join('') : `<li class="empty">${esc(t('noStopInZone'))}</li>`;
+      ul.innerHTML = placeRowsHtml(q, found);
     } catch (e) {
       if (e.name === 'AbortError') return;
       ul.hidden = false; ul.innerHTML = `<li class="empty">${esc(t('searchFailed'))}</li>`;
     }
+  }
+  // A tapped result row → a journey place
+  function placeFromRow(b) {
+    if (b.dataset.pid) { const p = getPlaces()[b.dataset.pid]; return p ? savedRef(p) : null; }
+    const coord = b.dataset.lat ? [+b.dataset.lat, +b.dataset.lon] : null;
+    if (b.dataset.id) return { kind: 'stop', id: b.dataset.id, name: b.dataset.name, coord };
+    if (b.dataset.addr) return { kind: 'addr', name: b.dataset.addr, coord };
+    return null;
   }
 
   function useMyPosition(which) {
@@ -1504,8 +1753,9 @@
   }
   // Where each walk starts and ends (US-32): a place, or a stop and its platform
   function placeWalks(legs, a, b) {
-    const startPlace = places.from && places.from.kind !== 'stop' ? { name: t('yourStart'), coord: places.from.coord } : null;
-    const endPlace = places.to && places.to.kind !== 'stop' ? { name: t('yourDestination'), coord: places.to.coord } : null;
+    const named = (p, fallback) => ['saved', 'addr'].includes(p.kind) ? p.name : t(fallback);
+    const startPlace = places.from && places.from.kind !== 'stop' ? { name: named(places.from, 'yourStart'), coord: places.from.coord } : null;
+    const endPlace = places.to && places.to.kind !== 'stop' ? { name: named(places.to, 'yourDestination'), coord: places.to.coord } : null;
     const stopEnd = (st, platform, mode) => st && st.name ? { name: st.name, stopId: st.id, coord: st.coord, platform, mode } : null;
     legs.forEach((l, i) => {
       if (l.type !== 'walk') return;
@@ -1582,6 +1832,7 @@
     const { from, to } = places;
     const status = $('journeyStatus');
     if (!from || !to) { status.textContent = t('chooseBoth'); return; }
+    [from, to].forEach(p => { if (p.kind === 'saved') recordPlaceUse(p.placeId); });
     if (journeyCtrl) journeyCtrl.abort();
     journeyCtrl = new AbortController();
     const signal = journeyCtrl.signal;
@@ -1732,7 +1983,7 @@
   }
   async function openPicker(which) {
     pickState = { which, pos: null, near: null };
-    $('mapTitle').textContent = t(which === 'from' ? 'pickStart' : 'pickEnd');
+    $('mapTitle').textContent = t(which === 'save' ? 'pickPlace' : which === 'from' ? 'pickStart' : 'pickEnd');
     $('mapSub').textContent = t('tapMap');
     $('mapInfo').textContent = '';
     $('walkThere').hidden = true; $('pickConfirm').hidden = true;
@@ -1742,8 +1993,8 @@
     ensureMap();
     map.invalidateSize();
     mapLayer.clearLayers(); userLayer.clearLayers();
-    const other = places[which === 'from' ? 'to' : 'from'];
-    const existing = places[which];
+    const other = which === 'save' ? null : places[which === 'from' ? 'to' : 'from'];
+    const existing = which === 'save' ? (placeDraft && placeDraft.coord ? { kind: 'point', coord: placeDraft.coord } : null) : places[which];
     map.setView((existing && existing.coord) || (other && other.coord) || DEFAULT_CENTER, existing ? 17 : 14);
     if (existing && existing.kind === 'point') setPickPoint(existing.coord);
   }
@@ -1804,6 +2055,11 @@
       created0: (f.real || f.dep).getTime(),   // first departure when the alarm was set, to shift the get-off times with live data
       alights: alightPlan(j)
     };
+    // US-33: set after the first vehicle left → already on board: no departure alarms, only get-off reminders.
+    // Set after the leave time → only "Leave" rings (at once). Set after the get-ready time → "Get ready" rings at once.
+    const tm0 = alarmTimes(alarm), now0 = Date.now();
+    if (now0 >= tm0.dep) { alarm.onBoard = true; alarm.fired.ready = alarm.fired.leave = now0; }
+    else if (now0 >= tm0.leave) alarm.fired.ready = now0;
     saveAlarms([alarm, ...getAlarms()].slice(0, 5));
     unlockAudio(); askNotificationPermission();
     renderAlarms(); tickAlarms();
@@ -1826,7 +2082,7 @@
         </div>
         <div class="al-line">${lineIdHtml(f.mode, f.style, f.label, true)} <span>→ ${esc(f.to)} · ${esc(f.stopName)}${esc(plat)}</span></div>
         <div class="status" data-k="src">${esc(src)} · ${esc(t('walkInfo', { min: fmtMin(tm.walk), speed: s.speedKmh.toFixed(1), margin: s.marginMin, prep: s.prepMin }))}</div>
-        ${tight}
+        ${a.onBoard ? `<div class="status" data-k="onboard">${esc(t('onBoard'))}</div>` : tight}
         ${alightLine(a, s)}
         <div class="al-actions">
           <button class="ghost" data-act="test-ready">${esc(t('testReady'))}</button>
@@ -1842,8 +2098,9 @@
     let list = getAlarms(), changed = false;
     for (const a of list) {
       const tm = alarmTimes(a, s);
-      if (!a.fired.ready && now >= tm.ready) { a.fired.ready = now; changed = true; fireAlarm(a, 'ready'); }
-      else if (!a.fired.leave && now >= tm.leave) { a.fired.leave = now; a.fired.ready = a.fired.ready || now; changed = true; fireAlarm(a, 'leave'); }
+      // past the leave time: only "Leave" rings (no "Get ready" first)
+      if (!a.fired.leave && now >= tm.leave) { a.fired.leave = now; a.fired.ready = a.fired.ready || now; changed = true; fireAlarm(a, 'leave'); }
+      else if (!a.fired.ready && now >= tm.ready) { a.fired.ready = now; changed = true; fireAlarm(a, 'ready'); }
       // get-off reminders: only the latest one due rings (no burst after the phone slept); while they are
       // switched off, due reminders are marked as passed so they don't ring when switched back on
       const due = (a.alights || []).map((x, n) => ({ x, n })).filter(({ x, n }) => !a.fired['alight' + n] && now >= x.at + alightShift(a));
@@ -1935,8 +2192,10 @@
     const line = `${modeName(f.mode)} ${f.label}`;
     const plat = f.platform ? ` (${t(f.mode === 'train' ? 'track' : 'platform', { p: f.platform })})` : '';
     const title = t(kind === 'ready' ? 'readyTitle' : 'leaveTitle');
+    const left = Math.max(0, Math.round((tm.leave - Date.now()) / 60000));
+    const late = Date.now() - tm.ready > 60000;   // less time than planned to get ready
     const body = kind === 'ready'
-      ? t('readyBody', { leave: hhmm(new Date(tm.leave)), line, dep: hhmm(new Date(tm.dep)), stop: f.stopName })
+      ? t(late ? 'readyShortBody' : 'readyBody', { leave: hhmm(new Date(tm.leave)), left, line, dep: hhmm(new Date(tm.dep)), stop: f.stopName })
       : t('leaveBody', { walk: fmtMin(tm.walk), stop: f.stopName + plat, line, dep: hhmm(new Date(tm.dep)) });
     $('abTitle').textContent = (kind === 'ready' ? '⏰ ' : '🚶 ') + title;
     $('abBody').textContent = body;
@@ -2103,7 +2362,7 @@
   // ---------- Language (US-10) ----------
   function applyLanguage() {
     document.documentElement.lang = lang;
-    document.title = lang === 'fr' ? 'Départs Unireso — Prototype Sprint 8' : 'Unireso departures — Sprint 8 prototype';
+    document.title = lang === 'fr' ? 'Départs Unireso — Prototype Sprint 9' : 'Unireso departures — Sprint 9 prototype';
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
@@ -2119,6 +2378,8 @@
     if (!$('settingsSheet').hidden) renderSettings();
     renderApiStatus();
     renderSource();
+    renderPlaceChips(); renderPlaceSheet();
+    ['from', 'to'].forEach(w => { if (places[w]) $(w + 'Q').value = placeLabel(places[w]); });
   }
 
   // ---------- Events ----------
@@ -2144,7 +2405,57 @@
   $('recent').addEventListener('click', pick);
   $('clearRecent').addEventListener('click', () => changeStops({}, t('stopsCleared')));
   $('recent').addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) removeStop(d.dataset.del); });
-  $('toastUndo').addEventListener('click', undoStopChange);
+  $('toastUndo').addEventListener('click', () => { const u = undoAction; hideToast(); if (u) u(); });
+
+  // Sprint 9: my places
+  $('placeChips').addEventListener('click', e => {
+    const d = e.target.closest('[data-pdel]');
+    if (d) { const all = getPlaces(), p = all[d.dataset.pdel]; if (!p) return; const name = placeName(p); delete all[p.id]; changePlaces(all, t('placeRemoved', { name })); return; }
+    const ed = e.target.closest('[data-pedit]');
+    if (ed) { const p = getPlaces()[ed.dataset.pedit]; if (p) openPlaceSheet({ id: p.id, kind: p.kind, name: p.name, coord: p.coord, where: p.where }); return; }
+    const o = e.target.closest('[data-pid]');
+    if (o) usePlace(o.dataset.pid);
+  });
+  $('addPlace').addEventListener('click', () => openPlaceSheet({ kind: getPlaces() && !Object.values(getPlaces()).some(p => p.kind === 'home') ? 'home' : 'other' }));
+  $('clearPlaces').addEventListener('click', () => changePlaces({}, t('placesCleared')));
+  document.querySelectorAll('.place-save').forEach(b => b.addEventListener('click', () => { const p = places[b.dataset.which]; if (p) openPlaceSheet(draftFrom(p)); }));
+  $('placeClose').addEventListener('click', closePlaceSheet);
+  document.querySelectorAll('#placeKind button').forEach(b => b.addEventListener('click', () => setPlaceKind(b.dataset.kind)));
+  $('placeName').addEventListener('input', () => { if (placeDraft) { placeDraft.name = $('placeName').value; placeDraft.touched = true; } });
+  $('placeSave').addEventListener('click', savePlaceDraft);
+  $('placeMap').addEventListener('click', () => openPicker('save'));
+  $('placeAdjust').addEventListener('click', () => openPicker('save'));
+  $('placeMe').addEventListener('click', () => {
+    if (!navigator.geolocation) { $('placeMsg').textContent = t('geoUnavailable'); return; }
+    $('placeMsg').innerHTML = `<span class="spinner"></span> ${esc(t('locating'))}`;
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const coord = [pos.coords.latitude, pos.coords.longitude];
+      let near = null;
+      try { near = (await stopsNear(coord, 1))[0] || null; } catch { /* label without the nearest stop */ }
+      if (!placeDraft) return;
+      Object.assign(placeDraft, { coord, where: placeLabel({ kind: 'me', coord, near }), confirmReplace: false });
+      $('placeMsg').textContent = ''; renderPlaceSheet();
+    }, () => { $('placeMsg').textContent = t('geoDenied'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+  });
+  { let deb;
+    $('placeQ').addEventListener('input', e => {
+      clearTimeout(deb); const q = e.target.value.trim();
+      if (q.length < 2) { $('placeResults').hidden = true; return; }
+      deb = setTimeout(() => searchPlaceSheet(q), 300);
+    });
+  }
+  $('placeResults').addEventListener('click', e => {
+    const b = e.target.closest('button[data-id], button[data-addr], button[data-pid]'); if (!b || !placeDraft) return;
+    const p = placeFromRow(b); if (!p) return;
+    const name = p.kind === 'saved' ? p.name : p.name;
+    Object.assign(placeDraft, { coord: p.coord, where: name, confirmReplace: false });
+    // "Lancy, Avenue des Communes-Réunies 60" → suggested name "Avenue des Communes-Réunies 60"
+    placeDraft.autoName = name.replace(/^[^,]+,\s*/, '');
+    if (placeDraft.kind === 'other' && !placeDraft.touched) placeDraft.name = placeDraft.autoName;
+    else placeDraft.name = $('placeName').value;
+    $('placeResults').hidden = true; $('placeQ').value = '';
+    renderPlaceSheet();
+  });
 
   $('lines').addEventListener('click', e => {
     const b = e.target.closest('.line-chip');
@@ -2202,14 +2513,20 @@
       deb = setTimeout(() => searchPlace(w, q), 300);
     });
     $(w + 'Results').addEventListener('click', e => {
-      const b = e.target.closest('button[data-id]'); if (!b) return;
-      setPlace(w, { kind: 'stop', id: b.dataset.id, name: b.dataset.name, coord: b.dataset.lat ? [+b.dataset.lat, +b.dataset.lon] : null });
+      const b = e.target.closest('button[data-id], button[data-pid], button[data-addr]'); if (!b) return;
+      const p = placeFromRow(b); if (p) setPlace(w, p);
     });
   }
   document.querySelectorAll('.place-me').forEach(b => b.addEventListener('click', () => useMyPosition(b.dataset.which)));
   document.querySelectorAll('.place-map').forEach(b => b.addEventListener('click', () => openPicker(b.dataset.which)));
   $('pickConfirm').addEventListener('click', () => {
     if (!pickState || !pickState.pos) return;
+    if (pickState.which === 'save') {
+      const near = pickState.near;
+      Object.assign(placeDraft, { coord: pickState.pos, where: placeLabel({ kind: 'point', coord: pickState.pos, near }) });
+      placeDraft.confirmReplace = false;
+      closeMap(); renderPlaceSheet(); return;
+    }
     setPlace(pickState.which, { kind: 'point', coord: pickState.pos, near: pickState.near });
     closeMap();
   });
@@ -2289,6 +2606,7 @@
   showTab(store.get('tab', 'departures'));
   try { if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js'); } catch { /* notifications fall back */ }
   applyLanguage();
+  renderSaveButtons();
   tickAlarms();
   refreshAlarmsLive();
   renderRecent();
