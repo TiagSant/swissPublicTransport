@@ -587,12 +587,13 @@
       readyShortBody: 'Less time than planned: {left} min left to get ready. Leave at {leave} to catch {line} at {dep} from {stop}.',
       onBoard: 'Already on board: departure alarms cancelled, only the get-off reminders remain.',
       footSetting: 'Suggest finishing on foot up to', footOffer: '🚶 Finish on foot from {from}', footAll: '🚶 Walk all the way',
-      footDetail: '{min} min · {dist} · arrive {arr}', footDelta: '{d}', footSame: 'same time', footBetter: 'faster than waiting for the {line}',
+      footDetail: '{min} min · {dist} · arrive {arr}', footDelta: '{d}', footSame: 'same arrival time', footBetter: 'faster than waiting for the {line}',
       busAlt: '🚌 Take the {line} instead', busAltDetail: 'arrive {arr} · {d}', footLearned: 'You often finish on foot here.',
       tagFootPossible: '🚶 Finish on foot?', tagFootBetter: '🚶 Faster on foot', tagOnFoot: '🚶 On foot at the end',
       startOffer: '🚶 Start on foot to {to}', startDetail: '{min} min · {dist} · leave {leave}', startLater: 'leave {d} later — no wait for the {line}',
       startEarlier: 'leave {d} earlier', startSame: 'leave at the same time', busStartAlt: '🚌 Take the {line} first instead', busStartDetail: 'leave {leave} · {d}',
-      startLearned: 'You often start on foot here.', tagStartPossible: '🚶 Start on foot?', tagStartBetter: '🚶 Leave later on foot', tagOnFootStart: '🚶 On foot at the start',
+      startLearned: 'You often start on foot here.', minSooner: '{n} min sooner', minLater: '{n} min later',
+      leaveEarlierBy: 'leave {n} min earlier', leaveLaterBy: 'leave {n} min later', tagStartPossible: '🚶 Start on foot?', tagStartBetter: '🚶 Leave later on foot', tagOnFootStart: '🚶 On foot at the start',
       liveShort: 'live', gpsOn: '📍 Following your position: the reminder rings when you leave the stop before.',
       gpsWaiting: '📍 Waiting for a precise position… until then the live time decides.',
       gpsDenied: 'Position not allowed: reminders follow the live time only.',
@@ -674,12 +675,13 @@
       readyShortBody: 'Moins de temps que prévu : il vous reste {left} min pour vous préparer. Partez à {leave} pour prendre le {line} de {dep} à {stop}.',
       onBoard: 'Déjà à bord : alarmes de départ annulées, seuls les rappels de descente restent.',
       footSetting: 'Proposer de finir à pied jusqu\u2019à', footOffer: '🚶 Finir à pied depuis {from}', footAll: '🚶 Tout à pied',
-      footDetail: '{min} min · {dist} · arrivée {arr}', footDelta: '{d}', footSame: 'même heure', footBetter: 'plus rapide qu\u2019attendre le {line}',
+      footDetail: '{min} min · {dist} · arrivée {arr}', footDelta: '{d}', footSame: 'même heure d\u2019arrivée', footBetter: 'plus rapide qu\u2019attendre le {line}',
       busAlt: '🚌 Prendre plutôt le {line}', busAltDetail: 'arrivée {arr} · {d}', footLearned: 'Vous finissez souvent à pied ici.',
       tagFootPossible: '🚶 Fin à pied ?', tagFootBetter: '🚶 Plus rapide à pied', tagOnFoot: '🚶 Fin à pied',
       startOffer: '🚶 Partir à pied jusqu\u2019à {to}', startDetail: '{min} min · {dist} · départ {leave}', startLater: 'partez {d} plus tard — sans attendre le {line}',
       startEarlier: 'partez {d} plus tôt', startSame: 'départ à la même heure', busStartAlt: '🚌 Prendre plutôt le {line} au départ', busStartDetail: 'départ {leave} · {d}',
-      startLearned: 'Vous partez souvent à pied ici.', tagStartPossible: '🚶 Départ à pied ?', tagStartBetter: '🚶 Partir plus tard à pied', tagOnFootStart: '🚶 Départ à pied',
+      startLearned: 'Vous partez souvent à pied ici.', minSooner: '{n} min plus tôt', minLater: '{n} min plus tard',
+      leaveEarlierBy: 'partez {n} min plus tôt', leaveLaterBy: 'partez {n} min plus tard', tagStartPossible: '🚶 Départ à pied ?', tagStartBetter: '🚶 Partir plus tard à pied', tagOnFootStart: '🚶 Départ à pied',
       liveShort: 'direct', gpsOn: '📍 Position suivie : le rappel sonne quand vous quittez l\u2019arrêt précédent.',
       gpsWaiting: '📍 En attente d\u2019une position précise… en attendant, l\u2019horaire en direct décide.',
       gpsDenied: 'Position non autorisée : les rappels suivent seulement l\u2019horaire en direct.',
@@ -1920,7 +1922,7 @@
     const startAt = prev ? (prev.arrReal || prev.arr) : j.leaveAt;
     if (!startAt) return null;
     const arriveAt = new Date(startAt.getTime() + min * 60000);
-    const delta = Math.round((arriveAt - j.arriveAt) / 60000);
+    const delta = shownMinDiff(arriveAt, j.arriveAt);   // > 0: on foot arrives later
     if (delta > FOOT_MAX_LATER) return null;
     return { start, startAt, min, meters: straight * DETOUR, arriveAt, delta, line: `${modeName(last.mode)} ${last.label}`,
              key: (prev ? prev.toStop.id : 'from:' + placeKey(places.from)) + '>' + placeKey(places.to) };
@@ -1951,7 +1953,7 @@
     const leaveAt = new Date((second.real || second.dep).getTime() - min * 60000);
     const when = readWhen();
     if (when.mode === 'now' && leaveAt < Date.now() - 60000) return null;            // too late to walk there
-    const later = Math.round((leaveAt - j.leaveAt) / 60000);                         // > 0: leave later on foot
+    const later = shownMinDiff(leaveAt, j.leaveAt);                                  // > 0: leave later on foot
     if (later < -FOOT_MAX_LATER) return null;
     const startName = ['saved', 'addr', 'stop'].includes(places.from.kind) ? placeLabel(places.from) : t('yourStart');
     return { kind: 'start', start: { name: startName, coord: origin }, end: to, min, straight, meters: straight * DETOUR, leaveAt, later,
@@ -1997,18 +1999,22 @@
     if (!e && !s) return j;
     return Object.assign({}, j, { footOffer: e ? end : null, startOffer: s ? start : null, base: j });
   }
-  const signed = d => d === 0 ? t('footSame') : (d > 0 ? '+' : '−') + Math.abs(d) + ' min';
+  // Minutes between two times as shown on screen (hh:mm, seconds dropped)
+  const shownMinDiff = (a, b) => Math.floor(a / 60000) - Math.floor(b / 60000);
+  // Comparisons in words, never a bare sign: "3 min sooner / later", "leave 3 min earlier / later"
+  const arriveWords = d => d === 0 ? t('footSame') : t(d < 0 ? 'minSooner' : 'minLater', { n: Math.abs(d) });
+  const leaveWords = d => d === 0 ? t('startSame') : t(d < 0 ? 'leaveEarlierBy' : 'leaveLaterBy', { n: Math.abs(d) });
   function startRowHtml(j, i) {
     if (j.onFoot === 'start') {
-      const d = Math.round((j.base.leaveAt - j.leaveAt) / 60000);   // < 0: the bus means leaving earlier
+      const d = shownMinDiff(j.base.leaveAt, j.leaveAt);   // < 0: with the bus, leave earlier
       const learned = footPref(j.alt.key) === 'foot' && !footChoice.has(j.base.key + '|start') ? `<small>${esc(t('startLearned'))}</small>` : '';
       return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-side="start" data-foot="0"><span>${esc(t('busStartAlt', { line: j.alt.line }))}</span>` +
-        `<small>${esc(t('busStartDetail', { leave: hhmm(j.base.leaveAt), d: signed(d) }))}</small>${learned}</button></li>`;
+        `<small>${esc(t('busStartDetail', { leave: hhmm(j.base.leaveAt), d: leaveWords(d) }))}</small>${learned}</button></li>`;
     }
     const a = j.startOffer;
     if (!a) return '';
     const better = a.later > 0;
-    const when = a.later > 0 ? t('startLater', { d: a.later + ' min', line: a.line }) : a.later < 0 ? t('startEarlier', { d: -a.later + ' min' }) : t('startSame');
+    const when = a.later > 0 ? t('startLater', { d: a.later + ' min', line: a.line }) : leaveWords(a.later);
     return `<li class="foot-alt"><button class="foot-toggle${better ? ' better' : ''}" data-i="${i}" data-side="start" data-foot="1"><span>${esc(t('startOffer', { to: a.end.name }))}</span>` +
       `<small>${esc(t('startDetail', { min: fmtMin(a.min), dist: fmtDistance(a.meters), leave: hhmm(a.leaveAt) }))} · ` +
       `<span class="d${better ? ' better' : ''}">${esc(when)}</span></small></button></li>`;
@@ -2016,10 +2022,10 @@
   function footRowHtml(j, i) {
     if (j.onFoot === 'start') return '';
     if (j.onFoot) {
-      const d = Math.round((j.base.arriveAt - j.arriveAt) / 60000);
+      const d = shownMinDiff(j.base.arriveAt, j.arriveAt);   // < 0: the bus arrives sooner
       const learned = footPref(j.alt.key) === 'foot' && !footChoice.has(j.base.key + '|end') ? `<small>${esc(t('footLearned'))}</small>` : '';
       return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-side="end" data-foot="0"><span>${esc(t('busAlt', { line: j.alt.line }))}</span>` +
-        `<small>${esc(t('busAltDetail', { arr: hhmm(j.base.arriveAt), d: signed(d) }))}</small>${learned}</button></li>`;
+        `<small>${esc(t('busAltDetail', { arr: hhmm(j.base.arriveAt), d: arriveWords(d) }))}</small>${learned}</button></li>`;
     }
     const a = j.footOffer;
     if (!a) return '';
@@ -2027,7 +2033,7 @@
     const better = a.delta < 0;
     return `<li class="foot-alt"><button class="foot-toggle${better ? ' better' : ''}" data-i="${i}" data-side="end" data-foot="1"><span>${esc(title)}</span>` +
       `<small>${esc(t('footDetail', { min: fmtMin(a.min), dist: fmtDistance(a.meters), arr: hhmm(a.arriveAt) }))} · ` +
-      `<span class="d${better ? ' better' : ''}">${esc(signed(a.delta))}${better ? ' — ' + esc(t('footBetter', { line: a.line })) : ''}</span></small></button></li>`;
+      `<span class="d${better ? ' better' : ''}">${esc(arriveWords(a.delta))}${better ? ' — ' + esc(t('footBetter', { line: a.line })) : ''}</span></small></button></li>`;
   }
 
   function getPrio() { return store.get('prio', 'fast'); }
