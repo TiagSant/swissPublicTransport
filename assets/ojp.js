@@ -260,7 +260,12 @@
           const inter = kids(timed, 'LegIntermediate');
           sections.push({
             journey: { category: info.category, number: info.number, name: info.name, operator: info.operator, to: info.to,
-                       passList: [board, ...inter, alight].map(c => ({ station: st(c) })) },
+                       // every stop of the ride with its times (planned, and live in prognosis), as in transport.opendata.ch
+                       passList: [board, ...inter, alight].map(c => {
+                         const ca = callTimes(c, 'ServiceArrival'), cd = callTimes(c, 'ServiceDeparture');
+                         return { station: st(c), arrival: ca.planned, departure: cd.planned,
+                                  prognosis: { arrival: ca.estimated, departure: cd.estimated } };
+                       }) },
             departure: { station: st(board), departure: d.planned, prognosis: { departure: d.estimated, platform: txt(board, 'EstimatedQuay') || null },
                          platform: txt(board, 'PlannedQuay') || null, delay: null },
             arrival: { station: st(alight), arrival: a.planned, prognosis: { arrival: a.estimated, platform: txt(alight, 'EstimatedQuay') || null },
