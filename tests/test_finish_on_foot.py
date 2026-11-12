@@ -25,13 +25,14 @@ DEST = (46.2047, 6.1470)                     # ~300 m east of Bel-Air
 START = (46.1965, 6.1395)                    # ~250 m from Plainpalais
 UNIMAIL = st("8592999", "Genève, Uni-Mail", 46.195300, 6.139800)   # ~140 m from START
 
+FAST_TRAM = {"on": False}     # tram 12 leaving at once: walking becomes slower than the bus
 def connection(base, origin=COMMUNES):
     at = lambda m: base + dt.timedelta(minutes=m)
     def end(s, m, kind): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": "", "prognosis": {}, "delay": None}
     def ride(cat, num, a, b, ma, mb): return {"journey": {"category": cat, "number": num, "to": b["name"], "operator": "TPG",
         "passList": [{"station": a, "departure": fmt(at(ma))}, {"station": b, "arrival": fmt(at(mb))}]}, "walk": None,
         "departure": end(a, ma, "departure"), "arrival": end(b, mb, "arrival")}
-    return {"sections": [ride("B", "21", origin, PLAINPALAIS, 10, 22), ride("T", "12", PLAINPALAIS, BELAIR, 28, 33)]}
+    return {"sections": [ride("B", "21", origin, PLAINPALAIS, 10, 22), ride("T", "12", PLAINPALAIS, BELAIR, *((23, 26) if FAST_TRAM["on"] else (28, 33)))]}
 
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
@@ -71,9 +72,12 @@ with sync_playwright() as p:
     offer = item().locator(".foot-toggle")
     text = offer.inner_text()
     import re
-    m = re.search(r"−(\d+) min — faster than waiting for the Tram 12", text)
+    m = re.search(r"arrive (\d\d:\d\d) · (\d+) min sooner — faster than waiting for the Tram 12", text)
     assert text.startswith("🚶 Finish on foot from Genève, Plainpalais") and m, text
-    gain = int(m.group(1))
+    gain = int(m.group(2))
+    # the difference matches the times on screen
+    to_min = lambda hm: int(hm[:2]) * 60 + int(hm[3:])
+    assert to_min(item().locator(".jr-top b").inner_text().split("→")[1].strip()) - to_min(m.group(1)) == gain
     assert "better" in offer.get_attribute("class")
     assert legs() == ["ride", "ride", "walk"], legs()
     bus_arrival = item().locator(".jr-top b").inner_text()
@@ -86,7 +90,7 @@ with sync_playwright() as p:
     assert "🚶 On foot at the end" in item().locator(".jr-meta").first.inner_text()
     assert "12" not in item().locator(".jr-segs").inner_text().replace("🚶12", "")
     alt = item().locator(".foot-toggle").inner_text()
-    assert alt.startswith("🚌 Take the Tram 12 instead") and f"+{gain} min" in alt, alt
+    assert alt.startswith("🚌 Take the Tram 12 instead") and f"{gain} min later" in alt, alt
     assert item().locator(".leg.walk .walk-map").count() == 1, "the walk can be seen on the map"
     print("on foot     →", item().locator(".jr-top b").inner_text(), "|", alt.replace("\n", " | "))
     pg.screenshot(path=str(OUT / "foot-chosen.png"), full_page=True)
@@ -137,7 +141,6 @@ with sync_playwright() as p:
     pg.evaluate("localStorage.removeItem('tpp:foot')")
     pg.evaluate(f"localStorage.setItem('tpp:journey:from', JSON.stringify({{ kind: 'point', coord: [{START[0]}, {START[1]}], near: null }}))")
     pg.reload()
-    pg.click("#searchJourney"); pg.wait_for_timeout(1500); print("DBG", pg.inner_text("#journeyStatus"), pg.input_value("#fromQ"), pg.is_hidden("#journeyResults"))
     search()
     rows = item().locator(".foot-toggle")
     assert rows.count() == 2, rows.all_inner_texts()
@@ -151,12 +154,25 @@ with sync_playwright() as p:
     assert "On foot at the start" in item().locator(".jr-meta").first.inner_text()
     assert item().locator(".foot-toggle").count() == 1, "one end on foot at a time"
     back = item().locator(".foot-toggle").inner_text()
-    assert back.startswith("🚌 Take the Bus 21 first instead") and "−" in back, back
+    assert back.startswith("🚌 Take the Bus 21 first instead") and re.search(r"leave \d+ min earlier", back), back
     print("start       →", start_row.replace("\n", " | "), "|", item().locator(".jr-top b").inner_text())
     pg.screenshot(path=str(OUT / "foot-start.png"), full_page=True)
     item().locator(".foot-toggle").click()
     assert legs() == ["walk", "ride", "ride", "walk"], legs()
 
+    # Walking slower than the bus: the walk says "later", the bus "sooner", matching the times shown
+    FAST_TRAM["on"] = True
+    pg.evaluate("localStorage.removeItem('tpp:foot')"); search()
+    offer = item().locator(".foot-toggle[data-side=end]").inner_text()
+    m = re.search(r"arrive (\d\d:\d\d) · (\d+) min later$", offer)
+    assert m and "better" not in item().locator(".foot-toggle[data-side=end]").get_attribute("class"), offer
+    bus_arr = item().locator(".jr-top b").inner_text().split("→")[1].strip()
+    assert to_min(m.group(1)) - to_min(bus_arr) == int(m.group(2)), (offer, bus_arr)
+    item().locator(".foot-toggle[data-side=end]").click()
+    back = item().locator(".foot-toggle").inner_text()
+    assert back.endswith(f"arrive {bus_arr} · {m.group(2)} min sooner"), back
+    print("slower walk →", offer.split("\n")[1], "|", back.split("\n")[1])
+    FAST_TRAM["on"] = False
     # French
     pg.evaluate("localStorage.removeItem('tpp:foot')"); search()
     pg.click("#lang")
