@@ -24,6 +24,7 @@ Live on GitHub Pages: https://tiagsant.github.io/swissPublicTransport/
 | 5 | [`prototypes/sprint-05-platforms`](prototypes/sprint-05-platforms/index.html) | Platform map with the rider's position and walking directions (US-13) |
 | 6 | [`prototypes/sprint-06-journeys`](prototypes/sprint-06-journeys/index.html) | Journey planner (stops, my position, map points; fastest / least walking), get-ready and leave alarms following live data, learned walking speed (US-07…09, US-14…19, TECH-04) |
 | 7 | [`prototypes/sprint-07-official-data`](prototypes/sprint-07-official-data/index.html) | Official data from opentransportdata.swiss (OJP 2.0) with the rider's own key, entered in Settings (TECH-05, TECH-06); remove a single saved stop (US-20) |
+| 8 | [`prototypes/sprint-08-journey-details`](prototypes/sprint-08-journey-details/index.html) | Journey details open inside the result, rides in their line colour, intermediate stops with times, reminder one stop before getting off (switch in Settings), each walk on a map, merged walks (US-28…32, BUG-03) |
 
 > **Language policy.** From Sprint 4 on, everything on GitHub is in English: code, comments, docs, issues and pull requests. The app UI is English by default and French when the phone is set to French. Prototypes 1–3 predate this rule and are kept as historical snapshots, unchanged.
 
@@ -74,6 +75,7 @@ python tests/test_sprint06.py            # journeys and alarms, with a frozen br
 python tests/test_api_outage.py          # API down / 503 / 429 / no answer → banner, 10 s timeout
 python tests/test_favorites.py           # remove one stop / clear all, with undo
 python tests/test_sprint07_ojp.py        # OJP key in Settings, departures / search / journeys from recorded real answers
+python tests/test_sprint08.py            # journey details, line colours, intermediate stops, get-off reminders, walk map
 ```
 
 ## Workflow

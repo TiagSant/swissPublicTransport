@@ -1,0 +1,2308 @@
+<!DOCTYPE html>
+<!--
+  swissPublicTransport — Sprint 8 prototype: journey details
+  - US-28: the details of a journey open inside the result, one at a time.
+  - US-29: each ride is drawn in the colour of its line.
+  - US-30: unfold the intermediate stops of a ride, with their times.
+  - US-31: reminder one stop before each stop where the rider gets off (switch in Settings ⚙).
+  - US-32: each walk on a map, from where to where.
+  - BUG-03: consecutive walks are merged into one.
+  Sprint 7: official data (opentransportdata.swiss)
+  - TECH-05: data from the official Swiss open-data platform (OJP 2.0): stop search, stops nearby, departures
+             with real time and platforms, journeys. The answers are turned into the shape the app already used
+             (assets/ojp.js), so every screen works the same with either source.
+  - TECH-06: the personal API key is entered in Settings ⚙ and stays on this device (never in the code).
+             Without a key, the prototype keeps using transport.opendata.ch.
+  - US-20: remove one stop from "Your stops", or all of them, with undo.
+  Sprint 6: journeys and departure alarms
+  - US-14/15: plan a journey between stops, my position or points picked on the map (nearest stops are tried,
+              walks at the rider's speed); US-07/08/09: fastest or least walking, remembered.
+  - US-16/17: "Get ready" and "Leave" alarms from the first vehicle's departure (live when available).
+  - US-18/19: preparation time, walking speed and margin; the walking speed is learned from measured walks.
+  - TECH-04: web simulation — alarms ring while the page is open, test buttons, simulated walk.
+  Sprint 5: find your platform
+  - US-13: tapping a platform letter / track number opens a map of the stop with every platform, the target
+           highlighted, the rider's position and distance, and a "Walk there" button (phone's maps app).
+           Platform positions: official ATLAS traffic points, rebuilt weekly into assets/quays.js.
+  Sprint 4: visual identity and languages
+  - US-10: English UI by default, French when the phone's language is French (EN/FR switch in the header).
+  - US-11: official Swiss public transport pictograms (modes) and SBB timetable icons (train products),
+           used unmodified from SBB's design-system repositories — see assets/sbb/NOTICE.md.
+  - US-12: each line in its operator's colour (TPG, Léman Express, Mouettes) — see assets/line-colors.js.
+  Everything from Sprints 1-3 is kept: stop search in the Unireso area, real-time departures, line and
+  direction filters, frequent stops, and the usage-based preselection of usual lines (US-06).
+  Data: https://opentransportdata.swiss (OJP 2.0, personal key) or https://transport.opendata.ch (no key).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Unireso departures — Sprint 8 prototype</title>
+<script src="../../assets/line-colors.js"></script>
+<script src="../../assets/ojp.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #c8102e; --late: #d9480f; --ok: #2b8a3e; --badge-ring: transparent;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b1220; --card: #141c2e; --text: #e8ecf3; --muted: #94a0b4; --line: #26314a;
+            --late: #ff922b; --ok: #69db7c; --badge-ring: rgba(255,255,255,.28); }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 12px 12px 40px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 2px 12px; }
+  header h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  header .right { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .75rem; }
+  .lang { border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: .75rem; font-weight: 700; color: var(--muted); background: none; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+  .search-row { display: flex; gap: 8px; }
+  input[type=search] { flex: 1; min-width: 0; font-size: 1rem; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; }
+  button:active { transform: scale(.98); }
+  .ghost { border: none; background: none; color: var(--muted); padding: 6px 8px; font-size: .85rem; }
+  .opts { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; color: var(--muted); font-size: .8rem; }
+  .opts label { display: flex; gap: 6px; align-items: center; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  .results li button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: center;
+    border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 11px 4px; }
+  .results li:last-child button { border-bottom: none; }
+  .results .dist { margin-left: auto; color: var(--muted); font-size: .8rem; }
+  .section-title { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* "Your stops" chip: open the stop, or ✕ to remove it from the list */
+  .stop-chip { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); overflow: hidden; }
+  .stop-chip button { border: none; background: none; border-radius: 0; font-size: .9rem; }
+  .stop-chip .stop-open { padding: 7px 4px 7px 12px; }
+  .stop-chip .stop-del { padding: 0 11px 0 7px; color: var(--muted); font-size: .8rem; }
+  .stop-chip .stop-del:hover { color: var(--accent); }
+  .stop-chip .n { color: var(--muted); font-size: .75rem; margin-left: 4px; }
+  .toast { position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 1500; max-width: 616px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 10px 10px 14px;
+    background: var(--text); color: var(--card); border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.3); font-size: .9rem; }
+  .toast button { border: none; background: none; color: inherit; font-weight: 800; padding: 6px 8px; text-transform: uppercase; font-size: .8rem; }
+  .board-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .board-head h2 { margin: 0; font-size: 1.2rem; }
+  .status { color: var(--muted); font-size: .78rem; margin-top: 2px; }
+
+  /* Mode pictograms (SBB pictogram library, unmodified) */
+  .picto { width: 22px; height: 22px; flex: none; display: block; }
+  .picto.sm { width: 18px; height: 18px; }
+  .picto-none { width: 22px; height: 22px; flex: none; border-radius: 4px; border: 1.5px dashed var(--line); }
+
+  /* Line badges: operator colours, SBB timetable icons, or a neutral fallback */
+  .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 24px; padding: 0 8px;
+    font-weight: 800; font-size: .9rem; line-height: 1; white-space: nowrap; box-shadow: 0 0 0 1px var(--badge-ring); }
+  .badge.pill { border-radius: 999px; }
+  .badge.hexagon { border-radius: 0; box-shadow: none; padding: 0 12px;
+    clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0 50%); }
+  .badge.neutral { border-radius: 4px; background: var(--card); color: var(--text); border: 1.5px solid currentColor; box-shadow: none; }
+  .tt { display: inline-flex; height: 24px; }
+  .tt img { height: 24px; width: auto; display: block; }
+  .line-id { display: inline-flex; align-items: center; gap: 6px; }
+
+  .line-chip { padding: 5px 8px; border-radius: 10px; display: inline-flex; gap: 6px; align-items: center; background: var(--bg);
+    border: 1px solid var(--line); color: var(--text); }
+  .line-chip[aria-pressed="false"] { opacity: .45; filter: grayscale(1); }
+  .line-chip[aria-pressed="false"] .badge, .line-chip[aria-pressed="false"] .tt { text-decoration: line-through; }
+  .line-chip[aria-pressed="mixed"] { border-style: dashed; }
+  .line-chip .cnt { font-size: .68rem; font-weight: 700; color: var(--muted); }
+  .line-chip .fav { font-size: .75rem; color: var(--accent); }
+
+  .dir-toggle { padding-left: 0; margin-top: 6px; }
+  .auto-info { font-size: .8rem; color: var(--muted); background: var(--bg); border-radius: 10px; padding: 6px 4px 6px 10px;
+    margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .auto-info button { padding: 4px 8px; font-size: .8rem; color: var(--accent); font-weight: 600; }
+  #dirs { border-top: 1px solid var(--line); margin-top: 4px; }
+  .dir-group { display: grid; grid-template-columns: 84px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .dir { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; border: none; background: none; padding: 6px 2px; border-radius: 8px; }
+  .dir .box { width: 22px; height: 22px; flex: none; border-radius: 6px; border: 2px solid var(--line); display: grid; place-items: center; font-size: .8rem; color: #fff; }
+  .dir[aria-pressed="true"] .box { background: var(--accent); border-color: var(--accent); }
+  .dir[aria-pressed="true"] .box::after { content: "✓"; }
+  .dir[aria-pressed="false"] .lbl b { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+  .dir .lbl { min-width: 0; }
+  .dir .lbl b { display: block; font-weight: 600; }
+  .dir .lbl small { color: var(--muted); font-size: .75rem; }
+  .filter-actions { display: flex; gap: 4px; }
+
+  .dep { display: grid; grid-template-columns: 108px 1fr auto; gap: 10px; align-items: center; padding: 10px 2px;
+    border-bottom: 1px solid var(--line); cursor: pointer; }
+  .dep:last-child { border-bottom: none; }
+  .dep .to { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dep .meta { color: var(--muted); font-size: .78rem; }
+  .dep .meta .late { color: var(--late); font-weight: 600; }
+  .dep .when { text-align: right; font-variant-numeric: tabular-nums; }
+  .dep .when b { font-size: 1.25rem; display: block; line-height: 1.1; }
+  .dep .when .now { color: var(--ok); }
+  .dep .when small { color: var(--muted); font-size: .75rem; }
+  .dep .stops { grid-column: 1 / -1; margin: 2px 0 0 118px; padding: 0; font-size: .8rem; color: var(--muted); }
+  .dep .stops li { display: flex; justify-content: space-between; padding: 2px 0 2px 10px; border-left: 2px solid var(--line); }
+  .dep .stops li span:last-child { font-variant-numeric: tabular-nums; }
+
+  .empty, .error { color: var(--muted); text-align: center; padding: 18px 8px; font-size: .9rem; }
+  .error { color: var(--late); }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { color: var(--muted); font-size: .72rem; text-align: center; margin-top: 16px; }
+  footer a { color: inherit; }
+  /* Platform links and map sheet (US-13) */
+  /* Platform chip: looks like the platform sign on site; tapping it opens the map */
+  .plat { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 3px 0 5px; margin-right: 2px;
+    border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--muted);
+    font: 600 .72rem/1 system-ui, sans-serif; vertical-align: middle; }
+  .plat svg { width: 11px; height: 11px; flex: none; fill: currentColor; }
+  .plat-v { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 4px;
+    background: var(--text); color: var(--card); font-weight: 800; font-size: .75rem; }
+  .plat:active { transform: scale(.96); }
+  .head-actions { display: flex; gap: 6px; }
+  .sheet { position: fixed; inset: 0; z-index: 1000; background: var(--card); display: flex; flex-direction: column; }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px;
+    border-bottom: 1px solid var(--line); }
+  .sheet-head h3 { margin: 0; font-size: 1.1rem; }
+  #map { flex: 1; min-height: 200px; background: var(--bg); }
+  .sheet-foot { padding: 10px 12px 14px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+  .sheet-foot .source { color: var(--muted); font-size: .7rem; }
+  .btn-primary { display: block; text-align: center; background: var(--accent); color: #fff; font-weight: 700;
+    border-radius: 12px; padding: 12px; text-decoration: none; }
+  .qm { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #111;
+    border: 2px solid #4b5563; font: 800 12px/1 system-ui, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  .qm.target { width: 38px; height: 38px; font-size: 16px; background: var(--accent); color: #fff; border: 3px solid #fff;
+    box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0,0,0,.4); }
+  /* Tabs, journey planner, alarms, settings (Sprint 6) */
+  .tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 12px; }
+  .tabs button { flex: 1; border: none; background: none; border-radius: 9px; padding: 8px; font-weight: 600; color: var(--muted); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; }
+  .place-label { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 4px; }
+  .swap-row { display: flex; justify-content: flex-end; margin: -2px 0 -6px; }
+  .swap-row button { font-size: 1.1rem; }
+  .when-row { display: flex; gap: 8px; margin: 12px 0 10px; }
+  .when-row select, .when-row input { font: inherit; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .when-row input { flex: 1; min-width: 0; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+  .seg button { flex: 1; border: none; border-radius: 0; background: var(--bg); color: var(--muted); font-weight: 600; padding: 9px; }
+  .seg button[aria-pressed="true"] { background: var(--text); color: var(--card); }
+  button.btn-primary { width: 100%; border: none; }
+  .jr { width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 12px 2px; display: grid; gap: 6px; }
+  #journeyList li:last-child .jr { border-bottom: none; }
+  .jr-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.05rem; }
+  .jr-dur { color: var(--muted); font-size: .9rem; }
+  .jr-segs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .jw { font-size: .8rem; color: var(--muted); }
+  .jsep { color: var(--muted); font-size: .8rem; }
+  .jr-meta { color: var(--muted); font-size: .8rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .jr-meta .tag, .tag { background: var(--text); color: var(--card); border-radius: 999px; padding: 1px 8px; font-size: .7rem; font-weight: 700; }
+  .tag.walk { background: var(--ok); color: #fff; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .late { color: var(--late); font-weight: 600; }
+  .legs { margin: 10px 0 12px; }
+  .leg { padding: 8px 0 8px 12px; border-left: 4px solid var(--line); margin-left: 6px; display: grid; gap: 4px; }
+  .leg.ride { border-left-color: var(--lc, var(--text)); }
+  .leg.walk { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; border-left: 3px dotted var(--muted); margin-left: 6.5px; }
+  .leg.walk > div { flex: 1; }
+  .walk-map { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; padding: 4px 9px; }
+  .walk-map svg { width: 14px; height: 14px; fill: currentColor; }
+  .via-toggle { border: none; background: none; padding: 2px 0; color: var(--muted); font: inherit; font-size: .82rem; cursor: pointer; justify-self: start; }
+  .via-toggle::after { content: ' ▾'; } .via-toggle[aria-expanded="true"]::after { content: ' ▴'; }
+  .via { margin: 0 0 2px; padding: 0; list-style: none; display: grid; gap: 3px; font-size: .84rem; }
+  .via li { display: flex; gap: 8px; align-items: baseline; position: relative; }
+  .via li::before { content: ''; position: absolute; left: -18.5px; top: .45em; width: 9px; height: 9px; border-radius: 50%; background: var(--card); border: 2px solid var(--lc, var(--text)); box-sizing: border-box; }
+  .via time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 3.1em; }
+  .via .next-off { font-weight: 600; }
+  .via .next-off small { color: var(--muted); font-weight: 400; }
+  .jr-item { border-bottom: 1px solid var(--line); }
+  #journeyList li.jr-item:last-child { border-bottom: none; }
+  .jr-item .jr { border-bottom: none; }
+  .jr[aria-expanded="true"] .jr-top b::after { content: ' ▴'; color: var(--muted); font-weight: 400; }
+  .jr-detail { padding: 0 2px 12px; }
+  .jr-detail .legs { margin-top: 2px; }
+  .jr-detail .btn-primary { margin-top: 4px; }
+  .wm { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .8rem; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+  .wm.a { background: #1a7f37; } .wm.b { background: #c62828; }
+  .leg-line { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .leg-stop { font-size: .88rem; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .leg-stop.muted { color: var(--muted); }
+  .alarm { padding: 4px 0 10px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+  .alarm:last-child { border-bottom: none; }
+  .al-times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; }
+  .al-times > div { background: var(--bg); border-radius: 10px; padding: 6px 4px; }
+  .al-times small { display: block; color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; }
+  .al-times b { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+  .al-times .done { opacity: .5; }
+  .al-line { display: flex; align-items: center; gap: 8px; font-size: .88rem; }
+  .al-actions { display: flex; flex-wrap: wrap; gap: 2px; }
+  .note { color: var(--muted); font-size: .72rem; margin: 6px 0 0; }
+  .walk-status { background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: .82rem; margin-top: 6px; }
+  .settings-body { padding: 12px; overflow: auto; display: grid; gap: 12px; align-content: start; }
+  .settings-body h4 { margin: 10px 0 0; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .set-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .set-row input { width: 76px; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); text-align: right; }
+  .set-info { display: flex; justify-content: space-between; align-items: center; margin-top: -6px; }
+  .alarm-banner { position: fixed; left: 12px; right: 12px; top: 12px; z-index: 2000; background: var(--card); color: var(--text);
+    border: 2px solid var(--accent); border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); display: grid; gap: 8px; max-width: 616px; margin: 0 auto; }
+  .alarm-banner b { font-size: 1.2rem; }
+  .ab-actions { display: flex; gap: 8px; }
+  .ab-actions button { flex: 1; }
+  .pick-pin { display: block; width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+  .api-status { background: #fff4e5; color: #8a4b00; border: 1px solid #f5c27a; border-radius: 12px; padding: 10px 12px;
+    font-size: .85rem; margin-bottom: 12px; }
+  @media (prefers-color-scheme: dark) { .api-status { background: #3a2a10; color: #ffd8a8; border-color: #8a5a1a; } }
+  .key-row { display: grid; gap: 6px; }
+  .key-row input { font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; box-sizing: border-box; }
+  .key-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .src-badge { font-size: .78rem; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+  .src-badge.official { border-color: var(--accent); }
+  .key-status.ok { color: #1a7f37; } .key-status.bad { color: #c62828; }
+  @media (prefers-color-scheme: dark) { .key-status.ok { color: #6fdc8c; } .key-status.bad { color: #ff8a80; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><span data-i18n="title"></span> <span>Unireso</span></h1>
+    <div class="right">
+      <span data-i18n="prototype"></span>
+      <button id="lang" class="lang" type="button"></button>
+      <button id="settingsBtn" class="lang" type="button" data-i18n-title="settingsTitle" data-i18n-aria="settingsTitle">⚙</button>
+    </div>
+  </header>
+
+  <div id="apiStatus" class="api-status" role="status" hidden></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="departures" data-i18n="tabDepartures"></button>
+    <button role="tab" data-tab="journey" data-i18n="tabJourney"></button>
+  </nav>
+
+  <!-- Departure alarms (US-16) — visible on both tabs -->
+  <section id="alarmCard" class="card" hidden>
+    <p class="section-title"><span data-i18n="alarmsTitle"></span></p>
+    <ul id="alarmList"></ul>
+    <div id="walkStatus" class="walk-status" hidden><span id="walkStatusText"></span> <button id="walkStop" class="ghost" data-i18n="stopMeasuring"></button></div>
+    <p class="note" data-i18n="webNote"></p>
+  </section>
+
+  <div id="tab-departures">
+
+  <!-- Stop search -->
+  <section class="card" data-i18n-aria="searchSection">
+    <div class="search-row">
+      <input id="q" type="search" data-i18n-placeholder="searchPlaceholder" autocomplete="off" enterkeyhint="search">
+      <button id="near" data-i18n-title="nearMe" data-i18n-aria="nearMe">📍</button>
+    </div>
+    <div class="opts">
+      <label><input id="allCH" type="checkbox"> <span data-i18n="allSwitzerland"></span></label>
+      <span id="searchStatus"></span>
+    </div>
+    <ul id="results" class="results" hidden></ul>
+  </section>
+
+  <!-- Most visited stops -->
+  <section id="recentCard" class="card" hidden>
+    <p class="section-title"><span data-i18n="yourStops"></span> <button id="clearRecent" class="ghost" data-i18n="clearAll"></button></p>
+    <div id="recent" class="chips"></div>
+  </section>
+
+  <!-- Departure board -->
+  <section id="board" class="card" hidden>
+    <div class="board-head">
+      <div>
+        <h2 id="stationName"></h2>
+        <div id="boardStatus" class="status"></div>
+      </div>
+      <div class="head-actions">
+        <button id="mapBtn" data-i18n-title="stopMap" data-i18n-aria="stopMap">🗺</button>
+        <button id="refresh" data-i18n-title="refresh" data-i18n-aria="refresh">↻</button>
+      </div>
+    </div>
+
+    <div style="margin:14px 0 6px">
+      <p class="section-title"><span data-i18n="lines"></span>
+        <span class="filter-actions">
+          <button id="allLines" class="ghost" data-i18n="all"></button>
+          <button id="noLines" class="ghost" data-i18n="none"></button>
+        </span>
+      </p>
+      <div id="autoInfo" class="auto-info" hidden></div>
+      <div id="lines" class="chips"></div>
+      <button id="dirToggle" class="ghost dir-toggle" aria-expanded="false"></button>
+      <div id="dirs" hidden></div>
+    </div>
+
+    <ul id="departures"></ul>
+  </section>
+  </div>
+
+  <!-- Journey planner (US-14, US-15, US-07, US-08, US-09) -->
+  <div id="tab-journey" hidden>
+    <section class="card">
+      <div class="place">
+        <label class="place-label" for="fromQ" data-i18n="from"></label>
+        <div class="search-row">
+          <input id="fromQ" type="search" autocomplete="off" data-i18n-placeholder="stopOrPlace">
+          <button class="place-me" data-which="from" data-i18n-title="myPosition" data-i18n-aria="myPosition">◎</button>
+          <button class="place-map" data-which="from" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
+        </div>
+        <ul id="fromResults" class="results" hidden></ul>
+      </div>
+      <div class="swap-row"><button id="swap" class="ghost" data-i18n-title="swap" data-i18n-aria="swap">⇅</button></div>
+      <div class="place">
+        <label class="place-label" for="toQ" data-i18n="to"></label>
+        <div class="search-row">
+          <input id="toQ" type="search" autocomplete="off" data-i18n-placeholder="stopOrPlace">
+          <button class="place-map" data-which="to" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
+        </div>
+        <ul id="toResults" class="results" hidden></ul>
+      </div>
+      <div class="when-row">
+        <select id="whenMode">
+          <option value="now" data-i18n="leaveNow"></option>
+          <option value="depart" data-i18n="departAt"></option>
+          <option value="arrive" data-i18n="arriveBy"></option>
+        </select>
+        <input id="whenAt" type="datetime-local" hidden>
+      </div>
+      <div id="prio" class="seg" role="group">
+        <button data-prio="fast" data-i18n="fastest"></button>
+        <button data-prio="walk" data-i18n="leastWalking"></button>
+      </div>
+      <button id="searchJourney" class="btn-primary" data-i18n="searchJourney"></button>
+      <div id="journeyStatus" class="status" style="margin-top:8px"></div>
+    </section>
+
+    <section id="journeyResults" class="card" hidden>
+      <ul id="journeyList"></ul>
+    </section>
+
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden><span id="toastText"></span><button id="toastUndo" data-i18n="undo"></button></div>
+
+  <footer>
+    <span data-i18n="dataSource"></span>
+    <a id="srcLink" href="https://transport.opendata.ch" target="_blank" rel="noopener">transport.opendata.ch</a>
+    · <span data-i18n="credits"></span>
+  </footer>
+</main>
+
+<!-- Platform map (US-13) -->
+<div id="mapSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="mapTitle">
+  <div class="sheet-head">
+    <div><h3 id="mapTitle"></h3><div id="mapSub" class="status"></div></div>
+    <button id="mapClose" data-i18n-aria="close" data-i18n-title="close">✕</button>
+  </div>
+  <div id="map"></div>
+  <div class="sheet-foot">
+    <div id="mapInfo" class="status"></div>
+    <a id="walkThere" class="btn-primary" target="_blank" rel="noopener" data-i18n="walkThere"></a>
+    <button id="pickConfirm" class="btn-primary" hidden data-i18n="usePoint"></button>
+    <div class="source" data-i18n="mapSource"></div>
+  </div>
+</div>
+
+<!-- Alarm settings (US-18, US-19, TECH-04) -->
+<div id="settingsSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="sheet-head">
+    <h3 id="settingsTitle" data-i18n="settingsTitle"></h3>
+    <button id="settingsClose" data-i18n-aria="close" data-i18n-title="close">✕</button>
+  </div>
+  <div class="settings-body">
+    <!-- Data source (TECH-05, TECH-06) -->
+    <h4 data-i18n="dataTitle"></h4>
+    <div class="set-row"><span data-i18n="srcNow"></span><span id="srcBadge" class="src-badge"></span></div>
+    <label class="key-row"><span data-i18n="ojpKey"></span>
+      <input id="setOjpKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="ojpKeyPlaceholder"></label>
+    <div class="key-actions">
+      <button id="ojpKeySave" class="btn-primary" data-i18n="keySave"></button>
+      <button id="ojpKeyShow" class="ghost" data-i18n="keyShow"></button>
+      <button id="ojpKeyRemove" class="ghost" data-i18n="keyRemove"></button>
+      <span id="ojpKeyStatus" class="status key-status" role="status"></span>
+    </div>
+    <p class="note" data-i18n="keyNote"></p>
+    <h4 data-i18n="alarmsTitle"></h4>
+    <label class="set-row"><span data-i18n="prep"></span><span><input id="setPrep" type="number" min="0" max="120" step="1" inputmode="numeric"> min</span></label>
+    <label class="set-row"><span data-i18n="speed"></span><span><input id="setSpeed" type="number" min="2" max="8" step="0.1" inputmode="decimal"> km/h</span></label>
+    <div class="set-info"><span id="speedInfo" class="status"></span> <button id="resetLearning" class="ghost" data-i18n="resetLearning"></button></div>
+    <label class="set-row"><span data-i18n="margin"></span><span><input id="setMargin" type="number" min="0" max="15" step="1" inputmode="numeric"> min</span></label>
+    <label class="set-row"><span data-i18n="alightSetting"></span><input id="setAlight" type="checkbox"></label>
+    <div class="set-row"><span data-i18n="notifications"></span><span><button id="enableNotif" class="ghost" data-i18n="enableNotif"></button> <span id="notifState" class="status"></span></span></div>
+    <h4 data-i18n="simTitle"></h4>
+    <div class="set-row"><span data-i18n="simWalk"></span><span><input id="simSpeed" type="number" min="1" max="10" step="0.1" value="5.5"> km/h <button id="simWalk" class="ghost">▶</button></span></div>
+    <div id="simResult" class="status"></div>
+    <p class="note" data-i18n="webNote"></p>
+  </div>
+</div>
+
+<!-- Ringing alarm -->
+<div id="alarmBanner" class="alarm-banner" hidden role="alertdialog" aria-labelledby="abTitle">
+  <b id="abTitle"></b>
+  <div id="abBody"></div>
+  <div class="ab-actions">
+    <button id="abTrack" hidden data-i18n="measureWalk"></button>
+    <button id="abOk" class="btn-primary" data-i18n="ok"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Configuration ----------
+  const API = 'https://transport.opendata.ch/v1';
+  const ASSETS = '../../assets';
+  // Approximate Unireso + Léman Pass / Léman Express area (Geneva, Nyon district, Ain, Haute-Savoie)
+  const ZONE = { latMin: 45.85, latMax: 46.50, lonMin: 5.80, lonMax: 6.65 };
+  // The API only returns journeys whose *scheduled* time is at or after `datetime`. A bus scheduled at 17:10
+  // running +8 min would vanish at 17:11, so we ask from LOOKBACK_MIN minutes ago and filter on the real time.
+  const LOOKBACK_MIN = 30;
+  const BOARD_LIMIT = 150;      // departures requested: the look-back window plus enough upcoming ones for a busy stop
+  const GONE_MS = 60000;        // a departure is dropped one minute after it has left
+  const SHOW_MAX = 25;          // departures shown after filtering
+  const REFRESH_MS = 30000;     // data refresh
+  const TICK_MS = 15000;        // countdown refresh
+
+  // ---------- Strings (US-10) ----------
+  // English is the default; French is used when the phone's language is French, or when chosen in the header.
+  // The switch label names the target language in that language (standard practice), hence French in the EN block.
+  const STRINGS = {
+    en: {
+      title: 'Departures', prototype: 'Prototype · Sprint 8', switchTo: 'FR', switchToLabel: 'Afficher en français',
+      searchSection: 'Stop search', searchPlaceholder: 'Stop: Bel-Air, Cornavin, Pâquis…', nearMe: 'Stops near me',
+      allSwitzerland: 'Include all of Switzerland', yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
+      removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
+      lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
+      dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators',
+      noStopInZone: 'No stop found in the Unireso area. Tick "Include all of Switzerland" to widen the search.',
+      noStop: 'No stop found.', searchFailed: 'Search failed (network?).', geoUnavailable: 'Geolocation not available.',
+      locating: 'locating…', noNearby: 'No stop nearby.', nearbyFailed: 'Could not load nearby stops.',
+      geoDenied: 'Location denied or unavailable.', nextStop: 'next stop: {name}',
+      manual: 'Manual selection', backToHabits: 'Back to my habits', allLinesShown: 'All lines', myLines: '★ My lines',
+      usualLines: '★ Your usual lines at this stop', seeAll: 'See all',
+      noLinesInBoard: 'No lines in the upcoming departures.', noDepartures: 'No departures coming up.',
+      noUsualDepartures: 'No upcoming departures on your usual lines.', noSelectedDepartures: 'No selected line in the upcoming departures.',
+      platform: 'Platform {p}', track: 'Track {p}', nextStopsUnavailable: 'Next stops not available',
+      justNow: 'just now', updatedAgo: 'updated {n} ago', loading: 'loading…',
+      loadFailed: 'Could not load departures.', retry: 'Retry',
+      stopMap: 'Map of the stop', allPlatforms: 'All platforms', showOnMap: '{p} — show on map', close: 'Close', walkThere: '🚶 Walk there',
+      distance: '{d} away (straight line) · about {min} min on foot at your pace', locatingYou: 'Locating you…',
+      noLocation: 'Allow location to see how far it is.', platformUnknown: 'Exact position not available for {p} — showing the stop.',
+      noPlatforms: 'Platform positions not available for this stop — showing the stop.', mapFailed: 'The map could not be loaded (network?).',
+      mapSource: 'Platforms: ATLAS, opentransportdata.swiss · Map © OpenStreetMap contributors',
+      tabDepartures: 'Departures', tabJourney: 'Journey', from: 'From', to: 'To', stopOrPlace: 'Stop — or ◎ / 🗺',
+      myPosition: 'My position', pickOnMap: 'Pick on the map', swap: 'Swap start and destination', pointOnMap: 'Point on the map',
+      nearStop: '{d} from {name}', leaveNow: 'Leave now', departAt: 'Depart at', arriveBy: 'Arrive by',
+      fastest: 'Fastest', leastWalking: 'Least walking', searchJourney: 'Search', chooseBoth: 'Choose a start and a destination.',
+      noStopNear: 'No stop within 1.2 km of {name}.', noJourney: 'No connection found.', journeyFailed: 'Journey search failed (network?).',
+      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', onTime: 'on time',
+      walkMin: 'Walk {min} min', walkTo: 'to {name}', walkToDest: 'to your destination', stopsCount: '{n} stops', back: '‹ Back',
+      stops1: '1 stop', showStops: '{n} — show', hideStops: '{n} — hide', nextOff: 'get off at the next stop',
+      walkOnMap: 'Map', walkMapTitle: 'Walk {min} min', walkFromTo: '{a} → {b}', yourStart: 'Your start', yourDestination: 'Your destination',
+      walkDist: 'about {d} on foot', walkDirections: '🚶 Directions',
+      alightSetting: 'Remind me one stop before I get off', alightTitle: 'Next stop: get off',
+      alightBodyChange: 'Get off at {stop} and change to {line}{plat} at {dep}.', alightBodyEnd: 'Get off at {stop}, then {walk}.',
+      alightBodyLast: 'Get off at {stop}.', alightWalkEnd: 'walk {min} min to your destination', testAlight: 'Test "Get off"',
+      alightPlan: 'Get-off reminders: {list}', alightOff: 'Get-off reminders are off (Settings ⚙)',
+      setAlarms: '⏰ Set departure alarms', pickStart: 'Choose the start', pickEnd: 'Choose the destination',
+      tapMap: 'Tap the map to place the point', usePoint: 'Use this point',
+      alarmsTitle: 'Departure alarms', getReady: 'Get ready', leaveHome: 'Leave', departs: 'Departs',
+      timetable: 'Timetable', liveDelay: 'Live {d}', liveOnTime: 'Live · on time',
+      walkInfo: '{min} min walk at {speed} km/h · margin {margin} min · getting ready {prep} min',
+      testReady: 'Test "Get ready"', testLeave: 'Test "Leave"', cancel: 'Cancel', mayMiss: 'It is tight — leave now!',
+      readyTitle: 'Time to get ready', readyBody: 'Leave at {leave} to catch {line} at {dep} from {stop}.',
+      leaveTitle: 'Leave now', leaveBody: '{walk} min walk to {stop}. {line} leaves at {dep}.', ok: 'OK',
+      measureWalk: 'Measure my walk', measuring: 'Measuring your walk to {stop}… {d} so far', stopMeasuring: 'Stop',
+      learnedSpeed: 'You walked {d} in {time} → {kmh} km/h. Your walking speed is now {speed} km/h ({n} walks).',
+      walkNotUsed: 'This walk was not used to learn your speed ({why}).', why_short: 'too short', why_speed: 'unusual speed',
+      why_few: 'not enough GPS positions', settingsTitle: 'Settings', prep: 'Time to get ready', speed: 'Walking speed',
+      margin: 'Safety margin', learnedFrom: 'Learned from {n} walks · last {last} km/h', notLearned: 'Not learned yet — measured on your walks to the stop.',
+      resetLearning: 'Reset', notifications: 'Notifications', enableNotif: 'Enable', notifOn: 'enabled', notifOff: 'blocked or unavailable',
+      simTitle: 'Simulation (web prototype)', simWalk: 'Simulate a 600 m walk at',
+      webNote: 'Web prototype: alarms only ring while this page is open. The Android app will ring in the background.',
+      api_timeout: '{src} is not responding — the data service may be down. Departures reload automatically; try a search again in a moment.',
+      api_network: '{src} cannot be reached (service down, no network, or too many requests). Departures reload automatically.',
+      api_server: '{src} reports an internal error (service partly down). Departures reload automatically.',
+      api_rate: 'Too many requests to {src} (the free service limits each user). Wait a moment and try again.',
+      api_auth: 'Your opentransportdata.swiss key was refused (expired or mistyped). Check it in Settings ⚙, or remove it to use transport.opendata.ch.',
+      dataTitle: 'Data source', srcNow: 'In use', srcOfficial: 'opentransportdata.swiss (official)', srcCommunity: 'transport.opendata.ch (community)',
+      ojpKey: 'Your opentransportdata.swiss API key (OJP 2.0)', ojpKeyPlaceholder: 'Paste the key (token), not the hash',
+      keySave: 'Check and use', keyShow: 'Show', keyHide: 'Hide', keyRemove: 'Remove',
+      keyChecking: 'Checking…', keyOk: 'Key works — official data in use.', keyBad: 'Key refused ({status}). Nothing was saved.',
+      keyUnchecked: 'Saved, but could not be checked now ({why}).', keyRemoved: 'Key removed — back to transport.opendata.ch.', keyEmpty: 'Paste a key first.',
+      keyNote: 'The key stays on this device (browser storage) and is only sent to api.opentransportdata.swiss. Free plan: 50 requests per minute. Without a key, the prototype uses transport.opendata.ch.',
+      alarmsTitle: 'Alarms',
+      mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Boat', funicular: 'Funicular', cableway: 'Cable car', other: 'Other' }
+    },
+    fr: {
+      title: 'Départs', prototype: 'Prototype · Sprint 8', switchTo: 'EN', switchToLabel: 'Show in English',
+      searchSection: 'Recherche d’arrêt', searchPlaceholder: 'Arrêt : Bel-Air, Cornavin, Pâquis…', nearMe: 'Arrêts autour de moi',
+      allSwitzerland: 'Inclure toute la Suisse', yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
+      removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
+      lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
+      dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants',
+      noStopInZone: 'Aucun arrêt trouvé dans la zone Unireso. Cochez « Inclure toute la Suisse » pour élargir.',
+      noStop: 'Aucun arrêt trouvé.', searchFailed: 'Recherche impossible (réseau ?).', geoUnavailable: 'Géolocalisation non disponible.',
+      locating: 'localisation…', noNearby: 'Aucun arrêt à proximité.', nearbyFailed: 'Impossible de charger les arrêts proches.',
+      geoDenied: 'Position refusée ou indisponible.', nextStop: 'prochain arrêt : {name}',
+      manual: 'Sélection manuelle', backToHabits: 'Revenir à mes habitudes', allLinesShown: 'Toutes les lignes', myLines: '★ Mes lignes',
+      usualLines: '★ Vos lignes habituelles à cet arrêt', seeAll: 'Tout voir',
+      noLinesInBoard: 'Aucune ligne dans les prochains départs.', noDepartures: 'Aucun départ prévu prochainement.',
+      noUsualDepartures: 'Aucun départ de vos lignes habituelles prochainement.', noSelectedDepartures: 'Aucune ligne sélectionnée dans les prochains départs.',
+      platform: 'Quai {p}', track: 'Voie {p}', nextStopsUnavailable: 'Prochains arrêts non disponibles',
+      justNow: 'à l’instant', updatedAgo: 'mis à jour il y a {n}', loading: 'chargement…',
+      loadFailed: 'Impossible de charger les départs.', retry: 'Réessayer',
+      stopMap: 'Plan de l\u2019arrêt', allPlatforms: 'Tous les quais', showOnMap: '{p} — voir sur le plan', close: 'Fermer', walkThere: '🚶 Y aller à pied',
+      distance: 'à {d} (à vol d\u2019oiseau) · environ {min} min à pied à votre rythme', locatingYou: 'Localisation…',
+      noLocation: 'Autorisez la localisation pour voir la distance.', platformUnknown: 'Position exacte inconnue pour : {p} — affichage de l\u2019arrêt.',
+      noPlatforms: 'Position des quais non disponible pour cet arrêt — affichage de l\u2019arrêt.', mapFailed: 'Impossible de charger le plan (réseau ?).',
+      mapSource: 'Quais : ATLAS, opentransportdata.swiss · Plan © contributeurs OpenStreetMap',
+      tabDepartures: 'Départs', tabJourney: 'Itinéraire', from: 'Départ', to: 'Arrivée', stopOrPlace: 'Arrêt — ou ◎ / 🗺',
+      myPosition: 'Ma position', pickOnMap: 'Choisir sur le plan', swap: 'Inverser départ et arrivée', pointOnMap: 'Point sur le plan',
+      nearStop: 'à {d} de {name}', leaveNow: 'Partir maintenant', departAt: 'Départ à', arriveBy: 'Arrivée avant',
+      fastest: 'Le plus rapide', leastWalking: 'Le moins de marche', searchJourney: 'Rechercher', chooseBoth: 'Choisissez un départ et une arrivée.',
+      noStopNear: 'Aucun arrêt à moins de 1,2 km : {name}.', noJourney: 'Aucune liaison trouvée.', journeyFailed: 'Recherche d\u2019itinéraire impossible (réseau ?).',
+      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', onTime: 'à l\u2019heure',
+      walkMin: 'Marche {min} min', walkTo: 'jusqu\u2019à {name}', walkToDest: 'jusqu\u2019à votre destination', stopsCount: '{n} arrêts', back: '‹ Retour',
+      stops1: '1 arrêt', showStops: '{n} — afficher', hideStops: '{n} — masquer', nextOff: 'descendez au prochain arrêt',
+      walkOnMap: 'Plan', walkMapTitle: 'Marche {min} min', walkFromTo: '{a} → {b}', yourStart: 'Votre départ', yourDestination: 'Votre destination',
+      walkDist: 'environ {d} à pied', walkDirections: '🚶 Itinéraire à pied',
+      alightSetting: 'Me prévenir un arrêt avant de descendre', alightTitle: 'Prochain arrêt : descendez',
+      alightBodyChange: 'Descendez à {stop} et prenez le {line}{plat} à {dep}.', alightBodyEnd: 'Descendez à {stop}, puis {walk}.',
+      alightBodyLast: 'Descendez à {stop}.', alightWalkEnd: 'marchez {min} min jusqu\u2019à votre destination', testAlight: 'Tester « Descendez »',
+      alightPlan: 'Rappels de descente : {list}', alightOff: 'Rappels de descente désactivés (Réglages ⚙)',
+      setAlarms: '⏰ Programmer les alarmes de départ', pickStart: 'Choisir le départ', pickEnd: 'Choisir l\u2019arrivée',
+      tapMap: 'Touchez le plan pour placer le point', usePoint: 'Utiliser ce point',
+      alarmsTitle: 'Alarmes de départ', getReady: 'Préparez-vous', leaveHome: 'Partir', departs: 'Départ',
+      timetable: 'Horaire', liveDelay: 'En direct {d}', liveOnTime: 'En direct · à l\u2019heure',
+      walkInfo: '{min} min de marche à {speed} km/h · marge {margin} min · préparation {prep} min',
+      testReady: 'Tester « Préparez-vous »', testLeave: 'Tester « Partir »', cancel: 'Annuler', mayMiss: 'C\u2019est juste — partez maintenant !',
+      readyTitle: 'Préparez-vous', readyBody: 'Partez à {leave} pour prendre le {line} de {dep} à {stop}.',
+      leaveTitle: 'Partez maintenant', leaveBody: '{walk} min de marche jusqu\u2019à {stop}. Le {line} part à {dep}.', ok: 'OK',
+      measureWalk: 'Mesurer ma marche', measuring: 'Mesure de votre marche vers {stop}… {d} parcourus', stopMeasuring: 'Arrêter',
+      learnedSpeed: 'Vous avez marché {d} en {time} → {kmh} km/h. Votre vitesse de marche est maintenant de {speed} km/h ({n} trajets).',
+      walkNotUsed: 'Ce trajet n\u2019a pas servi à apprendre votre vitesse ({why}).', why_short: 'trop court', why_speed: 'vitesse inhabituelle',
+      why_few: 'pas assez de positions GPS', settingsTitle: 'Réglages', prep: 'Temps de préparation', speed: 'Vitesse de marche',
+      margin: 'Marge de sécurité', learnedFrom: 'Apprise sur {n} trajets · dernier {last} km/h', notLearned: 'Pas encore apprise — mesurée lors de vos trajets vers l\u2019arrêt.',
+      resetLearning: 'Réinitialiser', notifications: 'Notifications', enableNotif: 'Activer', notifOn: 'activées', notifOff: 'bloquées ou indisponibles',
+      simTitle: 'Simulation (prototype web)', simWalk: 'Simuler une marche de 600 m à',
+      webNote: 'Prototype web : les alarmes ne sonnent que si cette page est ouverte. L\u2019app Android sonnera en arrière-plan.',
+      api_timeout: '{src} ne répond pas — le service de données est peut-être en panne. Les départs se rechargent automatiquement ; relancez une recherche dans un moment.',
+      api_network: '{src} est injoignable (service en panne, pas de réseau ou trop de requêtes). Les départs se rechargent automatiquement.',
+      api_server: '{src} signale une erreur interne (service en partie en panne). Les départs se rechargent automatiquement.',
+      api_rate: 'Trop de requêtes vers {src} (le service gratuit limite chaque utilisateur). Patientez un moment puis réessayez.',
+      api_auth: 'Votre clé opentransportdata.swiss a été refusée (expirée ou mal copiée). Vérifiez-la dans Réglages ⚙, ou supprimez-la pour utiliser transport.opendata.ch.',
+      dataTitle: 'Source des données', srcNow: 'Utilisée', srcOfficial: 'opentransportdata.swiss (officielle)', srcCommunity: 'transport.opendata.ch (communautaire)',
+      ojpKey: 'Votre clé API opentransportdata.swiss (OJP 2.0)', ojpKeyPlaceholder: 'Collez la clé (token), pas le hash',
+      keySave: 'Vérifier et utiliser', keyShow: 'Afficher', keyHide: 'Masquer', keyRemove: 'Supprimer',
+      keyChecking: 'Vérification…', keyOk: 'Clé valide — données officielles utilisées.', keyBad: 'Clé refusée ({status}). Rien n’a été enregistré.',
+      keyUnchecked: 'Enregistrée, mais pas vérifiable maintenant ({why}).', keyRemoved: 'Clé supprimée — retour à transport.opendata.ch.', keyEmpty: 'Collez d’abord une clé.',
+      keyNote: 'La clé reste sur cet appareil (stockage du navigateur) et n’est envoyée qu’à api.opentransportdata.swiss. Offre gratuite : 50 requêtes par minute. Sans clé, le prototype utilise transport.opendata.ch.',
+      alarmsTitle: 'Alarmes',
+      mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Bateau', funicular: 'Funiculaire', cableway: 'Téléphérique', other: 'Autre' }
+    }
+  };
+  const LOCALE = { en: 'en-GB', fr: 'fr-CH' };   // en-GB keeps the 24-hour clock
+
+  // ---------- Local storage (user preferences, on this device) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('tpp:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('tpp:' + k, JSON.stringify(v)); } catch { /* storage unavailable */ } }
+  };
+
+  function detectLang() {
+    const saved = store.get('lang', null);
+    if (saved && STRINGS[saved]) return saved;
+    const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+    return prefs.some(l => /^fr\b/i.test(l)) ? 'fr' : 'en';
+  }
+  let lang = detectLang();
+  function t(key, vars) {
+    let s = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace('{' + k + '}', v);
+    return s;
+  }
+  const modeName = m => STRINGS[lang].mode[m] || STRINGS[lang].mode.other;
+
+  // ---------- Helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const enc = encodeURIComponent;
+
+  // ---------- API calls: timeout, error kinds, service status ----------
+  // transport.opendata.ch is a free community service: it can be down, slow or rate-limited.
+  // Every call times out, says why it failed, and a banner tells the rider until a call succeeds again.
+  const API_TIMEOUT_MS = 10000;
+  class ApiError extends Error {
+    constructor(kind, status, message) { super(message || kind); this.name = 'ApiError'; this.kind = kind; this.status = status; }
+  }
+  // Data source: official OJP 2.0 when the rider has saved a key (TECH-06), otherwise transport.opendata.ch
+  const OJP = window.OJP_ADAPTER;
+  const getOjpKey = () => store.get('ojpKey', '') || '';
+  const useOjp = () => !!(OJP && getOjpKey());
+  const SRC_NAME = { ojp: 'opentransportdata.swiss', community: 'transport.opendata.ch' };
+
+  async function getJSON(url, signal) { return apiFetch('community', url, {}, signal, r => r.json()); }
+  // OJP answers are XML; `key` lets Settings check a key before saving it
+  async function ojpPost(xml, signal, key) {
+    return apiFetch('ojp', OJP.ENDPOINT, { method: 'POST', body: xml,
+      headers: { 'Content-Type': 'application/xml', Authorization: 'Bearer ' + (key || getOjpKey()) } }, signal, r => r.text());
+  }
+
+  async function apiFetch(src, url, init, signal, read) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
+    const forward = () => ctrl.abort();
+    if (signal) { if (signal.aborted) ctrl.abort(); else signal.addEventListener('abort', forward, { once: true }); }
+    try {
+      let r;
+      try { r = await fetch(url, Object.assign({}, init, { signal: ctrl.signal })); }
+      catch (e) {
+        if (signal && signal.aborted) throw e;                       // cancelled by the app (newer search): not an outage
+        throw new ApiError(ctrl.signal.aborted ? 'timeout' : 'network');
+      }
+      if (!r.ok) {
+        let message = '';
+        try { const text = await r.text(); try { const body = JSON.parse(text); message = (body.errors && body.errors[0] && body.errors[0].message) || ''; } catch { message = text.slice(0, 200); } } catch { /* no body */ }
+        const kind = r.status === 429 ? 'rate' : r.status >= 500 ? 'server' : (src === 'ojp' && (r.status === 401 || r.status === 403)) ? 'auth' : 'client';
+        throw new ApiError(kind, r.status, message);
+      }
+      const data = await read(r);
+      setApiStatus(null);
+      return data;
+    } catch (e) {
+      if (e.name === 'ApiError' && e.kind !== 'client') setApiStatus(e.kind, src);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', forward);
+    }
+  }
+  let apiProblem = null, apiProblemSrc = 'community';
+  function setApiStatus(kind, src) {
+    if (apiProblem !== kind || (kind && apiProblemSrc !== src)) { apiProblem = kind; apiProblemSrc = src || apiProblemSrc; renderApiStatus(); }
+  }
+  function renderApiStatus() {
+    const el = $('apiStatus');
+    el.hidden = !apiProblem;
+    if (apiProblem) el.textContent = '⚠ ' + t('api_' + apiProblem, { src: SRC_NAME[apiProblemSrc] });
+  }
+
+  // ---------- Data layer: one interface, two sources (TECH-05) ----------
+  // Every function returns the transport.opendata.ch v1 shape (assets/ojp.js converts the OJP answers).
+  const data = {
+    // Stop search by name. OJP ignores the name when an area is given, so the search is Switzerland-wide and
+    // the app keeps only the stops of the Unireso area (as with transport.opendata.ch).
+    async locations(q, signal) {
+      if (!useOjp()) return (await getJSON(`${API}/locations?type=station&query=${enc(q)}`, signal)).stations || [];
+      return OJP.toLocations(await ojpPost(OJP.locationsByName(q, { lang, limit: 40 }), signal)).stations;
+    },
+    // Stops around a point, with their distance in metres
+    async around(pos, signal) {
+      if (!useOjp()) return ((await getJSON(`${API}/locations?x=${pos[0]}&y=${pos[1]}`, signal)).stations || []).filter(s => s.id);
+      const dLat = MAX_ACCESS_M / 111320, dLon = MAX_ACCESS_M / (111320 * Math.cos(pos[0] * Math.PI / 180));
+      const zone = { latMin: pos[0] - dLat, latMax: pos[0] + dLat, lonMin: pos[1] - dLon, lonMax: pos[1] + dLon };
+      return OJP.toLocations(await ojpPost(OJP.locationsInZone(zone, { lang, limit: 40 }), signal)).stations
+        .map(s => Object.assign(s, { distance: s.coordinate ? Math.round(distanceM(pos, [s.coordinate.x, s.coordinate.y])) : null }));
+    },
+    // Departures from `from` on. With OJP, the next stops of each run (needed for directions) are heavy:
+    // they are fetched once per stop and remembered by run pattern; refreshes ask without them (≈ 5× lighter).
+    async board(stopId, from, signal) {
+      if (!useOjp()) return getJSON(`${API}/stationboard?id=${enc(stopId)}&limit=${BOARD_LIMIT}&datetime=${enc(apiDateTime(from))}`, signal);
+      const pat = loadPatterns(stopId);
+      const needFull = pat.fullAt == null || Date.now() - pat.fullAt > PATTERNS_MAX_AGE
+        || (pat.unknown > 0 && Date.now() - pat.fullAt > PATTERNS_RETRY_MS);
+      const light = ojpPost(OJP.stopEvents(stopId, { lang, from, limit: BOARD_LIMIT, onward: false }), signal);
+      light.catch(() => {});   // awaited below; avoids an unhandled rejection if the full request fails first
+      if (needFull) {
+        const full = await ojpPost(OJP.stopEvents(stopId, { lang, from: new Date(Date.now() - 2 * 60000), limit: PATTERNS_RESULTS }), signal);
+        OJP.toStationboard(full, stopId, pat.map);
+        pat.fullAt = Date.now();
+      }
+      const r = OJP.toStationboard(await light, stopId, pat.map);
+      pat.unknown = r.unknownPatterns;
+      savePatterns(stopId, pat);
+      return r;
+    },
+    // Journeys between two stops, leaving at / arriving by `ref`
+    async connections(a, b, ref, arrive, signal) {
+      if (!useOjp()) {
+        const [date, time] = apiDateTime(ref).split(' ');
+        const qs = new URLSearchParams({ from: a, to: b, date, time, limit: '4' });
+        if (arrive) qs.set('isArrivalTime', '1');
+        return getJSON(`${API}/connections?${qs}`, signal);
+      }
+      return OJP.toConnections(await ojpPost(OJP.trip(a, b, { lang, at: ref, arrive, limit: 4 }), signal));
+    }
+  };
+
+  // Run patterns per stop (next stops and minutes after this stop), kept on the device for a day
+  const PATTERNS_RESULTS = 40;              // departures asked with their next stops
+  const PATTERNS_MAX_AGE = 24 * 3600000;    // timetable changes, diversions: relearn once a day
+  const PATTERNS_RETRY_MS = 5 * 60000;      // a run with unknown next stops: ask again at most every 5 min
+  const patternCache = new Map();
+  function loadPatterns(stopId) {
+    if (!patternCache.has(stopId)) {
+      const saved = store.get('patterns:' + stopId, null);
+      patternCache.set(stopId, saved ? { fullAt: saved.fullAt, unknown: 0, map: new Map(saved.map) } : { fullAt: null, unknown: 0, map: new Map() });
+    }
+    return patternCache.get(stopId);
+  }
+  function savePatterns(stopId, pat) { store.set('patterns:' + stopId, { fullAt: pat.fullAt, map: [...pat.map] }); }
+
+  // "2026-11-09T23:41:00+0100" → Date (the +0100 offset without a colon is not parsed everywhere, e.g. Safari)
+  function parseTime(s) {
+    if (!s) return null;
+    const d = new Date(String(s).replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+    return isNaN(d) ? null : d;
+  }
+  const hhmm = (d) => d.toLocaleTimeString(LOCALE[lang], { hour: '2-digit', minute: '2-digit', hour12: false });
+  // API `datetime` parameter: Swiss local time "YYYY-MM-DD HH:mm" (the sv-SE locale formats exactly like that)
+  const apiDateTime = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+
+  function inZone(loc) {
+    const c = loc.coordinate;
+    if (!c || c.x == null || c.y == null) return false;
+    return c.x >= ZONE.latMin && c.x <= ZONE.latMax && c.y >= ZONE.lonMin && c.y <= ZONE.lonMax;
+  }
+
+  // ---------- Modes and pictograms (US-11) ----------
+  // API category codes → transport mode (validated against real data, see docs/real-data-validation.md)
+  const CATS = {
+    tram:      ['T', 'TRAM', 'NFT', 'STR'],
+    bus:       ['B', 'BUS', 'NFB', 'BN', 'EV', 'KB', 'EXB', 'BP', 'TX', 'NB', 'RUB', 'CAR'],
+    ship:      ['BAT', 'BAV', 'FAE', 'SCH', 'SHIP'],
+    funicular: ['FUN'],
+    cableway:  ['PB', 'GB'],
+    train:     ['S', 'SN', 'SL', 'L', 'R', 'RE', 'IR', 'IRE', 'IC', 'ICE', 'ICN', 'EC', 'EN', 'NJ', 'TGV',
+                'TER', 'RJ', 'RJX', 'PE', 'EXT', 'RB', 'IN', 'TRN']
+  };
+  const MODE_ORDER = { train: 0, tram: 1, bus: 2, ship: 3, funicular: 4, cableway: 5, other: 6 };
+  // Swiss public transport pictograms (SBB pictogram library, pictos/svg-digital), used unmodified
+  const PICTOGRAMS = { tram: 'Tram_r', bus: 'Bus_r', train: 'Zug_r', ship: 'Schiff_r',
+                       funicular: 'Standseilbahn_r', cableway: 'Luftseilbahn_r' };
+  // SBB timetable icons available in assets/sbb/timetable (each with a -negative variant for dark mode)
+  const SBB_TIMETABLE_ICONS = new Set(['ic-1', 'ic-5', 'ir-15', 'ir-57', 'ir-90', 'ir-95', 're-33', 'r-55', 'ter', 'tgv']);
+
+  function pictoHtml(mode, small) {
+    const p = PICTOGRAMS[mode];
+    return p ? `<img class="picto${small ? ' sm' : ''}" src="${ASSETS}/sbb/pictograms/${p}.svg" alt="${esc(modeName(mode))}">`
+             : `<span class="picto-none" aria-hidden="true"></span>`;
+  }
+
+  function modeOfCategory(cat) {
+    const c = String(cat || '').toUpperCase().trim();
+    for (const m of ['tram', 'bus', 'ship', 'funicular', 'cableway', 'train']) if (CATS[m].includes(c)) return m;
+    return 'other';
+  }
+  function modeOfIcon(icon, name) {
+    const m = ({ tram: 'tram', bus: 'bus', train: 'train', ship: 'ship', boat: 'ship', funicular: 'funicular', cableway: 'cableway' })[icon];
+    if (m) return m;
+    // Real data: some piers come without an icon (e.g. "Genève-Jardin-Anglais (lac)")
+    return /\(lac\)/i.test(name || '') ? 'ship' : 'other';
+  }
+
+  // Readable line label: "12" for a tram, "L2" for the Léman Express, "IR 90" for a train
+  function lineLabel(j, mode) {
+    const n = String(j.number || '').trim();
+    const c = String(j.category || '').trim();
+    if (mode !== 'train') return n || c || '?';
+    if (/^[A-Za-z]/.test(n)) return n;                     // e.g. L1…L6, S1
+    if (n && n.length <= 3) return (c + ' ' + n).trim();   // e.g. IR 90, RE 33
+    return c || n || '?';                                  // a long number is a run number: keep the category
+  }
+
+  // ---------- Line colours (US-12) ----------
+  // Priority: Léman Express colour (whatever the operator: SBB "R L2" and SNCF "TER L2" are the same line)
+  // → SBB timetable icon (other trains) → operator colour (TPG, Mouettes) → neutral badge
+  function lineStyle(j, mode, label) {
+    const nets = (window.LINE_COLORS && window.LINE_COLORS.networks) || {};
+    const isLex = mode === 'train' && /^L\d+$/.test(label);
+    if (isLex) {
+      const c = nets.LEX && nets.LEX[label];
+      return c ? { bg: c[0], fg: c[1], shape: c[2] } : { neutral: true };
+    }
+    const cat = String(j.category || '').toLowerCase().trim();
+    const num = String(j.number || '').trim();
+    if (mode === 'train') {
+      const icon = /^\d{1,3}$/.test(num) ? `${cat}-${num}` : cat;
+      if (SBB_TIMETABLE_ICONS.has(icon)) return { icon };
+    }
+    const op = String(j.operator || '');
+    let c = null;
+    if (/^tpg$/i.test(op)) c = nets.TPG && nets.TPG[label];
+    else if (mode === 'ship' && (/^mgsa$|mouettes/i.test(op) || /^M\d$/.test(label))) c = nets.MGN && nets.MGN[label];
+    return c ? { bg: c[0], fg: c[1], shape: c[2] } : { neutral: true };
+  }
+
+  function badgeHtml(style, label) {
+    if (style.icon) {
+      const base = `${ASSETS}/sbb/timetable/${style.icon}`;
+      return `<picture class="tt"><source srcset="${base}-negative.svg" media="(prefers-color-scheme: dark)">` +
+             `<img src="${base}.svg" alt="${esc(label)}"></picture>`;
+    }
+    if (style.neutral) return `<span class="badge neutral">${esc(label)}</span>`;
+    return `<span class="badge ${style.shape}" style="background:${style.bg};color:${style.fg}">${esc(label)}</span>`;
+  }
+  const lineIdHtml = (mode, style, label, small) => `<span class="line-id">${pictoHtml(mode, small)}${badgeHtml(style, label)}</span>`;
+
+  // ---------- State ----------
+  let current = null;        // { id, name }
+  let departures = [];       // normalised departures from the last load
+  let lastLoad = null;
+  let refreshTimer = null, tickTimer = null;
+  let searchCtrl = null, boardCtrl = null;
+  let lastResults = null;    // { stations, noteKey } so a language switch can re-render them
+
+  // ---------- Frequent stops (adapting to the user) ----------
+  function getStops() { return store.get('stops', {}); }
+  function recordVisit(st) {
+    const stops = getStops();
+    const s = stops[st.id] || { id: st.id, name: st.name, mode: st.mode || 'other', count: 0 };
+    s.name = st.name; if (st.mode && st.mode !== 'other') s.mode = st.mode;
+    s.count += 1; s.last = Date.now();
+    stops[st.id] = s;
+    store.set('stops', stops);
+    store.set('lastStop', st.id);
+  }
+  function renderRecent() {
+    const list = Object.values(getStops())
+      .sort((a, b) => b.count - a.count || b.last - a.last)
+      .slice(0, 8);
+    $('recentCard').hidden = list.length === 0;
+    $('recent').innerHTML = list.map(s =>
+      `<span class="stop-chip"><button class="stop-open" data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${esc(s.mode)}">` +
+      `${esc(s.name)}<span class="n">${s.count}×</span></button>` +
+      `<button class="stop-del" data-del="${esc(s.id)}" aria-label="${esc(t('removeStop', { name: s.name }))}" title="${esc(t('removeStop', { name: s.name }))}">✕</button></span>`).join('');
+  }
+
+  // Remove one stop, or all of them, with a few seconds to undo. Line and direction settings of a stop are kept,
+  // so they come back if the stop is visited again.
+  let toastTimer = null, undoStops = null;
+  function changeStops(next, message) {
+    undoStops = { stops: getStops(), lastStop: store.get('lastStop', null) };
+    store.set('stops', next);
+    if (!next[store.get('lastStop', null)]) store.set('lastStop', null);   // don't reopen a removed stop at start-up
+    renderRecent();
+    $('toastText').textContent = message;
+    $('toast').hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $('toast').hidden = true; undoStops = null; }, 6000);
+  }
+  function removeStop(id) {
+    const stops = getStops(), s = stops[id];
+    if (!s) return;
+    delete stops[id];
+    changeStops(stops, t('stopRemoved', { name: s.name }));
+  }
+  function undoStopChange() {
+    if (!undoStops) return;
+    store.set('stops', undoStops.stops); store.set('lastStop', undoStops.lastStop);
+    undoStops = null; clearTimeout(toastTimer); $('toast').hidden = true;
+    renderRecent();
+  }
+
+  // ---------- Search ----------
+  function renderResults(stations, noteKey) {
+    lastResults = { stations, noteKey };
+    const ul = $('results');
+    ul.hidden = false;
+    if (!stations.length) { ul.innerHTML = `<li class="empty">${esc(t(noteKey || 'noStopInZone'))}</li>`; return; }
+    ul.innerHTML = stations.slice(0, 10).map(s => {
+      const m = modeOfIcon(s.icon, s.name);
+      const dist = s.distance != null ? `<span class="dist">${Math.round(s.distance)} m</span>` : '';
+      return `<li><button data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-mode="${m}">` +
+             `${pictoHtml(m)}<span>${esc(s.name)}</span>${dist}</button></li>`;
+    }).join('');
+  }
+
+  function uniqueById(arr) {
+    const seen = new Set();
+    return arr.filter(s => s.id && !seen.has(s.id) && seen.add(s.id));
+  }
+
+  async function search(q) {
+    if (searchCtrl) searchCtrl.abort();
+    searchCtrl = new AbortController();
+    const signal = searchCtrl.signal;
+    const allCH = $('allCH').checked;
+    $('searchStatus').innerHTML = '<span class="spinner"></span>';
+    try {
+      const { stations, inside } = await findStops(q, signal);
+      renderResults(allCH ? stations : inside, allCH ? 'noStop' : 'noStopInZone');
+      $('searchStatus').textContent = '';
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      $('searchStatus').textContent = '';
+      renderResults([], 'searchFailed');
+    }
+  }
+
+  function nearMe() {
+    if (!navigator.geolocation) { renderResults([], 'geoUnavailable'); return; }
+    $('searchStatus').innerHTML = `<span class="spinner"></span> ${esc(t('locating'))}`;
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const { latitude: x, longitude: y } = pos.coords;
+        const st = uniqueById(await data.around([x, y])).sort((a, b) => (a.distance ?? 1e9) - (b.distance ?? 1e9));
+        $('searchStatus').textContent = '';
+        renderResults(st, 'noNearby');
+      } catch {
+        $('searchStatus').textContent = '';
+        renderResults([], 'nearbyFailed');
+      }
+    }, () => {
+      $('searchStatus').textContent = '';
+      renderResults([], 'geoDenied');
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  }
+
+  // ---------- Departure board ----------
+  function normalize(j) {
+    const stop = j.stop || {};
+    const sched = stop.departureTimestamp ? new Date(stop.departureTimestamp * 1000) : parseTime(stop.departure);
+    // Live data: the real-time estimate, or the scheduled time + delay when only the delay is known.
+    // Without live data, `real` stays null and the departure follows its scheduled time.
+    const prognosis = parseTime(stop.prognosis && stop.prognosis.departure);
+    let delay = stop.delay != null && stop.delay !== '' && !isNaN(Number(stop.delay)) ? Number(stop.delay) : null;
+    const real = prognosis || (sched && delay != null ? new Date(sched.getTime() + delay * 60000) : null);
+    if (prognosis && sched) delay = Math.round((prognosis - sched) / 60000);
+    const mode = modeOfCategory(j.category);
+    const label = lineLabel(j, mode);
+    const lineKey = mode + '|' + label;
+    // Direction = next stop after the current station (groups short runs in the same direction).
+    // Without a passList, fall back to the terminus.
+    const hereId = stop.station && stop.station.id;
+    const pl = Array.isArray(j.passList) ? j.passList : [];
+    const nxt = pl.find((p, i) => i > 0 && p && p.station && p.station.name && p.station.id !== hereId);
+    const nextStop = nxt ? nxt.station.name : '';
+    const dirKey = lineKey + '>' + (nxt ? (nxt.station.id || nextStop) : 'to:' + (j.to || ''));
+    return {
+      lineKey, dirKey, nextStop, label, mode, style: lineStyle(j, mode, label),
+      to: j.to || '', sched, real, live: !!real, time: real || sched, delay: delay || 0,
+      platform: (stop.prognosis && stop.prognosis.platform) || stop.platform || '',
+      operator: j.operator || '',
+      // next stops (shown when the departure is tapped)
+      stops: pl.slice(1).filter(p => p && p.station && p.station.name && p.station.id !== hereId).slice(0, 8)
+        .map(p => ({ name: p.station.name,
+                     time: p.arrivalTimestamp ? new Date(p.arrivalTimestamp * 1000) : parseTime(p.arrival || p.departure) }))
+    };
+  }
+
+  // ---------- Manual filter (Sprints 1-2) ----------
+  function hiddenSet() { return new Set(store.get('hidden:' + current.id, [])); }
+  function saveHidden(set) { store.set('hidden:' + current.id, [...set]); store.set('mode:' + current.id, 'manual'); }
+  // Manual mode if the user has already set their lines (including a filter inherited from Sprints 1-2)
+  function isManual() {
+    const m = store.get('mode:' + current.id, null);
+    if (m) return m === 'manual';
+    return store.get('hidden:' + current.id, []).length > 0;
+  }
+
+  // ---------- Habits (US-06) ----------
+  const HALF_LIFE_DAYS = 30;   // a 30-day-old use weighs half as much
+  // "Usual" threshold: 2 uses less than 30 days apart (1 + 0.5^(Δ/30 d) ≥ 1.5).
+  // Not 2: with decay, two uses always score slightly less than 2.
+  const FAV_MIN = 1.5;
+  const DEBOUNCE_MS = 10 * 60 * 1000; // several taps within 10 min = one use
+  let peekAll = false;         // temporary "See all", forgotten when changing stop
+
+  const decayed = (u, now) => u ? u.s * Math.pow(0.5, (now - u.t) / (HALF_LIFE_DAYS * 864e5)) : 0;
+  function getUsage() { return store.get('usage:' + current.id, {}); }
+  function recordUse(dirKey) {
+    const usage = getUsage(), now = Date.now(), u = usage[dirKey];
+    if (u && now - u.t < DEBOUNCE_MS) return false;
+    usage[dirKey] = { s: decayed(u, now) + 1, t: now };
+    store.set('usage:' + current.id, usage);
+    return true;
+  }
+  function dirScore(dirKey, usage = getUsage(), now = Date.now()) { return decayed(usage[dirKey], now); }
+  function favoriteDirs() {
+    const usage = getUsage(), now = Date.now(), fav = new Set();
+    lineModel.forEach(l => l.dirs.forEach(d => { if (dirScore(d.key, usage, now) >= FAV_MIN) fav.add(d.key); }));
+    return fav;
+  }
+
+  // Set actually applied: manual > "See all" > auto (usual directions only) > everything
+  function effectiveHidden() {
+    if (isManual()) return hiddenSet();
+    const fav = favoriteDirs();
+    if (peekAll || fav.size === 0) return new Set();
+    const set = new Set();
+    lineModel.forEach(l => l.dirs.forEach(d => { if (!fav.has(d.key)) set.add(d.key); }));
+    return set;
+  }
+  // First manual change: start from what the user currently sees
+  function materialize() {
+    if (!isManual()) saveHidden(effectiveHidden());
+    peekAll = false;
+  }
+
+  function renderAutoInfo() {
+    const fav = favoriteDirs(), box = $('autoInfo');
+    let html = '';
+    if (isManual()) {
+      if (fav.size) html = `<span>${esc(t('manual'))}</span><button id="backAuto" class="ghost">${esc(t('backToHabits'))}</button>`;
+    } else if (fav.size) {
+      html = peekAll
+        ? `<span>${esc(t('allLinesShown'))}</span><button id="peek" class="ghost">${esc(t('myLines'))}</button>`
+        : `<span>${esc(t('usualLines'))}</span><button id="peek" class="ghost">${esc(t('seeAll'))}</button>`;
+    }
+    box.hidden = !html; box.innerHTML = html;
+  }
+
+  function compareLines(a, b) {
+    return (MODE_ORDER[a.mode] - MODE_ORDER[b.mode]) ||
+      a.label.localeCompare(b.label, 'en', { numeric: true, sensitivity: 'base' });
+  }
+
+  // Hidden if the whole line is (line key, Sprint 1 compatible) or if this direction is
+  const isHidden = (d, set) => set.has(d.lineKey) || set.has(d.dirKey);
+  // Still to come? Real time when live data exists, otherwise the scheduled time (#19)
+  const upcoming = (d, now) => !!d.time && d.time - now > -GONE_MS;
+
+  let lineModel = [];
+  function buildLines() {
+    const lines = new Map();
+    for (const d of departures) {
+      let l = lines.get(d.lineKey);
+      if (!l) lines.set(d.lineKey, l = { key: d.lineKey, label: d.label, mode: d.mode, style: d.style, dirs: new Map() });
+      let dir = l.dirs.get(d.dirKey);
+      if (!dir) l.dirs.set(d.dirKey, dir = { key: d.dirKey, next: d.nextStop, termini: new Map() });
+      dir.termini.set(d.to, (dir.termini.get(d.to) || 0) + 1);
+    }
+    const usage = getUsage(), now = Date.now();
+    const lineScore = l => [...l.dirs.keys()].reduce((acc, k) => acc + dirScore(k, usage, now), 0);
+    return [...lines.values()].sort((a, b) => (lineScore(b) - lineScore(a)) || compareLines(a, b)).map(l => ({
+      key: l.key, label: l.label, mode: l.mode, style: l.style,
+      dirs: [...l.dirs.values()].map(x => ({
+        key: x.key, next: x.next,
+        // termini in the same direction, most frequent first: "Moillesulaz / Genève, Rive"
+        label: [...x.termini.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]).join(' / ')
+      })).sort((a, b) => a.label.localeCompare(b.label, 'fr'))
+    }));
+  }
+  const visibleDirs = (l, set) => set.has(l.key) ? 0 : l.dirs.filter(d => !set.has(d.key)).length;
+
+  function renderLines() {
+    lineModel = buildLines();
+    const hidden = effectiveHidden();
+    const fav = favoriteDirs();
+    renderAutoInfo();
+    $('lines').innerHTML = lineModel.length ? lineModel.map(l => {
+      const n = visibleDirs(l, hidden), total = l.dirs.length;
+      const state = n === 0 ? 'false' : n === total ? 'true' : 'mixed';
+      const cnt = state === 'mixed' ? `<span class="cnt">${n}/${total}</span>` : '';
+      const star = l.dirs.some(d => fav.has(d.key)) ? '<span class="fav">★</span>' : '';
+      return `<button class="line-chip" data-key="${esc(l.key)}" aria-pressed="${state}" title="${esc(modeName(l.mode) + ' ' + l.label)}">` +
+        `${lineIdHtml(l.mode, l.style, l.label, true)}${star}${cnt}</button>`;
+    }).join('') : `<span class="status">${esc(t('noLinesInBoard'))}</span>`;
+    $('dirToggle').hidden = lineModel.length === 0;
+    renderDirs(hidden);
+  }
+
+  function renderDirs(hidden) {
+    $('dirs').innerHTML = lineModel.map(l => {
+      const rows = l.dirs.map(d => {
+        const on = !hidden.has(l.key) && !hidden.has(d.key);
+        const next = d.next ? `<small>${esc(t('nextStop', { name: d.next }))}</small>` : '';
+        return `<button class="dir" data-line="${esc(l.key)}" data-dir="${esc(d.key)}" aria-pressed="${on}">` +
+          `<span class="box"></span><span class="lbl"><b>${esc(d.label || '—')}</b>${next}</span></button>`;
+      }).join('');
+      return `<div class="dir-group">${lineIdHtml(l.mode, l.style, l.label, true)}<div>${rows}</div></div>`;
+    }).join('');
+  }
+
+  function toggleLine(lineKey) {
+    const l = lineModel.find(x => x.key === lineKey); if (!l) return;
+    materialize();
+    const set = hiddenSet();
+    const anyVisible = visibleDirs(l, set) > 0;
+    l.dirs.forEach(d => set.delete(d.key));
+    anyVisible ? set.add(l.key) : set.delete(l.key);
+    saveHidden(set);
+  }
+
+  function toggleDir(lineKey, dirKey) {
+    const l = lineModel.find(x => x.key === lineKey); if (!l) return;
+    materialize();
+    const set = hiddenSet();
+    if (set.has(l.key)) {
+      // whole line hidden: enable this direction only
+      set.delete(l.key);
+      l.dirs.forEach(d => { if (d.key !== dirKey) set.add(d.key); });
+      set.delete(dirKey);
+    } else {
+      set.has(dirKey) ? set.delete(dirKey) : set.add(dirKey);
+      // every direction hidden → hide the line (including its future directions)
+      if (l.dirs.every(d => set.has(d.key))) { l.dirs.forEach(d => set.delete(d.key)); set.add(l.key); }
+    }
+    saveHidden(set);
+  }
+
+  function whenHtml(d, now) {
+    const time = d.time;
+    if (!time) return '<b>–</b>';
+    const min = Math.floor((time - now) / 60000);
+    if (min <= 0) return `<b class="now">0′</b><small>${hhmm(time)}</small>`;
+    if (min < 60) return `<b>${min}′</b><small>${hhmm(time)}</small>`;
+    return `<b>${hhmm(time)}</b><small>&nbsp;</small>`;
+  }
+
+  let expanded = null;  // expanded departure (unique key)
+  const depId = d => d.dirKey + '@' + (d.sched ? d.sched.getTime() : '');
+
+  function renderDepartures() {
+    const now = Date.now();
+    const hidden = effectiveHidden();
+    const list = departures
+      .filter(d => !isHidden(d, hidden))
+      .filter(d => upcoming(d, now))   // drop vehicles that have already left
+      .slice(0, SHOW_MAX);
+    const ul = $('departures');
+    if (!departures.length) { ul.innerHTML = `<li class="empty">${esc(t('noDepartures'))}</li>`; return; }
+    if (!list.length) {
+      ul.innerHTML = !isManual() && !peekAll && favoriteDirs().size
+        ? `<li class="empty">${esc(t('noUsualDepartures'))} <button id="peekEmpty">${esc(t('seeAll'))}</button></li>`
+        : `<li class="empty">${esc(t('noSelectedDepartures'))}</li>`;
+      return;
+    }
+    ul.innerHTML = list.map(d => {
+      const plat = d.platform ? platformChip(d.platform, d.mode) : '';
+      const late = d.delay > 0 ? `<span class="late">+${d.delay} min</span>` : '';
+      const meta = [plat, late].filter(Boolean).join(' · ');
+      const id = depId(d), open = id === expanded;
+      const stops = open ? `<ul class="stops">${d.stops.length ? d.stops.map(st =>
+          `<li><span>${esc(st.name)}</span><span>${st.time ? hhmm(st.time) : ''}</span></li>`).join('')
+          : `<li><span>${esc(t('nextStopsUnavailable'))}</span><span></span></li>`}</ul>` : '';
+      return `<li class="dep" data-dep="${esc(id)}" data-dir="${esc(d.dirKey)}" aria-expanded="${open}">${lineIdHtml(d.mode, d.style, d.label)}` +
+        `<div style="min-width:0"><div class="to">${esc(d.to)}</div><div class="meta">${meta || esc(modeName(d.mode))}</div></div>` +
+        `<div class="when">${whenHtml(d, now)}</div>${stops}</li>`;
+    }).join('');
+  }
+
+  function renderStatus(html) {
+    if (html !== undefined) { $('boardStatus').innerHTML = html; return; }
+    if (!lastLoad) return;
+    const s = Math.round((Date.now() - lastLoad) / 1000);
+    $('boardStatus').textContent = s < 10 ? t('justNow') : t('updatedAgo', { n: s < 60 ? s + ' s' : Math.round(s / 60) + ' min' });
+  }
+
+  async function loadBoard() {
+    if (!current) return;
+    if (boardCtrl) boardCtrl.abort();
+    boardCtrl = new AbortController();
+    renderStatus(`<span class="spinner"></span> ${esc(t('loading'))}`);
+    try {
+      const r = await data.board(current.id, new Date(Date.now() - LOOKBACK_MIN * 60000), boardCtrl.signal);
+      const now = Date.now();
+      departures = (r.stationboard || []).map(normalize)
+        .filter(d => upcoming(d, now))   // the look-back window also returns departures that have already left
+        .sort((a, b) => a.time - b.time);
+      if (r.station && r.station.name) $('stationName').textContent = r.station.name;
+      const c = r.station && r.station.coordinate;
+      if (c && c.x != null && c.y != null) current.coord = [c.x, c.y];   // API: x = latitude, y = longitude
+      lastLoad = Date.now();
+      renderLines(); renderDepartures(); renderStatus();
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      renderStatus('');
+      $('departures').innerHTML = `<li class="error">${esc(t('loadFailed'))} <button id="retry">${esc(t('retry'))}</button></li>`;
+      $('retry').onclick = loadBoard;
+    }
+  }
+
+  function startTimers() {
+    clearInterval(refreshTimer); clearInterval(tickTimer);
+    refreshTimer = setInterval(() => { if (document.visibilityState === 'visible') loadBoard(); }, REFRESH_MS);
+    tickTimer = setInterval(() => { renderDepartures(); renderStatus(); }, TICK_MS);
+  }
+
+  function openStop(st) {
+    current = { id: st.id, name: st.name };
+    recordVisit(st);
+    renderRecent();
+    $('results').hidden = true; lastResults = null;
+    $('q').value = '';
+    $('q').blur();
+    $('board').hidden = false;
+    $('stationName').textContent = st.name;
+    $('lines').innerHTML = '';
+    $('departures').innerHTML = '';
+    departures = []; lastLoad = null; peekAll = false; expanded = null;
+    loadBoard();
+    startTimers();
+    $('board').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------- Platform map (US-13) ----------
+  // Leaflet and the platform positions are only loaded when a map is first opened.
+  const LEAFLET = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
+  const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  let quaysPromise = null, leafletPromise = null, map = null, mapLayer = null, userLayer = null, watchId = null;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = src; el.onload = resolve; el.onerror = () => reject(new Error('Failed to load ' + src));
+      document.head.appendChild(el);
+    });
+  }
+  function loadLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (!leafletPromise) {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = LEAFLET + 'leaflet.css';
+      document.head.appendChild(css);
+      leafletPromise = loadScript(LEAFLET + 'leaflet.js').catch(e => { leafletPromise = null; throw e; });
+    }
+    return leafletPromise;
+  }
+  // assets/quays.js is a script (not JSON) so it also works when the page is opened as a local file
+  function loadQuays() {
+    if (!quaysPromise) quaysPromise = (window.QUAYS ? Promise.resolve() : loadScript(`${ASSETS}/quays.js`)).catch(() => {});
+    return quaysPromise.then(() => (window.QUAYS && window.QUAYS.stops) || {});
+  }
+
+  // ATLAS gives each platform an official designation and an internal one (e.g. "F" and "05"):
+  // group them by position and show the one riders see on departure boards.
+  function platformPoints(quays) {
+    const byPos = new Map();
+    for (const [name, pos] of Object.entries(quays)) {
+      const k = pos.join(',');
+      if (!byPos.has(k)) byPos.set(k, { pos, names: [] });
+      byPos.get(k).names.push(name);
+    }
+    const score = n => /^[A-Z]{1,2}$/.test(n) ? 0 : /^[1-9]\d?[A-Z]{0,2}$/.test(n) ? 1 : 2;
+    return [...byPos.values()].map(p => ({ pos: p.pos, names: p.names,
+      label: p.names.slice().sort((a, b) => score(a) - score(b) || a.length - b.length)[0] }));
+  }
+
+  function distanceM(a, b) {   // haversine, metres
+    const R = 6371000, rad = Math.PI / 180;
+    const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  const fmtDistance = m => m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
+  // "Platform F" chip in a departure row: pin, kind (platform / track) and the official designation
+  const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
+  function platformChip(p, mode, stop) {
+    const kind = mode === 'train' ? 'track' : 'platform';
+    const word = t(kind, { p: '' }).trim();
+    const at = stop ? ` data-stop-id="${esc(stop.id)}" data-stop-name="${esc(stop.name)}"` +
+      (stop.coord ? ` data-lat="${stop.coord[0]}" data-lon="${stop.coord[1]}"` : '') : '';
+    return `<button class="plat" data-quay="${esc(p)}" data-mode="${mode}"${at} aria-label="${esc(t('showOnMap', { p: t(kind, { p }) }))}">` +
+      `${PIN}<span class="plat-k">${esc(word)}</span><span class="plat-v">${esc(p)}</span></button>`;
+  }
+  const walkUrl = pos => `https://www.google.com/maps/dir/?api=1&destination=${pos[0]},${pos[1]}&travelmode=walking`;
+
+  async function openMap(platform, mode, stop = current) {
+    pickState = null;
+    const label = platform ? t(mode === 'train' ? 'track' : 'platform', { p: platform }) : t('allPlatforms');
+    $('mapTitle').textContent = label;
+    $('mapSub').textContent = stop.name;
+    $('mapInfo').textContent = '';
+    $('walkThere').hidden = true; $('pickConfirm').hidden = true;
+    $('mapSheet').hidden = false;
+    let quays;
+    try {
+      [quays] = await Promise.all([loadQuays(), loadLeaflet()]);
+    } catch {
+      $('mapInfo').textContent = t('mapFailed');
+      return;
+    }
+    if ($('mapSheet').hidden) return;   // closed while loading
+    const points = platformPoints(quays[stop.id] || {});
+    const target = platform ? points.find(p => p.names.includes(platform) || p.names.includes(platform.toUpperCase())) : null;
+    const dest = target ? target.pos : (stop.coord || (points[0] && points[0].pos));
+
+    ensureMap();
+    map.invalidateSize();
+    mapLayer.clearLayers(); userLayer.clearLayers();
+    for (const p of points) {
+      const isTarget = p === target;
+      const size = isTarget ? 38 : 28;
+      L.marker(p.pos, {
+        icon: L.divIcon({ className: '', html: `<span class="qm${isTarget ? ' target' : ''}" data-quay="${esc(p.label)}">${esc(p.label)}</span>`,
+                          iconSize: [size, size], iconAnchor: [size / 2, size / 2] }),
+        zIndexOffset: isTarget ? 1000 : 0, title: p.label, keyboard: false
+      }).addTo(mapLayer);
+    }
+    if (target) map.setView(target.pos, 19);
+    else if (points.length) map.fitBounds(points.map(p => p.pos), { padding: [40, 40], maxZoom: 19 });
+    else if (dest) map.setView(dest, 17);
+
+    const notes = [];
+    if (platform && !target) notes.push(t('platformUnknown', { p: label }));
+    else if (!points.length) notes.push(t('noPlatforms'));
+    $('mapInfo').textContent = notes.join(' ');
+    if (dest) { $('walkThere').href = walkUrl(dest); $('walkThere').textContent = t('walkThere'); $('walkThere').hidden = false; trackUser(dest, notes); }
+  }
+
+  function trackUser(dest, notes) {
+    if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    if (!navigator.geolocation) { $('mapInfo').textContent = [...notes, t('noLocation')].join(' '); return; }
+    $('mapInfo').textContent = [...notes, t('locatingYou')].join(' ');
+    let first = true;
+    watchId = navigator.geolocation.watchPosition(pos => {
+      const me = [pos.coords.latitude, pos.coords.longitude];
+      userLayer.clearLayers();
+      L.circle(me, { radius: pos.coords.accuracy || 0, weight: 1, color: '#1c7ed6', fillOpacity: .1 }).addTo(userLayer);
+      L.circleMarker(me, { radius: 8, weight: 3, color: '#fff', fillColor: '#1c7ed6', fillOpacity: 1 }).addTo(userLayer);
+      const d = distanceM(me, dest);
+      $('mapInfo').textContent = [...notes, t('distance', { d: fmtDistance(d), min: fmtMin(walkMinutes(d)) })].join(' ');
+      if (first && d < 2000) map.fitBounds([me, dest], { padding: [50, 50], maxZoom: 19 });   // show both, once
+      first = false;
+    }, () => { $('mapInfo').textContent = [...notes, t('noLocation')].join(' '); },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  }
+
+  function closeMap() {
+    $('mapSheet').hidden = true;
+    pickState = null; $('pickConfirm').hidden = true;
+    if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  }
+
+  // ---------- Settings (US-18) ----------
+  // Walking time = straight-line distance × DETOUR / walking speed (streets are rarely straight).
+  const DETOUR = 1.3;
+  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true };
+  const getSettings = () => Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {}));
+  const saveSettings = s => store.set('settings', s);
+  const speedMPerMin = () => getSettings().speedKmh * 1000 / 60;
+  const walkMinutes = meters => meters * DETOUR / speedMPerMin();
+  const fmtMin = m => String(Math.max(1, Math.round(m)));
+  const fmtDuration = min => { const m = Math.round(min); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`; };
+
+  // ---------- Journeys (US-14, US-15, US-07, US-08, US-09) ----------
+  const MAX_ACCESS_M = 1200;          // stops further than this from a map point are not tried
+  const DEFAULT_CENTER = [46.2044, 6.1432];
+  const places = { from: null, to: null };
+  let journeys = [], journeyCtrl = null;
+  const journeySearchCtrl = { from: null, to: null };
+
+  // Stop search shared by the departure board and the journey planner
+  async function findStops(q, signal) {
+    let stations = uniqueById(await data.locations(q, signal));
+    let inside = stations.filter(inZone);
+    // Short names ("Bel-Air", "Gare") often return other towns first: retry targeting Geneva
+    if (inside.length < 3 && !/gen[eè]v/i.test(q)) {
+      stations = uniqueById([...stations, ...(await data.locations('Genève ' + q, signal))]);
+      inside = stations.filter(inZone);
+    }
+    return { stations, inside };
+  }
+  const coordOf = s => s && s.coordinate && s.coordinate.x != null ? [s.coordinate.x, s.coordinate.y] : null;
+
+  // Stops around a point, nearest first, with their straight-line distance
+  async function stopsNear(pos, n, signal) {
+    return uniqueById(await data.around(pos, signal)).map(s => {
+      const c = coordOf(s);
+      return { id: s.id, name: s.name, coord: c, meters: c ? distanceM(pos, c) : (s.distance ?? 1e9) };
+    }).filter(s => s.meters <= MAX_ACCESS_M).sort((a, b) => a.meters - b.meters).slice(0, n);
+  }
+
+  function placeLabel(p) {
+    if (!p) return '';
+    if (p.kind === 'stop') return p.name;
+    const base = t(p.kind === 'me' ? 'myPosition' : 'pointOnMap');
+    return p.near ? `${base} · ${t('nearStop', { d: fmtDistance(p.near.meters), name: p.near.name })}` : base;
+  }
+  function setPlace(which, p) {
+    places[which] = p;
+    $(which + 'Q').value = placeLabel(p);
+    $(which + 'Results').hidden = true;
+    store.set('journey:' + which, p);
+  }
+
+  async function searchPlace(which, q) {
+    if (journeySearchCtrl[which]) journeySearchCtrl[which].abort();
+    const ctrl = journeySearchCtrl[which] = new AbortController();
+    const ul = $(which + 'Results');
+    try {
+      const { inside } = await findStops(q, ctrl.signal);
+      ul.hidden = false;
+      ul.innerHTML = inside.length ? inside.slice(0, 8).map(s => {
+        const m = modeOfIcon(s.icon, s.name), c = coordOf(s);
+        return `<li><button data-id="${esc(s.id)}" data-name="${esc(s.name)}" data-lat="${c ? c[0] : ''}" data-lon="${c ? c[1] : ''}">` +
+               `${pictoHtml(m)}<span>${esc(s.name)}</span></button></li>`;
+      }).join('') : `<li class="empty">${esc(t('noStopInZone'))}</li>`;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      ul.hidden = false; ul.innerHTML = `<li class="empty">${esc(t('searchFailed'))}</li>`;
+    }
+  }
+
+  function useMyPosition(which) {
+    if (!navigator.geolocation) { $('journeyStatus').textContent = t('geoUnavailable'); return; }
+    $('journeyStatus').innerHTML = `<span class="spinner"></span> ${esc(t('locating'))}`;
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const coord = [pos.coords.latitude, pos.coords.longitude];
+      let near = null;
+      try { near = (await stopsNear(coord, 1))[0] || null; } catch { /* label without the nearest stop */ }
+      setPlace(which, { kind: 'me', coord, near });
+      $('journeyStatus').textContent = '';
+    }, () => { $('journeyStatus').textContent = t('geoDenied'); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+  }
+
+  // Candidate stops for a place: the stop itself, or the nearest stops of a point
+  async function candidates(p, n, signal) {
+    if (p.kind === 'stop') return [{ id: p.id, name: p.name, coord: p.coord, meters: 0 }];
+    return stopsNear(p.coord, n, signal);
+  }
+
+  function readWhen() {
+    const mode = $('whenMode').value;
+    const at = mode === 'now' ? new Date() : new Date($('whenAt').value);
+    return { mode, at: isNaN(at) ? new Date() : at };
+  }
+
+  async function fetchConnections(a, b, when, signal) {
+    const access = walkMinutes(a.meters), egress = walkMinutes(b.meters);
+    // Ask from the moment the rider can actually be at the first stop (or by when they must leave the last one)
+    const ref = when.mode === 'arrive' ? new Date(when.at - egress * 60000) : new Date(Math.max(when.at, Date.now()) + access * 60000);
+    const r = await data.connections(a.id, b.id, ref, when.mode === 'arrive', signal);
+    return (r.connections || []).map(c => buildJourney(c, a, b)).filter(Boolean);
+  }
+
+  const tsOr = (ts, s) => ts ? new Date(ts * 1000) : parseTime(s);
+  const stopRef = st => st ? { id: st.id, name: st.name, coord: coordOf(st) } : { id: null, name: '', coord: null };
+  function walkSectionMin(s, dep, arr) {
+    if (dep && arr && arr > dep) return (arr - dep) / 60000;
+    const d = s.walk && s.walk.duration;
+    if (typeof d === 'number') return d > 100 ? d / 60 : d;               // seconds or minutes
+    const m = String(d || '').match(/(\d+):(\d+)(?::(\d+))?$/);           // "00d00:05:00" or "00:05:00"
+    return m ? (m[3] != null ? +m[1] * 60 + +m[2] + +m[3] / 60 : +m[1] * 60 + +m[2]) : 0;
+  }
+
+  // Colour of a ride's line on the journey (US-29): the line colour, or the colour of the SBB timetable icon
+  function lineColor(style) {
+    if (style.bg) return style.bg;
+    if (style.icon) return /^(ter|r|s|sn|pe)(-|$)/.test(style.icon) ? 'var(--text)' : '#eb0000';
+    return null;
+  }
+  // Stops between boarding and alighting, with their (live) time (US-30). Entries without a name are skipped.
+  function viaStops(pass) {
+    return pass.slice(1, -1).map(p => {
+      const st = p.station || {};
+      const planned = tsOr(p.arrivalTimestamp, p.arrival) || tsOr(p.departureTimestamp, p.departure);
+      const pr = p.prognosis || {};
+      const live = parseTime(pr.arrival) || parseTime(pr.departure);
+      const depAt = parseTime(pr.departure) || tsOr(p.departureTimestamp, p.departure) || live || planned;
+      return { name: st.name || '', id: st.id || null, time: live || planned, live: !!live, depAt };
+    }).filter(v => v.name);
+  }
+  // Where each walk starts and ends (US-32): a place, or a stop and its platform
+  function placeWalks(legs, a, b) {
+    const startPlace = places.from && places.from.kind !== 'stop' ? { name: t('yourStart'), coord: places.from.coord } : null;
+    const endPlace = places.to && places.to.kind !== 'stop' ? { name: t('yourDestination'), coord: places.to.coord } : null;
+    const stopEnd = (st, platform, mode) => st && st.name ? { name: st.name, stopId: st.id, coord: st.coord, platform, mode } : null;
+    legs.forEach((l, i) => {
+      if (l.type !== 'walk') return;
+      const prev = legs.slice(0, i).reverse().find(x => x.type === 'ride');
+      const next = legs.slice(i + 1).find(x => x.type === 'ride');
+      l.start = (i > 0 && legs[i - 1].type === 'ride') ? stopEnd(prev.toStop, prev.arrPlatform, prev.mode)
+        : prev ? stopEnd(prev.toStop, prev.arrPlatform, prev.mode)
+        : (startPlace || stopEnd({ id: a.id, name: a.name, coord: a.coord }, '', 'bus'));
+      l.end = next ? stopEnd(next.from, next.platform, next.mode) : (endPlace || stopEnd({ id: b.id, name: b.name, coord: b.coord }, '', 'bus'));
+      if (l.edge === 'access' && startPlace) l.start = startPlace;
+      if (l.edge === 'egress' && endPlace) l.end = endPlace;
+    });
+  }
+  // BUG-03: a walk followed by another walk is one walk, from the first start to the last end
+  function mergeWalks(legs) {
+    for (let i = legs.length - 1; i > 0; i--) {
+      const x = legs[i - 1], y = legs[i];
+      if (x.type !== 'walk' || y.type !== 'walk') continue;
+      legs.splice(i - 1, 2, Object.assign({}, x, {
+        min: x.min + y.min, meters: (x.meters || 0) + (y.meters || 0) || undefined, end: y.end || x.end, to: y.to,
+        edge: y.edge === 'egress' ? 'egress' : x.edge === 'access' ? 'access' : y.edge
+      }));
+    }
+  }
+
+  function buildJourney(c, a, b) {
+    const legs = [];
+    if (a.meters > 30) legs.push({ type: 'walk', min: walkMinutes(a.meters), meters: a.meters, to: a.name, edge: 'access' });
+    for (const s of c.sections || []) {
+      const dep = s.departure || {}, arr = s.arrival || {};
+      const depT = tsOr(dep.departureTimestamp, dep.departure), arrT = tsOr(arr.arrivalTimestamp, arr.arrival);
+      if (s.journey) {
+        const j = s.journey, mode = modeOfCategory(j.category), label = lineLabel(j, mode);
+        const depReal = parseTime(dep.prognosis && dep.prognosis.departure);
+        let delay = dep.delay != null && !isNaN(Number(dep.delay)) ? Number(dep.delay) : null;
+        if (depReal && depT) delay = Math.round((depReal - depT) / 60000);
+        const real = depReal || (depT && delay != null ? new Date(depT.getTime() + delay * 60000) : null);
+        const arrReal = parseTime(arr.prognosis && arr.prognosis.arrival);
+        const pass = j.passList || [];
+        const style = lineStyle(j, mode, label);
+        legs.push({ type: 'ride', mode, label, style, color: lineColor(style), to: j.to || '', category: j.category, number: j.number,
+          dep: depT, real, live: !!real, delay: delay || 0, arr: arrT, arrReal,
+          from: stopRef(dep.station), toStop: stopRef(arr.station),
+          platform: (dep.prognosis && dep.prognosis.platform) || dep.platform || '',
+          arrPlatform: (arr.prognosis && arr.prognosis.platform) || arr.platform || '',
+          stops: Math.max(0, pass.length - 1), via: viaStops(pass) });
+      } else {
+        legs.push({ type: 'walk', min: walkSectionMin(s, depT, arrT), to: (arr.station && arr.station.name) || '', edge: 'transfer' });
+      }
+    }
+    if (b.meters > 30) legs.push({ type: 'walk', min: walkMinutes(b.meters), meters: b.meters, from: b.name, to: '', edge: 'egress' });
+    placeWalks(legs, a, b);
+    mergeWalks(legs);
+    const rides = legs.filter(l => l.type === 'ride');
+    if (!rides.length || !rides[0].dep) return null;
+    const firstIdx = legs.indexOf(rides[0]), lastIdx = legs.lastIndexOf(rides[rides.length - 1]);
+    const sumWalk = arr => arr.filter(l => l.type === 'walk').reduce((acc, l) => acc + l.min, 0);
+    const walkBefore = sumWalk(legs.slice(0, firstIdx)), walkAfter = sumWalk(legs.slice(lastIdx + 1));
+    const first = rides[0], last = rides[rides.length - 1];
+    const leaveAt = new Date((first.real || first.dep).getTime() - walkBefore * 60000);
+    const arriveAt = new Date((last.arrReal || last.arr || last.dep).getTime() + walkAfter * 60000);
+    return { legs, rides, leaveAt, arriveAt, walkBefore, accessMeters: a.meters, apiWalkBefore: walkBefore - (a.meters > 30 ? walkMinutes(a.meters) : 0),
+      durationMin: (arriveAt - leaveAt) / 60000, transfers: rides.length - 1, walkMin: sumWalk(legs), live: rides.some(r => r.live),
+      key: rides.map(r => `${r.label}@${r.dep.getTime()}`).join('|') };
+  }
+
+  function rankJourneys(list, prio, mode) {
+    const byTime = (x, y) => mode === 'arrive' ? (y.leaveAt - x.leaveAt) : (x.arriveAt - y.arriveAt);
+    const byWalk = (x, y) => Math.round(x.walkMin) - Math.round(y.walkMin);
+    return list.slice().sort(prio === 'walk' ? (x, y) => byWalk(x, y) || byTime(x, y) : (x, y) => byTime(x, y) || byWalk(x, y));
+  }
+
+  async function searchJourneys() {
+    const { from, to } = places;
+    const status = $('journeyStatus');
+    if (!from || !to) { status.textContent = t('chooseBoth'); return; }
+    if (journeyCtrl) journeyCtrl.abort();
+    journeyCtrl = new AbortController();
+    const signal = journeyCtrl.signal;
+    status.innerHTML = `<span class="spinner"></span> ${esc(t('loading'))}`;
+    openJourney = null;
+    try {
+      const when = readWhen();
+      // 2 × 2 stops at most: each pair is one /connections call, and the free API allows about 1000 per day
+      const [fromC, toC] = await Promise.all([candidates(from, 2, signal), candidates(to, 2, signal)]);
+      if (!fromC.length || !toC.length) {
+        status.textContent = t('noStopNear', { name: placeLabel(!fromC.length ? from : to) }); $('journeyResults').hidden = true; return;
+      }
+      const pairs = fromC.flatMap(a => toC.map(b => [a, b])).filter(([a, b]) => a.id !== b.id);
+      const lists = await Promise.all(pairs.map(([a, b]) => fetchConnections(a, b, when, signal).catch(e => { if (e.name === 'AbortError') throw e; return []; })));
+      const limit = when.mode === 'now' ? Date.now() - 60000 : when.at.getTime() - 60000;
+      const best = new Map();
+      for (const j of lists.flat()) {
+        if (when.mode === 'arrive' ? j.arriveAt > when.at.getTime() + 60000 : j.leaveAt < limit) continue;  // can't make it
+        const prev = best.get(j.key);
+        if (!prev || j.walkMin < prev.walkMin) best.set(j.key, j);   // same vehicles from another stop: keep the shorter walk
+      }
+      journeys = [...best.values()];
+      status.textContent = journeys.length ? '' : t('noJourney');
+      renderJourneys();
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      status.textContent = t('journeyFailed');
+    }
+  }
+
+  function getPrio() { return store.get('prio', 'fast'); }
+  function renderPrio() {
+    document.querySelectorAll('#prio button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.prio === getPrio())));
+  }
+
+  function rideIds(j) {
+    return j.legs.map(l => l.type === 'walk'
+      ? `<span class="jw">🚶${fmtMin(l.min)}′</span>`
+      : lineIdHtml(l.mode, l.style, l.label, true)).join('<span class="jsep">›</span>');
+  }
+  function transfersText(n) { return n === 0 ? t('direct') : n === 1 ? t('transfer1') : t('transfersN', { n }); }
+
+  let openJourney = null;   // key of the journey whose details are open (US-28)
+  function renderJourneys() {
+    const box = $('journeyResults');
+    if (!journeys.length) { box.hidden = true; return; }
+    const mode = readWhen().mode;
+    const ranked = rankJourneys(journeys, getPrio(), mode);
+    const fastest = rankJourneys(journeys, 'fast', mode)[0], leastWalk = rankJourneys(journeys, 'walk', mode)[0];
+    journeys = ranked;
+    box.hidden = false;
+    const openVia = new Set([...document.querySelectorAll('#journeyList .via-toggle[aria-expanded="true"]')].map(b => b.dataset.key));
+    $('journeyList').innerHTML = ranked.slice(0, 8).map((j, i) => {
+      const tags = [j === fastest ? `<span class="tag">${esc(t('fastest'))}</span>` : '',
+                    j === leastWalk && Math.round(j.walkMin) < Math.round(fastest.walkMin) ? `<span class="tag walk">${esc(t('leastWalking'))}</span>` : ''].join('');
+      const first = j.rides[0];
+      const live = first.live ? ` · <span class="${first.delay > 0 ? 'late' : 'ok'}">${first.delay > 0 ? '+' + first.delay + ' min' : esc(t('onTime'))}</span>` : '';
+      const open = j.key === openJourney;
+      return `<li class="jr-item"><button class="jr" data-i="${i}" aria-expanded="${open}">
+        <div class="jr-top"><b>${hhmm(j.leaveAt)} → ${hhmm(j.arriveAt)}</b><span class="jr-dur">${fmtDuration(j.durationMin)}</span></div>
+        <div class="jr-segs">${rideIds(j)}</div>
+        <div class="jr-meta">${esc(transfersText(j.transfers))} · ${esc(t('walkTotal', { min: fmtMin(j.walkMin) }))}${live}${tags}</div>
+      </button>${open ? journeyDetailHtml(j, i, openVia) : ''}</li>`;
+    }).join('');
+  }
+
+  const MAP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5.1 9 3 3 5v16l6-2.1 6 2.1 6-2V3l-6 2.1zM14 18.6l-4-1.4V5.4l4 1.4v11.8z"/></svg>';
+  function journeyDetailHtml(j, i, openVia) {
+    const rows = j.legs.map((l, k) => {
+      if (l.type === 'walk') {
+        const where = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: l.to || (l.end && l.end.name) || '' });
+        const dist = l.meters ? ` · ${fmtDistance(l.meters)}` : '';
+        const btn = l.start && l.end && (l.start.coord || l.start.stopId) && (l.end.coord || l.end.stopId)
+          ? `<button class="ghost walk-map" data-leg="${k}" data-i="${i}">${MAP_ICON}${esc(t('walkOnMap'))}</button>` : '';
+        return `<li class="leg walk"><span class="leg-ico">🚶</span><div>${esc(t('walkMin', { min: fmtMin(l.min) }))}${esc(dist)} — ${esc(where)}</div>${btn}</li>`;
+      }
+      const late = l.delay > 0 ? ` <span class="late">+${l.delay} min</span>` : '';
+      const plat = l.platform ? platformChip(l.platform, l.mode, l.from) : '';
+      const arr = l.arrReal || l.arr;
+      const key = `${j.key}#${k}`, unfolded = openVia && openVia.has(key);
+      const count = l.stops === 1 ? t('stops1') : t('stopsCount', { n: l.stops });
+      let via = '';
+      if (l.via.length) {
+        via = `<button class="via-toggle" data-key="${esc(key)}" aria-expanded="${unfolded}">${esc(count)}</button>` +
+          `<ul class="via"${unfolded ? '' : ' hidden'}>${l.via.map((v, n) => {
+            const last = n === l.via.length - 1;
+            return `<li${last ? ' class="next-off"' : ''}><time${v.live ? ' class="live"' : ''}>${v.time ? hhmm(v.time) : ''}</time>` +
+              `<span>${esc(v.name)}${last ? ` <small>· ${esc(t('nextOff'))}</small>` : ''}</span></li>`;
+          }).join('')}</ul>`;
+      }
+      const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
+      return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
+        <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
+        ${via}
+        <div class="leg-stop muted">${!l.via.length && l.stops ? esc(count) + ' · ' : ''}<b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)}</div></li>`;
+    }).join('');
+    return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
+      <ul class="legs">${rows}</ul>
+      <button class="btn-primary set-alarms" data-i="${i}">${esc(t('setAlarms'))}</button></div>`;
+  }
+
+  // US-32: one walk on the map, from its start to its end (platform positions when known)
+  async function openWalkMap(l) {
+    pickState = null;
+    $('mapTitle').textContent = t('walkMapTitle', { min: fmtMin(l.min) });
+    const label = e => e.platform ? `${e.name} (${t(e.mode === 'train' ? 'track' : 'platform', { p: e.platform })})` : e.name;
+    $('mapSub').textContent = t('walkFromTo', { a: label(l.start), b: label(l.end) });
+    $('mapInfo').textContent = '';
+    $('walkThere').hidden = true; $('pickConfirm').hidden = true;
+    $('mapSheet').hidden = false;
+    let quays;
+    try { [quays] = await Promise.all([loadQuays(), loadLeaflet()]); }
+    catch { $('mapInfo').textContent = t('mapFailed'); return; }
+    if ($('mapSheet').hidden) return;
+    const pos = e => {
+      if (e.platform && e.stopId) {
+        const p = platformPoints(quays[e.stopId] || {}).find(q => q.names.includes(e.platform) || q.names.includes(String(e.platform).toUpperCase()));
+        if (p) return p.pos;
+      }
+      return e.coord || null;
+    };
+    const A = pos(l.start), B = pos(l.end);
+    ensureMap(); map.invalidateSize();
+    mapLayer.clearLayers(); userLayer.clearLayers();
+    const marker = (p, cls, txt, title) => L.marker(p, { icon: L.divIcon({ className: '', html: `<span class="wm ${cls}">${txt}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }), title, keyboard: false }).addTo(mapLayer);
+    if (A) marker(A, 'a', 'A', label(l.start));
+    if (B) marker(B, 'b', 'B', label(l.end));
+    if (A && B) {
+      L.polyline([A, B], { color: '#1c7ed6', weight: 4, dashArray: '2 8', lineCap: 'round' }).addTo(mapLayer);
+      map.fitBounds([A, B], { padding: [50, 50], maxZoom: 19 });
+      const d = distanceM(A, B) * DETOUR;
+      $('mapInfo').textContent = t('walkDist', { d: fmtDistance(d) });
+      $('walkThere').href = `https://www.google.com/maps/dir/?api=1&origin=${A[0]},${A[1]}&destination=${B[0]},${B[1]}&travelmode=walking`;
+      $('walkThere').textContent = t('walkDirections');
+      $('walkThere').hidden = false;
+    } else if (A || B) map.setView(A || B, 18);
+  }
+
+  // ---------- Map picker (US-15) ----------
+  let pickState = null;   // { which, pos, near }
+  function ensureMap() {
+    if (map) return;
+    map = L.map('map', { zoomControl: true, attributionControl: true });
+    L.tileLayer(TILES, { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+    mapLayer = L.layerGroup().addTo(map);
+    userLayer = L.layerGroup().addTo(map);
+    map.on('click', e => { if (pickState) setPickPoint([e.latlng.lat, e.latlng.lng]); });
+  }
+  async function openPicker(which) {
+    pickState = { which, pos: null, near: null };
+    $('mapTitle').textContent = t(which === 'from' ? 'pickStart' : 'pickEnd');
+    $('mapSub').textContent = t('tapMap');
+    $('mapInfo').textContent = '';
+    $('walkThere').hidden = true; $('pickConfirm').hidden = true;
+    $('mapSheet').hidden = false;
+    try { await loadLeaflet(); } catch { $('mapInfo').textContent = t('mapFailed'); return; }
+    if (!pickState) return;
+    ensureMap();
+    map.invalidateSize();
+    mapLayer.clearLayers(); userLayer.clearLayers();
+    const other = places[which === 'from' ? 'to' : 'from'];
+    const existing = places[which];
+    map.setView((existing && existing.coord) || (other && other.coord) || DEFAULT_CENTER, existing ? 17 : 14);
+    if (existing && existing.kind === 'point') setPickPoint(existing.coord);
+  }
+  async function setPickPoint(pos) {
+    if (!pickState) return;
+    pickState.pos = pos; pickState.near = null;
+    mapLayer.clearLayers();
+    L.marker(pos, { icon: L.divIcon({ className: '', html: '<span class="pick-pin"></span>', iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(mapLayer);
+    $('pickConfirm').hidden = false;
+    $('mapInfo').innerHTML = `<span class="spinner"></span> ${esc(t('loading'))}`;
+    try {
+      const near = (await stopsNear(pos, 1))[0];
+      if (!pickState || pickState.pos !== pos) return;
+      pickState.near = near || null;
+      $('mapInfo').textContent = near ? t('nearStop', { d: fmtDistance(near.meters), name: near.name }) : t('noStopNear', { name: t('pointOnMap') });
+    } catch { $('mapInfo').textContent = ''; }
+  }
+
+  // ---------- Departure alarms (US-16, US-17) ----------
+  const LIVE_REFRESH_MS = 60000;
+  const getAlarms = () => store.get('alarms', []);
+  const saveAlarms = list => store.set('alarms', list);
+
+  function alarmTimes(a, s = getSettings()) {
+    const dep = (a.live && a.live.dep) || a.first.sched;
+    const walk = (a.accessMeters > 30 ? walkMinutes(a.accessMeters) : 0) + (a.apiWalkBefore || 0);
+    const leave = dep - (walk + s.marginMin) * 60000;
+    return { dep, walk, leave, ready: leave - s.prepMin * 60000,
+             delay: a.live ? Math.round((a.live.dep - a.first.sched) / 60000) : null };
+  }
+
+  // One reminder per ride, when the vehicle leaves the stop before the one where the rider gets off (US-31)
+  function alightPlan(j) {
+    return j.rides.map((r, n) => {
+      const prev = r.via.length ? r.via[r.via.length - 1] : null;
+      const at = prev ? (prev.depAt || prev.time) : (r.real || r.dep);
+      const next = j.rides[n + 1];
+      const after = j.legs.slice(j.legs.indexOf(r) + 1);
+      const walkEnd = !next ? after.filter(l => l.type === 'walk').reduce((s, l) => s + l.min, 0) : 0;
+      return { at: at ? at.getTime() : null, stop: r.toStop.name, mode: r.mode, label: r.label,
+               next: next ? { mode: next.mode, label: next.label, platform: next.platform, dep: (next.real || next.dep).getTime() } : null,
+               walkEnd };
+    }).filter(x => x.at);
+  }
+  // Live delay of the first vehicle since the alarm was set, applied to the get-off times
+  const alightShift = a => a.live && a.created0 ? a.live.dep - a.created0 : 0;
+  const lastAlightAt = a => (a.alights || []).reduce((m, x) => Math.max(m, x.at), 0) + alightShift(a);
+
+  function createAlarm(j) {
+    const f = j.rides[0];
+    const alarm = {
+      id: String(Date.now()), created: Date.now(), fired: {},
+      from: placeLabel(places.from), to: placeLabel(places.to), origin: places.from && places.from.coord,
+      accessMeters: j.accessMeters, apiWalkBefore: Math.max(0, j.apiWalkBefore || 0),
+      first: { stopId: f.from.id, stopName: f.from.name, stopCoord: f.from.coord, category: f.category, number: f.number,
+               mode: f.mode, label: f.label, style: f.style, to: f.to, sched: f.dep.getTime(), platform: f.platform },
+      live: f.real ? { dep: f.real.getTime(), at: Date.now() } : null,
+      created0: (f.real || f.dep).getTime(),   // first departure when the alarm was set, to shift the get-off times with live data
+      alights: alightPlan(j)
+    };
+    saveAlarms([alarm, ...getAlarms()].slice(0, 5));
+    unlockAudio(); askNotificationPermission();
+    renderAlarms(); tickAlarms();
+    $('alarmCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderAlarms() {
+    const list = getAlarms(), s = getSettings();
+    $('alarmCard').hidden = list.length === 0;
+    $('alarmList').innerHTML = list.map(a => {
+      const tm = alarmTimes(a, s), f = a.first;
+      const src = tm.delay == null ? t('timetable') : tm.delay > 0 ? t('liveDelay', { d: '+' + tm.delay + ' min' }) : t('liveOnTime');
+      const plat = f.platform ? ` · ${t(f.mode === 'train' ? 'track' : 'platform', { p: f.platform })}` : '';
+      const tight = tm.leave < Date.now() && !a.fired.leave ? `<div class="late">${esc(t('mayMiss'))}</div>` : '';
+      return `<li class="alarm" data-id="${esc(a.id)}">
+        <div class="al-times">
+          <div class="${a.fired.ready ? 'done' : ''}"><small>${esc(t('getReady'))}</small><b data-k="ready">${hhmm(new Date(tm.ready))}</b></div>
+          <div class="${a.fired.leave ? 'done' : ''}"><small>${esc(t('leaveHome'))}</small><b data-k="leave">${hhmm(new Date(tm.leave))}</b></div>
+          <div><small>${esc(t('departs'))}</small><b data-k="dep">${hhmm(new Date(tm.dep))}</b></div>
+        </div>
+        <div class="al-line">${lineIdHtml(f.mode, f.style, f.label, true)} <span>→ ${esc(f.to)} · ${esc(f.stopName)}${esc(plat)}</span></div>
+        <div class="status" data-k="src">${esc(src)} · ${esc(t('walkInfo', { min: fmtMin(tm.walk), speed: s.speedKmh.toFixed(1), margin: s.marginMin, prep: s.prepMin }))}</div>
+        ${tight}
+        ${alightLine(a, s)}
+        <div class="al-actions">
+          <button class="ghost" data-act="test-ready">${esc(t('testReady'))}</button>
+          <button class="ghost" data-act="test-leave">${esc(t('testLeave'))}</button>
+          ${(a.alights || []).length ? `<button class="ghost" data-act="test-alight">${esc(t('testAlight'))}</button>` : ''}
+          <button class="ghost" data-act="cancel">${esc(t('cancel'))}</button>
+        </div></li>`;
+    }).join('');
+  }
+
+  function tickAlarms() {
+    const now = Date.now(), s = getSettings();
+    let list = getAlarms(), changed = false;
+    for (const a of list) {
+      const tm = alarmTimes(a, s);
+      if (!a.fired.ready && now >= tm.ready) { a.fired.ready = now; changed = true; fireAlarm(a, 'ready'); }
+      else if (!a.fired.leave && now >= tm.leave) { a.fired.leave = now; a.fired.ready = a.fired.ready || now; changed = true; fireAlarm(a, 'leave'); }
+      // get-off reminders: only the latest one due rings (no burst after the phone slept); while they are
+      // switched off, due reminders are marked as passed so they don't ring when switched back on
+      const due = (a.alights || []).map((x, n) => ({ x, n })).filter(({ x, n }) => !a.fired['alight' + n] && now >= x.at + alightShift(a));
+      if (due.length) {
+        due.forEach(({ n }) => { a.fired['alight' + n] = now; });
+        changed = true;
+        const last = due[due.length - 1];
+        if (s.alightReminder !== false && now - (last.x.at + alightShift(a)) < 3 * 60000) fireAlight(a, last.n);
+      }
+    }
+    // forget alarms 10 min after the departure, or after the last get-off reminder
+    const kept = list.filter(a => now <= Math.max(alarmTimes(a, s).dep, lastAlightAt(a)) + 10 * 60000);
+    if (changed || kept.length !== list.length) { saveAlarms(kept); renderAlarms(); }
+  }
+
+  // US-17: follow the first vehicle on live data while the alarm is pending
+  async function refreshAlarmsLive() {
+    const list = getAlarms();
+    let changed = false;
+    for (const a of list) {
+      if (a.fired.leave) continue;
+      try {
+        const r = await data.board(a.first.stopId, new Date(a.first.sched - LOOKBACK_MIN * 60000));
+        const schedOf = j => { const st = j.stop || {}; const d = st.departureTimestamp ? new Date(st.departureTimestamp * 1000) : parseTime(st.departure); return d ? d.getTime() : 0; };
+        const m = (r.stationboard || []).find(j => String(j.category) === String(a.first.category) && String(j.number) === String(a.first.number)
+          && Math.abs(schedOf(j) - a.first.sched) < 60000);
+        if (!m) continue;
+        const n = normalize(m);
+        if (n.real) { a.live = { dep: n.real.getTime(), at: Date.now() }; changed = true; }
+      } catch { /* keep the last known time */ }
+    }
+    if (changed) { saveAlarms(list); renderAlarms(); tickAlarms(); }
+  }
+
+  // ---------- Ringing: banner, sound, vibration, notification ----------
+  let audioCtx = null;
+  function unlockAudio() {
+    try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch { audioCtx = null; }
+  }
+  function beep() {
+    if (!audioCtx) return;
+    try {
+      [0, 0.35, 0.7].forEach(dt => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.value = 880; g.gain.value = 0.15;
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(audioCtx.currentTime + dt); o.stop(audioCtx.currentTime + dt + 0.2);
+      });
+    } catch { /* no sound */ }
+  }
+  function askNotificationPermission() {
+    try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().then(renderNotifState); } catch { /* unsupported */ }
+  }
+  async function notify(title, body) {
+    try {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.showNotification(title, { body, tag: 'tpp-alarm', renotify: true });
+      else new Notification(title, { body });   // desktop browsers without the service worker
+    } catch { /* the in-app banner is enough */ }
+  }
+
+  function alightLine(a, s) {
+    if (!(a.alights || []).length) return '';
+    if (s.alightReminder === false) return `<div class="status">${esc(t('alightOff'))}</div>`;
+    const list = a.alights.map((x, n) => `${x.stop} ${hhmm(new Date(x.at + alightShift(a)))}${a.fired['alight' + n] ? ' ✓' : ''}`).join(' · ');
+    return `<div class="status" data-k="alights">${esc(t('alightPlan', { list }))}</div>`;
+  }
+  function fireAlight(a, n) {
+    const x = a.alights[n];
+    let body;
+    if (x.next) {
+      const plat = x.next.platform ? ` (${t(x.next.mode === 'train' ? 'track' : 'platform', { p: x.next.platform })})` : '';
+      body = t('alightBodyChange', { stop: x.stop, line: `${modeName(x.next.mode)} ${x.next.label}`, plat, dep: hhmm(new Date(x.next.dep + alightShift(a))) });
+    } else body = x.walkEnd >= 1 ? t('alightBodyEnd', { stop: x.stop, walk: t('alightWalkEnd', { min: fmtMin(x.walkEnd) }) }) : t('alightBodyLast', { stop: x.stop });
+    const title = t('alightTitle');
+    $('abTitle').textContent = '🔔 ' + title;
+    $('abBody').textContent = body;
+    $('abTrack').hidden = true;
+    $('alarmBanner').dataset.kind = 'alight';
+    $('alarmBanner').hidden = false;
+    beep();
+    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch { /* no vibration */ }
+    notify(title, body);
+  }
+
+  function fireAlarm(a, kind) {
+    const tm = alarmTimes(a), f = a.first;
+    const line = `${modeName(f.mode)} ${f.label}`;
+    const plat = f.platform ? ` (${t(f.mode === 'train' ? 'track' : 'platform', { p: f.platform })})` : '';
+    const title = t(kind === 'ready' ? 'readyTitle' : 'leaveTitle');
+    const body = kind === 'ready'
+      ? t('readyBody', { leave: hhmm(new Date(tm.leave)), line, dep: hhmm(new Date(tm.dep)), stop: f.stopName })
+      : t('leaveBody', { walk: fmtMin(tm.walk), stop: f.stopName + plat, line, dep: hhmm(new Date(tm.dep)) });
+    $('abTitle').textContent = (kind === 'ready' ? '⏰ ' : '🚶 ') + title;
+    $('abBody').textContent = body;
+    $('abTrack').hidden = kind !== 'leave' || !f.stopCoord;
+    $('abTrack').dataset.id = a.id;
+    $('alarmBanner').dataset.kind = kind;
+    $('alarmBanner').hidden = false;
+    beep();
+    try { navigator.vibrate && navigator.vibrate([300, 150, 300, 150, 300]); } catch { /* no vibration */ }
+    notify(title, body);
+  }
+
+  // ---------- Learning the walking speed (US-19) ----------
+  const LEARN_ALPHA = 0.3;    // weight of a new walk in the moving average
+  const MIN_WALK_M = 150, MIN_WALK_S = 90, MIN_KMH = 2.5, MAX_KMH = 7.5, MAX_ACCURACY_M = 35;
+  let walkWatch = null, walkTrack = [], walkTimer = null;
+
+  // Path length of a GPS track, ignoring jitter below 5 m and imprecise fixes
+  function measureWalk(track) {
+    const pts = track.filter(p => (p.acc == null || p.acc <= MAX_ACCURACY_M));
+    if (pts.length < 3) return { ok: false, why: 'few' };
+    let meters = 0, anchor = pts[0];
+    for (const p of pts.slice(1)) {
+      const d = distanceM([anchor.lat, anchor.lon], [p.lat, p.lon]);
+      if (d >= 5) { meters += d; anchor = p; }
+    }
+    const sec = (pts[pts.length - 1].t - pts[0].t) / 1000;
+    if (meters < MIN_WALK_M || sec < MIN_WALK_S) return { ok: false, why: 'short', meters, sec };
+    const kmh = meters / sec * 3.6;
+    if (kmh < MIN_KMH || kmh > MAX_KMH) return { ok: false, why: 'speed', meters, sec, kmh };
+    return { ok: true, meters, sec, kmh };
+  }
+  function learnSpeed(kmh) {
+    const s = getSettings();
+    s.speedKmh = Math.round((LEARN_ALPHA * kmh + (1 - LEARN_ALPHA) * s.speedKmh) * 10) / 10;
+    s.learned = (s.learned || 0) + 1;
+    s.samples = [...(s.samples || []), { kmh: Math.round(kmh * 10) / 10, at: Date.now() }].slice(-20);
+    saveSettings(s);
+    return s;
+  }
+  function learnFromTrack(track) {
+    const r = measureWalk(track);
+    if (!r.ok) return t('walkNotUsed', { why: t('why_' + r.why) });
+    const s = learnSpeed(r.kmh);
+    renderSettings(); renderAlarms();
+    const mm = Math.floor(r.sec / 60), ss = String(Math.round(r.sec % 60)).padStart(2, '0');
+    return t('learnedSpeed', { d: fmtDistance(r.meters), time: `${mm}:${ss}`, kmh: r.kmh.toFixed(1), speed: s.speedKmh.toFixed(1), n: s.learned });
+  }
+
+  function startWalkTracking(a) {
+    if (!navigator.geolocation || !a.first.stopCoord) return;
+    stopWalkTracking();
+    walkTrack = [];
+    const dest = a.first.stopCoord;
+    $('walkStatus').hidden = false;
+    $('walkStatusText').textContent = t('measuring', { stop: a.first.stopName, d: '0 m' });
+    walkWatch = navigator.geolocation.watchPosition(pos => {
+      walkTrack.push({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp || Date.now() });
+      const done = measureWalk(walkTrack);
+      $('walkStatusText').textContent = t('measuring', { stop: a.first.stopName, d: fmtDistance(done.meters || 0) });
+      if (distanceM([pos.coords.latitude, pos.coords.longitude], dest) <= 35) finishWalkTracking();   // arrived at the stop
+    }, () => { $('walkStatusText').textContent = t('noLocation'); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    walkTimer = setTimeout(finishWalkTracking, 40 * 60000);
+  }
+  function stopWalkTracking() {
+    if (walkWatch != null) { navigator.geolocation.clearWatch(walkWatch); walkWatch = null; }
+    clearTimeout(walkTimer);
+  }
+  function finishWalkTracking() {
+    if (walkWatch == null) return;
+    stopWalkTracking();
+    $('walkStatusText').textContent = learnFromTrack(walkTrack);
+  }
+
+  // TECH-04: a synthetic GPS track (fix every 5 s, a few metres of jitter) fed into the same learning
+  function simulatedTrack(kmh, start, meters = 600) {
+    const pts = [], stepS = 5, total = meters / (kmh / 3.6);
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5;   // deterministic jitter
+    const mPerDegLat = 111320, mPerDegLon = 111320 * Math.cos(start[0] * Math.PI / 180);
+    for (let s = 0; s <= total; s += stepS) {
+      const along = meters * s / total;
+      pts.push({ lat: start[0] + (rnd() * 4) / mPerDegLat, lon: start[1] + (along + rnd() * 4) / mPerDegLon, acc: 8, t: s * 1000 });
+    }
+    return pts;
+  }
+
+  // ---------- Settings sheet ----------
+  function renderSource() {
+    const official = useOjp();
+    $('srcBadge').textContent = t(official ? 'srcOfficial' : 'srcCommunity');
+    $('srcBadge').classList.toggle('official', official);
+    $('ojpKeyRemove').hidden = !getOjpKey();
+    $('srcLink').textContent = official ? 'opentransportdata.swiss' : 'transport.opendata.ch';
+    $('srcLink').href = official ? 'https://opentransportdata.swiss' : 'https://transport.opendata.ch';
+  }
+  function keyStatus(key, cls, vars) {
+    const el = $('ojpKeyStatus');
+    el.textContent = key ? t(key, vars) : ''; el.className = 'status key-status' + (cls ? ' ' + cls : '');
+  }
+  // Check a key with one tiny request before using it; a refused key is never saved
+  async function saveOjpKey() {
+    const key = $('setOjpKey').value.trim().replace(/^Bearer\s+/i, '');
+    if (!key) { keyStatus('keyEmpty', 'bad'); return; }
+    keyStatus('keyChecking');
+    let ok = true, why = '';
+    try { await ojpPost(OJP.locationsByName('Cornavin', { lang, limit: 1 }), null, key); }
+    catch (e) {
+      if (e.kind === 'auth') { setApiStatus(null); keyStatus('keyBad', 'bad', { status: e.status }); return; }
+      ok = false; why = e.kind || e.message;
+    }
+    store.set('ojpKey', key);
+    $('setOjpKey').value = ''; $('setOjpKey').placeholder = '••••••••' + key.slice(-4);
+    ok ? keyStatus('keyOk', 'ok') : keyStatus('keyUnchecked', 'bad', { why });
+    sourceChanged();
+  }
+  function removeOjpKey() {
+    try { localStorage.removeItem('tpp:ojpKey'); } catch { /* storage unavailable */ }
+    $('setOjpKey').value = ''; $('setOjpKey').placeholder = t('ojpKeyPlaceholder');
+    keyStatus('keyRemoved', 'ok');
+    sourceChanged();
+  }
+  // New source: drop the banner of the old one and reload what is on screen
+  function sourceChanged() {
+    setApiStatus(null); renderSource();
+    if (current) loadBoard();
+    refreshAlarmsLive();
+  }
+
+  function renderSettings() {
+    renderSource();
+    const k = getOjpKey();
+    if (k && !$('setOjpKey').value) $('setOjpKey').placeholder = '••••••••' + k.slice(-4);
+    const s = getSettings();
+    $('setPrep').value = s.prepMin; $('setSpeed').value = s.speedKmh.toFixed(1); $('setMargin').value = s.marginMin;
+    $('setAlight').checked = s.alightReminder !== false;
+    const last = s.samples && s.samples.length ? s.samples[s.samples.length - 1].kmh.toFixed(1) : null;
+    $('speedInfo').textContent = s.learned ? t('learnedFrom', { n: s.learned, last }) : t('notLearned');
+    renderNotifState();
+  }
+  function renderNotifState() {
+    const p = 'Notification' in window ? Notification.permission : 'unsupported';
+    $('notifState').textContent = p === 'granted' ? t('notifOn') : p === 'default' ? '' : t('notifOff');
+    $('enableNotif').hidden = p !== 'default';
+  }
+  function readSettingsForm() {
+    const s = getSettings();
+    const num = (id, lo, hi, d) => { const v = parseFloat($(id).value); return isNaN(v) ? d : Math.min(hi, Math.max(lo, v)); };
+    s.prepMin = Math.round(num('setPrep', 0, 120, s.prepMin));
+    s.speedKmh = Math.round(num('setSpeed', 2, 8, s.speedKmh) * 10) / 10;
+    s.marginMin = Math.round(num('setMargin', 0, 15, s.marginMin));
+    s.alightReminder = $('setAlight').checked;
+    saveSettings(s); renderAlarms(); tickAlarms();
+  }
+
+  // ---------- Tabs ----------
+  function showTab(tab) {
+    store.set('tab', tab);
+    document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    $('tab-departures').hidden = tab !== 'departures';
+    $('tab-journey').hidden = tab !== 'journey';
+  }
+
+  // ---------- Language (US-10) ----------
+  function applyLanguage() {
+    document.documentElement.lang = lang;
+    document.title = lang === 'fr' ? 'Départs Unireso — Prototype Sprint 8' : 'Unireso departures — Sprint 8 prototype';
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+    $('lang').textContent = t('switchTo');
+    $('lang').setAttribute('aria-label', t('switchToLabel'));
+    $('dirToggle').textContent = $('dirs').hidden ? t('chooseDirections') : t('hideDirections');
+    if (lastResults && !$('results').hidden) renderResults(lastResults.stations, lastResults.noteKey);
+    if (current && lastLoad) { renderLines(); renderDepartures(); renderStatus(); }
+    for (const w of ['from', 'to']) if (places[w]) $(w + 'Q').value = placeLabel(places[w]);
+    renderAlarms(); renderJourneys();
+    renderRecent();
+    if (!$('settingsSheet').hidden) renderSettings();
+    renderApiStatus();
+    renderSource();
+  }
+
+  // ---------- Events ----------
+  let debounce;
+  $('q').addEventListener('input', e => {
+    clearTimeout(debounce);
+    const q = e.target.value.trim();
+    if (q.length < 2) { $('results').hidden = true; if (searchCtrl) searchCtrl.abort(); $('searchStatus').textContent = ''; return; }
+    debounce = setTimeout(() => search(q), 300);
+  });
+  $('q').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const first = $('results').querySelector('button[data-id]'); if (first) first.click(); }
+  });
+  $('allCH').addEventListener('change', () => { const q = $('q').value.trim(); if (q.length >= 2) search(q); });
+  $('near').addEventListener('click', nearMe);
+  $('lang').addEventListener('click', () => { lang = lang === 'fr' ? 'en' : 'fr'; store.set('lang', lang); applyLanguage(); });
+
+  const pick = (e) => {
+    const b = e.target.closest('button[data-id]');
+    if (b) openStop({ id: b.dataset.id, name: b.dataset.name, mode: b.dataset.mode });
+  };
+  $('results').addEventListener('click', pick);
+  $('recent').addEventListener('click', pick);
+  $('clearRecent').addEventListener('click', () => changeStops({}, t('stopsCleared')));
+  $('recent').addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) removeStop(d.dataset.del); });
+  $('toastUndo').addEventListener('click', undoStopChange);
+
+  $('lines').addEventListener('click', e => {
+    const b = e.target.closest('.line-chip');
+    if (!b) return;
+    toggleLine(b.dataset.key);
+    renderLines(); renderDepartures();
+  });
+  $('dirs').addEventListener('click', e => {
+    const b = e.target.closest('.dir');
+    if (!b) return;
+    toggleDir(b.dataset.line, b.dataset.dir);
+    renderLines(); renderDepartures();
+  });
+  function setDirPanel(open) {
+    $('dirs').hidden = !open;
+    $('dirToggle').setAttribute('aria-expanded', String(open));
+    $('dirToggle').textContent = open ? t('hideDirections') : t('chooseDirections');
+    store.set('dirOpen', open);
+  }
+  $('dirToggle').addEventListener('click', () => setDirPanel($('dirs').hidden));
+  setDirPanel(store.get('dirOpen', false));
+  $('allLines').addEventListener('click', () => { peekAll = false; saveHidden(new Set()); renderLines(); renderDepartures(); });
+  $('noLines').addEventListener('click', () => {
+    peekAll = false; saveHidden(new Set(lineModel.map(l => l.key))); renderLines(); renderDepartures();
+  });
+  $('autoInfo').addEventListener('click', e => {
+    if (e.target.id === 'peek') peekAll = !peekAll;
+    else if (e.target.id === 'backAuto') { store.set('hidden:' + current.id, []); store.set('mode:' + current.id, 'auto'); peekAll = false; }
+    else return;
+    renderLines(); renderDepartures();
+  });
+  $('departures').addEventListener('click', e => {
+    if (e.target.id === 'peekEmpty') { peekAll = true; renderLines(); renderDepartures(); return; }
+    const q = e.target.closest('.plat');
+    if (q) { openMap(q.dataset.quay, q.dataset.mode); return; }   // the platform link does not expand the row
+    const li = e.target.closest('.dep'); if (!li) return;
+    const opening = expanded !== li.dataset.dep;
+    expanded = opening ? li.dataset.dep : null;
+    if (opening && recordUse(li.dataset.dir)) renderLines();   // a use may move the line up
+    renderDepartures();
+  });
+  $('refresh').addEventListener('click', loadBoard);
+  $('mapBtn').addEventListener('click', () => openMap(null));
+  $('mapClose').addEventListener('click', closeMap);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('mapSheet').hidden) closeMap(); });
+
+  // Sprint 6: tabs, journey planner, alarms, settings
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  for (const w of ['from', 'to']) {
+    let deb;
+    $(w + 'Q').addEventListener('input', e => {
+      places[w] = null; clearTimeout(deb);
+      const q = e.target.value.trim();
+      if (q.length < 2) { $(w + 'Results').hidden = true; return; }
+      deb = setTimeout(() => searchPlace(w, q), 300);
+    });
+    $(w + 'Results').addEventListener('click', e => {
+      const b = e.target.closest('button[data-id]'); if (!b) return;
+      setPlace(w, { kind: 'stop', id: b.dataset.id, name: b.dataset.name, coord: b.dataset.lat ? [+b.dataset.lat, +b.dataset.lon] : null });
+    });
+  }
+  document.querySelectorAll('.place-me').forEach(b => b.addEventListener('click', () => useMyPosition(b.dataset.which)));
+  document.querySelectorAll('.place-map').forEach(b => b.addEventListener('click', () => openPicker(b.dataset.which)));
+  $('pickConfirm').addEventListener('click', () => {
+    if (!pickState || !pickState.pos) return;
+    setPlace(pickState.which, { kind: 'point', coord: pickState.pos, near: pickState.near });
+    closeMap();
+  });
+  $('swap').addEventListener('click', () => { const f = places.from, to = places.to; setPlace('from', to); setPlace('to', f); });
+  $('whenMode').addEventListener('change', () => {
+    const now = $('whenMode').value === 'now';
+    $('whenAt').hidden = now;
+    if (!now && !$('whenAt').value) {   // default: next multiple of 5 minutes, local time
+      const d = new Date(Math.ceil(Date.now() / 300000) * 300000);
+      $('whenAt').value = apiDateTime(d).replace(' ', 'T');
+    }
+  });
+  document.querySelectorAll('#prio button').forEach(b => b.addEventListener('click', () => { store.set('prio', b.dataset.prio); renderPrio(); renderJourneys(); }));
+  $('searchJourney').addEventListener('click', searchJourneys);
+  $('journeyList').addEventListener('click', e => {
+    const q = e.target.closest('.plat');
+    if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }); return; }
+    const w = e.target.closest('.walk-map');
+    if (w) { const j = journeys[+w.dataset.i]; if (j) openWalkMap(j.legs[+w.dataset.leg]); return; }
+    const v = e.target.closest('.via-toggle');
+    if (v) { const open = v.getAttribute('aria-expanded') !== 'true'; v.setAttribute('aria-expanded', String(open)); v.nextElementSibling.hidden = !open; return; }
+    const al = e.target.closest('.set-alarms');
+    if (al) { const j = journeys[+al.dataset.i]; if (j) createAlarm(j); return; }
+    const b = e.target.closest('.jr');
+    if (!b) return;
+    const j = journeys[+b.dataset.i];
+    openJourney = openJourney === j.key ? null : j.key;
+    renderJourneys();
+    const opened = document.querySelector('#journeyList .jr[aria-expanded="true"]');
+    if (opened && opened.scrollIntoView) opened.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  $('alarmList').addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return;
+    const id = b.closest('.alarm').dataset.id, a = getAlarms().find(x => x.id === id); if (!a) return;
+    unlockAudio();
+    if (b.dataset.act === 'cancel') { saveAlarms(getAlarms().filter(x => x.id !== id)); renderAlarms(); }
+    else if (b.dataset.act === 'test-alight') fireAlight(a, 0);
+    else fireAlarm(a, b.dataset.act === 'test-ready' ? 'ready' : 'leave');   // test: rings without marking the alarm as done
+  });
+  $('abOk').addEventListener('click', () => { $('alarmBanner').hidden = true; });
+  $('abTrack').addEventListener('click', () => {
+    const a = getAlarms().find(x => x.id === $('abTrack').dataset.id);
+    $('alarmBanner').hidden = true;
+    if (a) startWalkTracking(a);
+  });
+  $('walkStop').addEventListener('click', () => { finishWalkTracking(); $('walkStatus').hidden = true; });
+  $('settingsBtn').addEventListener('click', () => { unlockAudio(); renderSettings(); $('settingsSheet').hidden = false; });
+  $('settingsClose').addEventListener('click', () => { $('settingsSheet').hidden = true; });
+  ['setPrep', 'setSpeed', 'setMargin', 'setAlight'].forEach(id => $(id).addEventListener('change', readSettingsForm));
+  $('resetLearning').addEventListener('click', () => {
+    const s = getSettings(); s.speedKmh = DEFAULT_SETTINGS.speedKmh; s.learned = 0; s.samples = [];
+    saveSettings(s); renderSettings(); renderAlarms();
+  });
+  $('enableNotif').addEventListener('click', askNotificationPermission);
+  $('ojpKeySave').addEventListener('click', saveOjpKey);
+  $('setOjpKey').addEventListener('keydown', e => { if (e.key === 'Enter') saveOjpKey(); });
+  $('ojpKeyRemove').addEventListener('click', removeOjpKey);
+  $('ojpKeyShow').addEventListener('click', () => {
+    const i = $('setOjpKey'), show = i.type === 'password';
+    i.type = show ? 'text' : 'password'; $('ojpKeyShow').textContent = t(show ? 'keyHide' : 'keyShow');
+  });
+  $('simWalk').addEventListener('click', () => {
+    const a = getAlarms()[0];
+    const start = (a && a.origin) || (places.from && places.from.coord) || DEFAULT_CENTER;
+    $('simResult').textContent = learnFromTrack(simulatedTrack(parseFloat($('simSpeed').value) || 5, start));
+  });
+  setInterval(tickAlarms, 5000);
+  setInterval(refreshAlarmsLive, LIVE_REFRESH_MS);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tickAlarms(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && current && lastLoad && Date.now() - lastLoad > REFRESH_MS) loadBoard();
+  });
+
+  // ---------- Start-up: straight to the last stop viewed ----------
+  for (const w of ['from', 'to']) places[w] = store.get('journey:' + w, null);
+  renderPrio();
+  showTab(store.get('tab', 'departures'));
+  try { if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js'); } catch { /* notifications fall back */ }
+  applyLanguage();
+  tickAlarms();
+  refreshAlarmsLive();
+  renderRecent();
+  const lastId = store.get('lastStop', null);
+  const last = lastId && getStops()[lastId];
+  if (last) {
+    // reopen without incrementing the visit count
+    current = { id: last.id, name: last.name };
+    $('board').hidden = false;
+    $('stationName').textContent = last.name;
+    loadBoard();
+    startTimers();
+  }
+})();
+</script>
+</body>
+</html>
