@@ -36,14 +36,15 @@
     `<LowerRight><siri:Longitude>${z.lonMax}</siri:Longitude><siri:Latitude>${z.latMin}</siri:Latitude></LowerRight>` +
     '</Rectangle></GeoRestriction>';
 
-  const lirRestrictions = limit =>
-    `<Restrictions><Type>stop</Type><NumberOfResults>${limit}</NumberOfResults><IncludePtModes>true</IncludePtModes></Restrictions>`;
+  // types: 'stop' (default), 'address', 'poi' — several allowed
+  const lirRestrictions = (limit, types) =>
+    `<Restrictions>${(types || ['stop']).map(x => `<Type>${x}</Type>`).join('')}<NumberOfResults>${limit}</NumberOfResults><IncludePtModes>true</IncludePtModes></Restrictions>`;
 
   // Stop search by name, optionally limited to an area
   function locationsByName(name, o = {}) {
     return envelope('<OJPLocationInformationRequest><siri:RequestTimestamp>{TS}</siri:RequestTimestamp>' +
       `<InitialInput><Name>${xesc(name)}</Name>${o.zone ? rectangle(o.zone) : ''}</InitialInput>` +
-      lirRestrictions(o.limit || 20) + '</OJPLocationInformationRequest>', o.lang, o.now);
+      lirRestrictions(o.limit || 20, o.types) + '</OJPLocationInformationRequest>', o.lang, o.now);
   }
 
   // Stops inside an area (used for "stops near me" and around a map point)
