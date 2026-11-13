@@ -253,6 +253,17 @@
   .jr-detail .btn-primary { margin-top: 4px; }
   .wm { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .8rem; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .wm.a { background: #1a7f37; } .wm.b { background: #c62828; }
+  /* Stopover and round trip (US-45, US-46) */
+  .trip-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 6px 0 10px; font-size: .9rem; }
+  .trip-opts .rt { display: inline-flex; align-items: center; gap: 6px; }
+  .stay-row { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: .9rem; color: var(--muted); }
+  .stay-row input { width: 4.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+  .place.via { border-left: 3px solid var(--accent); padding-left: 8px; }
+  .jw.stay { font-weight: 700; }
+  .leg.stay, .tl.stay { list-style: none; margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px dashed var(--line); }
+  .leg.stay b, .tl.stay b { display: block; }
+  .stay-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .early { margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: .9rem; }
   .leg.change, .tl.change { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; }
   .wm { min-width: 30px; width: auto; height: 30px; padding: 0 4px; box-sizing: border-box; font-size: .9rem; }
   .qm.other { width: 24px; height: 24px; font-size: 11px; opacity: .75; }
@@ -372,7 +383,6 @@
       <button id="near" data-i18n-title="nearMe" data-i18n-aria="nearMe">📍</button>
     </div>
     <div class="opts">
-      <label><input id="allCH" type="checkbox"> <span data-i18n="allSwitzerland"></span></label>
       <span id="searchStatus"></span>
     </div>
     <ul id="results" class="results" hidden></ul>
@@ -435,6 +445,18 @@
         <ul id="fromResults" class="results" hidden></ul>
       </div>
       <div class="swap-row"><button id="swap" class="ghost" data-i18n-title="swap" data-i18n-aria="swap">⇅</button></div>
+      <!-- US-45: a stopover on the way, for as long as the rider chooses -->
+      <div id="viaBox" class="place via" hidden>
+        <label class="place-label" for="viaQ" data-i18n="stopover"></label>
+        <div class="search-row">
+          <input id="viaQ" type="search" autocomplete="off" data-i18n-placeholder="stopOrPlace">
+          <button class="place-map" data-which="via" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
+          <button id="viaRemove" class="ghost" data-i18n-title="removeStopover" data-i18n-aria="removeStopover">✕</button>
+        </div>
+        <ul id="viaResults" class="results" hidden></ul>
+        <label class="stay-row"><span data-i18n="stayFor"></span>
+          <input id="viaStay" type="number" min="1" max="720" step="5" inputmode="numeric"> <span data-i18n="minutesShort"></span></label>
+      </div>
       <div class="place">
         <label class="place-label" for="toQ" data-i18n="to"></label>
         <div class="search-row">
@@ -443,6 +465,13 @@
           <button class="place-map" data-which="to" data-i18n-title="pickOnMap" data-i18n-aria="pickOnMap">🗺</button>
         </div>
         <ul id="toResults" class="results" hidden></ul>
+      </div>
+      <!-- US-45 / US-46: stopover, round trip with a chosen time there -->
+      <div class="trip-opts">
+        <button id="addVia" class="ghost" data-i18n="addStopover"></button>
+        <label class="rt"><input id="roundTrip" type="checkbox"> <span data-i18n="roundTrip"></span></label>
+        <label id="returnStayBox" class="stay-row" hidden><span data-i18n="stayThere"></span>
+          <input id="returnStay" type="number" min="1" max="720" step="5" inputmode="numeric"> <span data-i18n="minutesShort"></span></label>
       </div>
       <div class="when-row">
         <select id="whenMode">
@@ -569,7 +598,6 @@
   const API = 'https://transport.opendata.ch/v1';
   const ASSETS = '../../assets';
   // Approximate Unireso + Léman Pass / Léman Express area (Geneva, Nyon district, Ain, Haute-Savoie)
-  const ZONE = { latMin: 45.85, latMax: 46.50, lonMin: 5.80, lonMax: 6.65 };
   // The API only returns journeys whose *scheduled* time is at or after `datetime`. A bus scheduled at 17:10
   // running +8 min would vanish at 17:11, so we ask from LOOKBACK_MIN minutes ago and filter on the real time.
   const LOOKBACK_MIN = 30;
@@ -586,11 +614,10 @@
     en: {
       title: 'Departures', prototype: 'Prototype · Sprint 9', switchTo: 'FR', switchToLabel: 'Afficher en français',
       searchSection: 'Stop search', searchPlaceholder: 'Stop: Bel-Air, Cornavin, Pâquis…', nearMe: 'Stops near me',
-      allSwitzerland: 'Include all of Switzerland', yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
+      yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
       removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
       lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
       dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators and © OpenStreetMap contributors (ODbL)',
-      noStopInZone: 'No stop found in the Unireso area. Tick "Include all of Switzerland" to widen the search.',
       noStop: 'No stop found.', searchFailed: 'Search failed (network?).', geoUnavailable: 'Geolocation not available.',
       locating: 'locating…', noNearby: 'No stop nearby.', nearbyFailed: 'Could not load nearby stops.',
       geoDenied: 'Location denied or unavailable.', nextStop: 'next stop: {name}',
@@ -651,6 +678,15 @@
       altMarginDetail: '{m} min margin · arrive {t}',
       waitAfterWalk: 'Change: {walk} min walk, then {wait} min wait', waitOnly: 'Change: {wait} min wait',
       samePlatform: 'Same platform, no walking', sameWait: '{n} min wait', platformMoved: 'Platform changed: go to {name}',
+      stopover: 'Stopover', addStopover: '+ Add a stopover', removeStopover: 'Remove the stopover', stayFor: 'Stay', minutesShort: 'min',
+      roundTrip: 'Round trip', stayThere: 'Time there', chooseVia: 'Choose the stopover, or remove it.',
+      stayTitle: 'Stopover at {place} · {min} min', stayUntil: 'Arrive {from} · leave {until}', stayReturn: 'Time at {place} · {min} min, then back',
+      stayNow: 'I’m leaving now', stayMore: 'Stay 15 min longer', stayOptions: 'Next part from {place}:', stayOptionsNone: 'No connection found from {place}.',
+      stayShort: 'You left {place} early: earlier connections', stayLong: 'Still at {place}? Later connections', stayLate: 'Your stopover is shorter ({n} min instead of {m}): later connections',
+      stayEndNotify: 'End of your stopover', stayEndBody: 'Leave now for {line} at {dep} from {stop}.', stayLongNotify: 'Staying longer?', stayLongBody: 'Later connections from {place} are ready.',
+      altStay: '{lines} at {dep}', altStayDetail: 'arrive {t} · leave {leave}', partN: 'Part {n}',
+      earlyLeft: 'You left early: “Get ready” and “Leave” are cancelled.', earlyAtStop: 'You are at {stop}, {n} min before the {line}.',
+      earlyOnWay: 'On your way: at {stop} around {t}, {n} min before the {line}.', earlyOptions: 'Earlier options:', altEarly: '{lines} at {dep}', altEarlyDetail: 'arrive {t} ({n} min sooner)',
       waitNoneWalk: 'Change: {walk} min walk, no time to spare', waitNone: 'Change: no time to spare', waitMissed: 'Change: missed at the current times',
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
       altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
@@ -692,11 +728,10 @@
     fr: {
       title: 'Départs', prototype: 'Prototype · Sprint 9', switchTo: 'EN', switchToLabel: 'Show in English',
       searchSection: 'Recherche d’arrêt', searchPlaceholder: 'Arrêt : Bel-Air, Cornavin, Pâquis…', nearMe: 'Arrêts autour de moi',
-      allSwitzerland: 'Inclure toute la Suisse', yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
+      yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
       removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
       lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
       dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants et © contributeurs OpenStreetMap (ODbL)',
-      noStopInZone: 'Aucun arrêt trouvé dans la zone Unireso. Cochez « Inclure toute la Suisse » pour élargir.',
       noStop: 'Aucun arrêt trouvé.', searchFailed: 'Recherche impossible (réseau ?).', geoUnavailable: 'Géolocalisation non disponible.',
       locating: 'localisation…', noNearby: 'Aucun arrêt à proximité.', nearbyFailed: 'Impossible de charger les arrêts proches.',
       geoDenied: 'Position refusée ou indisponible.', nextStop: 'prochain arrêt : {name}',
@@ -757,6 +792,15 @@
       altMarginDetail: '{m} min de marge · arrivée {t}',
       waitAfterWalk: 'Correspondance : {walk} min de marche, puis {wait} min d\u2019attente', waitOnly: 'Correspondance : {wait} min d\u2019attente',
       samePlatform: 'Même quai, pas de marche', sameWait: '{n} min d\u2019attente', platformMoved: 'Changement de quai : aller à {name}',
+      stopover: 'Escale', addStopover: '+ Ajouter une escale', removeStopover: 'Enlever l\u2019escale', stayFor: 'Durée', minutesShort: 'min',
+      roundTrip: 'Aller-retour', stayThere: 'Temps sur place', chooseVia: 'Choisissez l\u2019escale, ou enlevez-la.',
+      stayTitle: 'Escale à {place} · {min} min', stayUntil: 'Arrivée {from} · départ {until}', stayReturn: 'Sur place à {place} · {min} min, puis retour',
+      stayNow: 'Je repars maintenant', stayMore: 'Rester 15 min de plus', stayOptions: 'Suite depuis {place} :', stayOptionsNone: 'Aucune correspondance trouvée depuis {place}.',
+      stayShort: 'Vous êtes reparti de {place} plus tôt : correspondances plus tôt', stayLong: 'Toujours à {place} ? Correspondances plus tard', stayLate: 'Votre escale est plus courte ({n} min au lieu de {m}) : correspondances plus tard',
+      stayEndNotify: 'Fin de l\u2019escale', stayEndBody: 'Partez maintenant pour {line} à {dep} depuis {stop}.', stayLongNotify: 'Vous restez plus longtemps ?', stayLongBody: 'Les correspondances plus tard depuis {place} sont prêtes.',
+      altStay: '{lines} à {dep}', altStayDetail: 'arrivée {t} · départ {leave}', partN: 'Partie {n}',
+      earlyLeft: 'Vous êtes parti plus tôt : « Préparez-vous » et « Partir » sont annulées.', earlyAtStop: 'Vous êtes à {stop}, {n} min avant le {line}.',
+      earlyOnWay: 'En route : à {stop} vers {t}, {n} min avant le {line}.', earlyOptions: 'Options plus tôt :', altEarly: '{lines} à {dep}', altEarlyDetail: 'arrivée {t} ({n} min plus tôt)',
       waitNoneWalk: 'Correspondance : {walk} min de marche, aucune marge', waitNone: 'Correspondance : aucune marge', waitMissed: 'Correspondance : manquée aux horaires actuels',
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
       altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
@@ -972,11 +1016,6 @@
   const apiDateTime = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit',
     day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
 
-  function inZone(loc) {
-    const c = loc.coordinate;
-    if (!c || c.x == null || c.y == null) return false;
-    return c.x >= ZONE.latMin && c.x <= ZONE.latMax && c.y >= ZONE.lonMin && c.y <= ZONE.lonMax;
-  }
 
   // ---------- Modes and pictograms (US-11) ----------
   // API category codes → transport mode (validated against real data, see docs/real-data-validation.md)
@@ -1273,7 +1312,7 @@
     lastResults = { stations, noteKey };
     const ul = $('results');
     ul.hidden = false;
-    if (!stations.length) { ul.innerHTML = `<li class="empty">${esc(t(noteKey || 'noStopInZone'))}</li>`; return; }
+    if (!stations.length) { ul.innerHTML = `<li class="empty">${esc(t(noteKey || 'noStop'))}</li>`; return; }
     ul.innerHTML = stations.slice(0, 10).map(s => {
       const m = modeOfIcon(s.icon, s.name);
       const dist = s.distance != null ? `<span class="dist">${Math.round(s.distance)} m</span>` : '';
@@ -1291,11 +1330,9 @@
     if (searchCtrl) searchCtrl.abort();
     searchCtrl = new AbortController();
     const signal = searchCtrl.signal;
-    const allCH = $('allCH').checked;
     $('searchStatus').innerHTML = '<span class="spinner"></span>';
     try {
-      const { stations, inside } = await findStops(q, signal);
-      renderResults(allCH ? stations : inside, allCH ? 'noStop' : 'noStopInZone');
+      renderResults(await findStops(q, signal), 'noStop');
       $('searchStatus').textContent = '';
     } catch (e) {
       if (e.name === 'AbortError') return;
@@ -1748,27 +1785,40 @@
   let journeys = [], journeyBase = [], journeyCtrl = null;   // journeyBase: as found; journeys: as shown (US-36)
   const journeySearchCtrl = { from: null, to: null };
 
-  // Stop search shared by the departure board and the journey planner
+  // Stop search: all of Switzerland (US-43). The rider's own world comes first: stops already used, then stops in
+  // the towns of those stops (Geneva for a new rider), then the rest in the API's order. Short names ("Bel-Air",
+  // "Gare") often return other towns first: when the rider's towns are missing, asked again with the main town.
+  const townOf = name => { const n = String(name || ''); return n.includes(',') ? n.split(',')[0].trim() : ''; };
+  function homeTowns() {
+    const w = {};
+    for (const st of Object.values(getStops())) { const town = townOf(st.name); if (town) w[town] = (w[town] || 0) + (st.count || 1); }
+    const list = Object.entries(w).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+    return list.length ? list : ['Genève'];
+  }
+  function rankPlaces(list) {
+    const known = getStops(), towns = homeTowns().map(fold);
+    const score = x => known[x.id] ? 0 : towns.includes(fold(townOf(x.name))) ? 1 : 2;
+    return list.map((x, i) => ({ x, i, s: score(x) })).sort((a, b) => a.s - b.s || (a.s === 0 ? (known[b.x.id].count - known[a.x.id].count) : 0) || a.i - b.i).map(o => o.x);
+  }
+  const mentionsTown = (q, towns) => towns.some(tw => fold(q).includes(fold(tw)));
   async function findStops(q, signal) {
     let stations = uniqueById(await data.locations(q, signal));
-    let inside = stations.filter(inZone);
-    // Short names ("Bel-Air", "Gare") often return other towns first: retry targeting Geneva
-    if (inside.length < 3 && !/gen[eè]v/i.test(q)) {
-      stations = uniqueById([...stations, ...(await data.locations('Genève ' + q, signal))]);
-      inside = stations.filter(inZone);
-    }
-    return { stations, inside };
+    const towns = homeTowns();
+    if (rankPlaces(stations).filter(x => x.id && (getStops()[x.id] || towns.map(fold).includes(fold(townOf(x.name))))).length < 3 && !mentionsTown(q, towns))
+      stations = uniqueById([...stations, ...(await data.locations(towns[0] + ' ' + q, signal))]);
+    return rankPlaces(stations);
   }
   const coordOf = s => s && s.coordinate && s.coordinate.x != null ? [s.coordinate.x, s.coordinate.y] : null;
 
-  // Stops, addresses and places of interest; those in the area first (US-23)
+  // Stops, addresses and places of interest, all of Switzerland, the rider's towns first (US-23, US-43)
   async function findPlaces(q, signal) {
     const key = x => x.id || `${x.name}|${x.coordinate.x.toFixed(5)}`;
     const dedupe = list => [...new Map(list.map(x => [key(x), x])).values()];
     let found = dedupe(await data.places(q, signal));
-    if (found.filter(inZone).length < 3 && !/gen[eè]v/i.test(q)) found = dedupe([...found, ...(await data.places('Genève ' + q, signal))]);
-    const inside = found.filter(inZone);
-    return [...inside, ...found.filter(x => !inZone(x))].slice(0, 10);
+    const towns = homeTowns();
+    const local = list => list.filter(x => getStops()[x.id] || towns.map(fold).includes(fold(townOf(x.name))));
+    if (local(found).length < 3 && !mentionsTown(q, towns)) found = dedupe([...found, ...(await data.places(towns[0] + ' ' + q, signal))]);
+    return rankPlaces(found).slice(0, 10);
   }
 
   // Stops around a point, nearest first, with their straight-line distance
@@ -1785,6 +1835,26 @@
     if (p.kind === 'saved') return `${p.icon || ''} ${p.name}`.trim();
     const base = t(p.kind === 'me' ? 'myPosition' : 'pointOnMap');
     return p.near ? `${base} · ${t('nearStop', { d: fmtDistance(p.near.meters), name: p.near.name })}` : base;
+  }
+  // US-45 / US-46: stopover and round trip settings
+  const viaOn = () => !$('viaBox').hidden;
+  const minutesOf = (id, def) => { const v = Math.round(+$(id).value); return v > 0 ? Math.min(v, 720) : def; };
+  function renderTripOpts() {
+    $('viaBox').hidden = !store.get('journey:viaOn', false);
+    $('addVia').hidden = !$('viaBox').hidden;
+    $('viaStay').value = store.get('journey:viaStay', 30);
+    $('roundTrip').checked = store.get('journey:roundTrip', false);
+    $('returnStayBox').hidden = !$('roundTrip').checked;
+    $('returnStay').value = store.get('journey:returnStay', 60);
+    if (places.via) $('viaQ').value = placeLabel(places.via);
+  }
+  // The trip: its places and the time spent at each place in between
+  function tripPoints() {
+    const pts = [places.from], stays = [];
+    if (viaOn()) { pts.push(places.via); stays.push(minutesOf('viaStay', 30)); }
+    pts.push(places.to);
+    if ($('roundTrip').checked) { stays.push(minutesOf('returnStay', 60)); pts.push(places.from); }
+    return { pts, stays };
   }
   function setPlace(which, p) {
     places[which] = p;
@@ -1999,11 +2069,48 @@
     return list.slice().sort(prio === 'walk' ? (x, y) => byWalk(x, y) || byTime(x, y) : (x, y) => byTime(x, y) || byWalk(x, y));
   }
 
+  // Journeys between two places (one part of the trip): 2 × 2 stops at most, each pair one /connections call
+  // (the free API allows about 1000 per day); the same vehicles from another stop keep the shorter walk
+  async function journeysBetween(from, to, when, signal) {
+    const [fromC, toC] = await Promise.all([candidates(from, 2, signal), candidates(to, 2, signal)]);
+    if (!fromC.length || !toC.length) throw Object.assign(new Error('no stop'), { noStop: !fromC.length ? from : to });
+    const ctx = { from, to };
+    const pairs = fromC.flatMap(a => toC.map(b => [a, b])).filter(([a, b]) => a.id !== b.id);
+    const lists = await Promise.all(pairs.map(([a, b]) => fetchConnections(a, b, when, signal, ctx).catch(e => { if (e.name === 'AbortError') throw e; return []; })));
+    const limit = when.mode === 'now' ? Date.now() - 60000 : when.at.getTime() - 60000;
+    const best = new Map();
+    for (const j of lists.flat()) {
+      if (when.mode === 'arrive' ? j.arriveAt > when.at.getTime() + 60000 : j.leaveAt < limit) continue;  // can't make it
+      const prev = best.get(j.key);
+      if (!prev || j.walkMin < prev.walkMin) best.set(j.key, j);
+    }
+    return [...best.values()];
+  }
+  // Parts of a trip put together, with the time at each place in between (a "stay" leg)
+  function combineJourney(parts, pts, stays) {
+    const legs = [];
+    parts.forEach((j, n) => {
+      if (n > 0) {
+        const at = pts[n], back = n === parts.length - 1 && pts.length > 2 && pts[pts.length - 1] === pts[0] && n === pts.length - 2;
+        legs.push({ type: 'stay', min: stays[n - 1], from: parts[n - 1].arriveAt, until: j.leaveAt, back,
+                    place: { kind: at.kind, id: at.id || null, placeId: at.placeId || null, name: placeLabel(at), coord: at.coord || null } });
+      }
+      legs.push(...j.legs);
+    });
+    const first = parts[0], last = parts[parts.length - 1];
+    const rides = parts.flatMap(j => j.rides);
+    return { legs, rides, parts, segments: parts.length, leaveAt: first.leaveAt, arriveAt: last.arriveAt,
+      walkBefore: first.walkBefore, accessMeters: first.accessMeters, apiWalkBefore: first.apiWalkBefore,
+      durationMin: (last.arriveAt - first.leaveAt) / 60000, transfers: parts.reduce((x, j) => x + j.transfers, 0),
+      walkMin: parts.reduce((x, j) => x + j.walkMin, 0), live: parts.some(j => j.live), key: parts.map(j => j.key).join('||') };
+  }
+
   async function searchJourneys() {
     const { from, to } = places;
     const status = $('journeyStatus');
     if (!from || !to) { status.textContent = t('chooseBoth'); return; }
-    [from, to].forEach(p => { if (p.kind === 'saved') recordPlaceUse(p.placeId); });
+    if (viaOn() && !places.via) { status.textContent = t('chooseVia'); return; }
+    [from, to, viaOn() ? places.via : null].forEach(p => { if (p && p.kind === 'saved') recordPlaceUse(p.placeId); });
     if (journeyCtrl) journeyCtrl.abort();
     journeyCtrl = new AbortController();
     const signal = journeyCtrl.signal;
@@ -2011,27 +2118,29 @@
     openJourney = null;
     try {
       const when = readWhen();
-      // 2 × 2 stops at most: each pair is one /connections call, and the free API allows about 1000 per day
-      const [fromC, toC] = await Promise.all([candidates(from, 2, signal), candidates(to, 2, signal)]);
-      if (!fromC.length || !toC.length) {
-        status.textContent = t('noStopNear', { name: placeLabel(!fromC.length ? from : to) }); $('journeyResults').hidden = true; return;
+      const { pts, stays } = tripPoints();
+      journeyBase = await journeysBetween(pts[0], pts[1], when, signal);
+      // US-45 / US-46: each next part leaves once the time at the place is over; each journey of the first part
+      // gets the best next part it can catch (one search per part, from the earliest possible time)
+      if (pts.length > 2) {
+        let combos = journeyBase.map(j => ({ parts: [j], end: j.arriveAt.getTime() }));
+        for (let n = 1; n < pts.length - 1 && combos.length; n++) {
+          const stay = stays[n - 1] * 60000;
+          const earliest = Math.min(...combos.map(c => c.end)) + stay;
+          const next = rankJourneys(await journeysBetween(pts[n], pts[n + 1], { mode: 'depart', at: new Date(earliest) }, signal), getPrio(), 'depart');
+          combos = combos.map(c => { const nx = next.find(x => x.leaveAt.getTime() >= c.end + stay); return nx ? { parts: [...c.parts, nx], end: nx.arriveAt.getTime() } : null; })
+            .filter(Boolean);
+        }
+        const seen = new Set();
+        journeyBase = combos.map(c => combineJourney(c.parts, pts, stays)).filter(j => !seen.has(j.key) && seen.add(j.key));
       }
-      const pairs = fromC.flatMap(a => toC.map(b => [a, b])).filter(([a, b]) => a.id !== b.id);
-      const lists = await Promise.all(pairs.map(([a, b]) => fetchConnections(a, b, when, signal).catch(e => { if (e.name === 'AbortError') throw e; return []; })));
-      const limit = when.mode === 'now' ? Date.now() - 60000 : when.at.getTime() - 60000;
-      const best = new Map();
-      for (const j of lists.flat()) {
-        if (when.mode === 'arrive' ? j.arriveAt > when.at.getTime() + 60000 : j.leaveAt < limit) continue;  // can't make it
-        const prev = best.get(j.key);
-        if (!prev || j.walkMin < prev.walkMin) best.set(j.key, j);   // same vehicles from another stop: keep the shorter walk
-      }
-      journeyBase = [...best.values()];
       footChoice.clear();
-      for (const k of new Set(journeyBase.flatMap(j => [footAlternative(j), startAlternative(j)]).filter(Boolean).map(x => x.key))) recordFoot(k, 'shown');
+      for (const k of new Set(journeyBase.filter(j => !(j.segments > 1)).flatMap(j => [footAlternative(j), startAlternative(j)]).filter(Boolean).map(x => x.key))) recordFoot(k, 'shown');
       status.textContent = journeyBase.length ? '' : t('noJourney');
       renderJourneys();
     } catch (e) {
       if (e.name === 'AbortError') return;
+      if (e.noStop) { status.textContent = t('noStopNear', { name: placeLabel(e.noStop) }); $('journeyResults').hidden = true; return; }
       status.textContent = t('journeyFailed');
     }
   }
@@ -2122,6 +2231,7 @@
   }
   // What the list shows for each journey found: the bus, or the walk when chosen or learned
   function displayJourney(j) {
+    if (j.segments > 1) return j;   // a trip in parts: no walk / bus switch at its ends
     const end = footAlternative(j), start = startAlternative(j);
     const state = (alt, side) => {
       if (!alt) return null;
@@ -2179,10 +2289,13 @@
   }
 
   function rideIds(j) {
-    return j.legs.filter(l => !l.samePlatform).map(l => l.type === 'walk'
-      ? `<span class="jw">🚶${fmtMin(l.min)}′</span>`
+    return j.legs.filter(l => !l.samePlatform).map(l => l.type === 'stay'
+      ? `<span class="jw stay">${l.back ? '⇄' : '⏸'} ${fmtMin(l.min)}′</span>`
+      : l.type === 'walk' ? `<span class="jw">🚶${fmtMin(l.min)}′</span>`
       : lineIdHtml(l.mode, l.style, l.label, true)).join('<span class="jsep">›</span>');
   }
+  // A trip in parts: "Stopover", "Round trip", or both
+  const tripKind = j => [j.legs.some(l => l.type === 'stay' && !l.back) ? t('stopover') : '', j.legs.some(l => l.type === 'stay' && l.back) ? t('roundTrip') : ''].filter(Boolean).join(' · ');
   function transfersText(n) { return n === 0 ? t('direct') : n === 1 ? t('transfer1') : t('transfersN', { n }); }
 
   let openJourney = null;   // key of the journey whose details are open (US-28)
@@ -2209,7 +2322,8 @@
       return `<li class="jr-item"><button class="jr" data-i="${i}" aria-expanded="${open}">
         <div class="jr-top"><b>${hhmm(j.leaveAt)} → ${hhmm(j.arriveAt)}</b><span class="jr-dur">${fmtDuration(j.durationMin)}</span></div>
         <div class="jr-segs">${rideIds(j)}</div>
-        <div class="jr-meta">${j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(Math.round(j.walkMin) ? t('walkTotal', { min: fmtMin(j.walkMin) }) : t('noWalk'))}${live}${tags}</div>
+        <div class="jr-meta">${j.segments > 1 ? esc(tripKind(j)) + (j.transfers ? ' · ' + esc(transfersText(j.transfers)) : '') + ' · '
+          : j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(Math.round(j.walkMin) ? t('walkTotal', { min: fmtMin(j.walkMin) }) : t('noWalk'))}${live}${tags}</div>
       </button>${open ? journeyDetailHtml(j, i, openVia) : ''}</li>`;
     }).join('');
   }
@@ -2223,6 +2337,8 @@
     }).join('');
     function legHtml(l, k) {
       if (l.samePlatform) return samePlatformRow(j.legs, k, 'leg change');
+      if (l.type === 'stay') return `<li class="leg stay"><b>${esc(t(l.back ? 'stayReturn' : 'stayTitle', { place: l.place.name, min: fmtMin(l.min) }))}</b>` +
+        `<small>${esc(t('stayUntil', { from: hhmm(l.from), until: hhmm(l.until) }))}</small></li>`;
       if (l.type === 'walk') {
         const where = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: l.to || (l.end && l.end.name) || '' });
         const dist = l.meters ? ` · ${fmtDistance(l.meters)}` : '';
@@ -2252,7 +2368,8 @@
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
         <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${l.arrPlatform ? platformChip(l.arrPlatform, l.mode, l.toStop) : ''}</div></li>`;
     }
-    return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
+    const route = j.segments > 1 ? tripPoints().pts.map(placeLabel).join(' → ') : `${placeLabel(places.from)} → ${placeLabel(places.to)}`;
+    return `<div class="jr-detail"><div class="jr-meta">${esc(route)}</div>
       <ul class="legs">${rows}</ul>
       ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('followJourney'))}</button>` : ''}</div>`;
   }
@@ -2427,8 +2544,21 @@
     }
     return out;
   }
+  // US-44: the first stop of a followed trip is watched from 30 min before "Get ready" until its departure
+  const LEFT_HOME_M = 150;        // this far from the start place, and closer to the stop: on the way
+  function startWatched(a, now) {
+    if (!a.plan || a.onBoard || !a.origin) return null;
+    const r = a.plan.find(l => l.type === 'ride');
+    if (!r || !r.from.coord || depOf(r) <= now || now < alarmTimes(a).ready - 30 * 60000) return null;
+    if (a.fired.leave && !a.early) return null;   // left at the planned time: nothing to adjust
+    return r;
+  }
+  // US-45: a stay is watched from its arrival until 30 min after its planned end
+  const stayWatched = (a, now) => (a.plan || []).map((l, k) => ({ l, k })).filter(({ l }) => l.type === 'stay' && l.place && l.place.coord &&
+    now >= (arrivalBefore(a.plan, a.plan.indexOf(l)) || l.from) - 5 * 60000 && now <= l.until + 30 * 60000);
   function updateGpsWatch() {
-    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord);
+    const now = Date.now();
+    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord) || getAlarms().some(a => startWatched(a, now) || stayWatched(a, now).length);
     if (need && !gps.watch && !gps.denied && navigator.geolocation) {
       gps.watch = navigator.geolocation.watchPosition(onGpsFix, err => {
         if (err && err.code === 1) { gps.denied = true; stopGpsWatch(); renderAlarms(); }
@@ -2444,6 +2574,8 @@
     const first = !gpsFresh(Date.now());
     gps.fix = { p: [pos.coords.latitude, pos.coords.longitude], t: Date.now() };
     checkGpsAlights();
+    checkGpsStart();
+    checkGpsStays();
     if (first) renderAlarms();
   }
   function checkGpsAlights() {
@@ -2474,6 +2606,52 @@
     }
     if (changed) { saveAlarms(list); renderAlarms(); }
   }
+  // US-44: on the way to the first stop before the planned time, or already there: the departure alarms are
+  // cancelled (they would ring for nothing), the arrival at the stop is estimated, and earlier options are looked for
+  function checkGpsStart() {
+    if (!gps.fix) return;
+    const now = Date.now(), p = gps.fix.p, list = getAlarms();
+    let changed = false;
+    for (const a of list) {
+      const r = startWatched(a, now); if (!r) continue;
+      const stop = r.from.coord, home = a.origin, dStop = distanceM(p, stop);
+      const atStop = dStop <= NEAR_M;
+      const homeToStop = distanceM(home, stop);
+      const onWay = homeToStop > LEFT_HOME_M && distanceM(p, home) >= LEFT_HOME_M && dStop < homeToStop - 30;
+      if (!atStop && !onWay) continue;
+      const e = a.early || { at: now };
+      if (!a.early && (!a.fired.ready || !a.fired.leave)) { a.fired.ready = a.fired.ready || now; a.fired.leave = a.fired.leave || now; e.silenced = true; }
+      const eta = atStop ? now : now + walkMinutes(dStop) * 60000;
+      if (e.atStop && !atStop) continue;   // once at the stop, stays at the stop
+      if (Math.abs((e.eta || 0) - eta) > 30000 || !!e.atStop !== atStop) { e.eta = eta; e.atStop = atStop ? now : null; changed = true; }
+      a.early = e;
+      if (!changed) changed = true;
+    }
+    if (changed) { saveAlarms(list); renderAlarms(); }
+  }
+  // US-45: the rider leaves a stay place well before its planned end, or is still there after it
+  const STAY_NEAR_M = 120, STAY_LEFT_M = 250;
+  function checkGpsStays() {
+    if (!gps.fix) return;
+    const now = Date.now(), p = gps.fix.p, list = getAlarms();
+    const asks = [];
+    let changed = false;
+    for (const a of list) {
+      for (const { l, k } of stayWatched(a, now)) {
+        const d = distanceM(p, l.place.coord);
+        a.staySeen = a.staySeen || {}; a.stayGps = a.stayGps || {};
+        if (d <= STAY_NEAR_M && !a.staySeen[k]) { a.staySeen[k] = now; changed = true; }
+        if (a.staySeen[k] && d > STAY_LEFT_M && now < l.until - 5 * 60000 && !a.stayGps[k]) {
+          a.stayGps[k] = 'short'; changed = true; asks.push([a.id, k, now, 'short']);
+        } else if (d <= STAY_NEAR_M && now > l.until + 2 * 60000 && a.stayGps[k] !== 'long') {
+          a.stayGps[k] = 'long'; changed = true; asks.push([a.id, k, now, 'long']);
+          fireTrip(t('stayLongNotify'), t('stayLongBody', { place: l.place.name }));
+        }
+      }
+    }
+    if (changed) { saveAlarms(list); renderAlarms(); }
+    asks.forEach(x => requestStayOptions(...x));
+  }
   // The live time says "now", but a recent precise position says the vehicle is not there yet or still at the stop
   function gpsHolds(a, x, n, now) {
     if (!gpsFresh(now) || !x.prevCoord || now - alightAt(a, x) > GPS_WAIT_MAX_MS) return false;
@@ -2492,7 +2670,7 @@
     const f = j.rides[0];
     const alarm = {
       id: String(Date.now()), created: Date.now(), fired: {},
-      from: placeLabel(places.from), to: placeLabel(places.to), origin: places.from && places.from.coord,
+      from: placeLabel(places.from), to: placeLabel(j.segments > 1 ? tripPoints().pts.slice(-1)[0] : places.to), origin: places.from && places.from.coord,
       accessMeters: j.accessMeters, apiWalkBefore: Math.max(0, j.apiWalkBefore || 0),
       first: { stopId: f.from.id, stopName: f.from.name, stopCoord: f.from.coord, category: f.category, number: f.number,
                mode: f.mode, label: f.label, style: f.style, to: f.to, toStopId: f.toStop.id, sched: f.dep.getTime(), platform: f.platform },
@@ -2500,7 +2678,7 @@
       created0: (f.real || f.dep).getTime(),   // first departure when the alarm was set, to shift the get-off times with live data
       alights: alightPlan(j),
       // US-38: the whole journey, followed live
-      plan: planOf(j), dest: places.to, rev: 0
+      plan: planOf(j), dest: j.segments > 1 ? tripPoints().pts.slice(-1)[0] : places.to, rev: 0
     };
     // US-33: set after the first vehicle left → already on board: no departure alarms, only get-off reminders.
     // Set after the leave time → only "Leave" rings (at once). Set after the get-ready time → "Get ready" rings at once.
@@ -2518,7 +2696,7 @@
   function renderAlarms() {
     const list = getAlarms(), s = getSettings();
     $('alarmCard').hidden = list.length === 0;
-    $('alarmList').innerHTML = list.map(a => {
+    $('alarmList').innerHTML = list.slice().sort((x, y) => alarmTimes(x, s).dep - alarmTimes(y, s).dep).map(a => {
       const tm = alarmTimes(a, s), f = a.first;
       const src = tm.delay == null ? t('timetable') : tm.delay > 0 ? t('liveDelay', { d: '+' + tm.delay + ' min' }) : t('liveOnTime');
       const plat = f.platform ? ` · ${t(f.mode === 'train' ? 'track' : 'platform', { p: f.platform })}` : '';
@@ -2551,6 +2729,14 @@
       // past the leave time: only "Leave" rings (no "Get ready" first)
       if (!a.fired.leave && now >= tm.leave) { a.fired.leave = now; a.fired.ready = a.fired.ready || now; changed = true; fireAlarm(a, 'leave'); }
       else if (!a.fired.ready && now >= tm.ready) { a.fired.ready = now; changed = true; fireAlarm(a, 'ready'); }
+      // US-45: end of a stay: time to leave for the next part (not when the rider already left)
+      (a.plan || []).forEach((l, k) => {
+        if (l.type !== 'stay' || a.fired['stay' + k] || now < l.until || now - l.until > 10 * 60000) return;
+        a.fired['stay' + k] = now; changed = true;
+        if (a.stayGps && a.stayGps[k] === 'short') return;
+        const r = a.plan.slice(k + 1).find(x => x.type === 'ride');
+        if (r) fireTrip(t('stayEndNotify'), t('stayEndBody', { line: `${modeName(r.mode)} ${r.label}`, dep: hhmm(new Date(depOf(r))), stop: r.from.name }));
+      });
       // get-off reminders: only the latest one due rings (no burst after the phone slept); while they are
       // switched off, due reminders are marked as passed so they don't ring when switched back on
       const due = (a.alights || []).map((x, n) => ({ x, n }))
@@ -2649,6 +2835,7 @@
           from: l.from, toStop: l.toStop, dep: ms(l.dep), real: ms(l.real), arr: ms(l.arr), arrReal: ms(l.arrReal),
           platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops,
           via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), depAt: ms(v.depAt), live: !!v.live })) }
+      : l.type === 'stay' ? { type: 'stay', min: l.min, from: ms(l.from), until: ms(l.until), back: !!l.back, place: l.place }
       : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '',
           samePlatform: !!l.samePlatform, apiMin: l.apiMin || null });
   }
@@ -2671,8 +2858,8 @@
   // Changes: from ride at index i to the next ride at index k
   function tripConnections(plan) {
     const idx = plan.map((l, k) => l.type === 'ride' ? k : -1).filter(k => k >= 0);
-    return idx.slice(0, -1).map((i, n) => {
-      const k = idx[n + 1], cur = plan[i], next = plan[k];
+    return idx.slice(0, -1).map((i, n) => [i, idx[n + 1]]).filter(([i, k]) => !plan.slice(i + 1, k).some(l => l.type === 'stay')).map(([i, k]) => {
+      const cur = plan[i], next = plan[k];
       const ready = arrOf(cur) + walkBetween(plan, i, k) * 60000;
       const slack = Math.floor((depOf(next) - ready) / 60000);
       const walk = walkBetween(plan, i, k), gap = Math.floor(depOf(next) / 60000) - Math.floor(arrOf(cur) / 60000);
@@ -2681,6 +2868,48 @@
   }
 
   const COMFORT_MIN = 3;   // a change with at least 3 min to spare is comfortable
+  // US-45 / US-46: a trip in parts. A part ends at a stay (or at the end); alternatives stay within their part.
+  const segmentEnd = (plan, from) => { const k = plan.findIndex((l, n) => n >= from && l.type === 'stay'); return k < 0 ? plan.length : k; };
+  const destAfter = (a, idx) => { const k = segmentEnd(a.plan, idx); return k < a.plan.length ? a.plan[k].place : a.dest; };
+  const spliceSegment = (plan, from, legs) => [...plan.slice(0, from), ...legs, ...plan.slice(segmentEnd(plan, from))];
+  // When the rider is at the end of a part: its last ride's arrival and the walks after it
+  function arrivalBefore(plan, k) {
+    let last = -1; plan.slice(0, k).forEach((l, n) => { if (l.type === 'ride') last = n; });
+    if (last < 0) return null;
+    return arrOf(plan[last]) + plan.slice(last + 1, k).filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0) * 60000;
+  }
+  // Next parts from a stay place, leaving from `at` (the rider leaves earlier or later than planned)
+  async function findStayOptions(a, k, at) {
+    const st = a.plan[k], dest = destAfter(a, k + 1);
+    if (!st || !st.place || !dest) return [];
+    const list = rankJourneys(await journeysBetween(st.place, dest, { mode: 'depart', at: new Date(at) }, null), 'fast', 'depart');
+    return list.slice(0, 3).map(jj => ({ kind: 'stay', k, dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), leave: jj.leaveAt.getTime(),
+      arrive: jj.arriveAt.getTime(), lines: jj.rides.map(r => `${modeName(r.mode)} ${r.label}`).join(' › '), plan: planOf(jj) }));
+  }
+  // The rider leaves a stay earlier or later (button or position): options for the next part, shown at once.
+  // The revision goes up so that a live refresh already under way does not overwrite them.
+  async function requestStayOptions(id, k, at, reason) {
+    const put = alts => { const list = getAlarms(), a = list.find(x => x.id === id); if (!a) return null; a.alts = alts; a.rev = (a.rev || 0) + 1; saveAlarms(list); renderAlarms(); return a; };
+    const a = put({ for: 'stay' + k, reason, at: Date.now(), list: null });
+    if (!a) return;
+    let options = [];
+    try { options = await findStayOptions(a, k, at); } catch { /* no route */ }
+    put({ for: 'stay' + k, reason, at: Date.now(), list: options });
+  }
+  // US-44: left early / at the first stop early → earlier ways to the end of the first part
+  const EARLY_MIN = 3;          // at least 3 min to wait at the stop: worth looking for earlier options
+  async function findEarlier(a, idx) {
+    const r = a.plan[idx], dest = destAfter(a, idx);
+    if (!r.from.id || !dest) return [];
+    const endAt = arrivalBefore(a.plan, segmentEnd(a.plan, idx));
+    const from = { kind: 'stop', id: r.from.id, name: r.from.name, coord: r.from.coord };
+    const list = await journeysBetween(from, dest, { mode: 'depart', at: new Date(a.early.eta + 60000) }, null);
+    return list.filter(jj => (jj.rides[0].real || jj.rides[0].dep).getTime() >= a.early.eta + 60000 && jj.arriveAt.getTime() <= endAt - 60000)
+      .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 2)
+      .map(jj => ({ kind: 'early', fromIdx: idx, dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), arrive: jj.arriveAt.getTime(),
+        sooner: Math.floor(endAt / 60000) - Math.floor(jj.arriveAt.getTime() / 60000),
+        lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
+  }
   async function refreshTrip(a, boardOf, schedOf) {
     const now = Date.now();
     let changed = false;
@@ -2748,9 +2977,32 @@
       }
       break;   // the first broken change decides what comes next
     }
+    // US-44: left early or at the first stop early: earlier ways, refreshed every 3 min
+    const firstIdx = a.plan.findIndex(l => l.type === 'ride');
+    if (a.early && firstIdx >= 0 && depOf(a.plan[firstIdx]) > now) {
+      const wait = Math.floor((depOf(a.plan[firstIdx]) - a.early.eta) / 60000);
+      if (wait >= EARLY_MIN && (!a.alts || a.alts.for !== 'early' || now - a.alts.at > 3 * 60000)) {
+        a.alts = { for: 'early', at: now, list: null };
+        try { a.alts.list = await findEarlier(a, firstIdx); } catch { a.alts.list = []; }
+        changed = true;
+      }
+    }
+    // US-45: a delay makes a stay at least 2 min shorter than chosen: the next part a little later, keeping the time chosen
+    for (const [k, l] of a.plan.entries()) {
+      if (l.type !== 'stay' || l.until < now) continue;
+      const arrive = arrivalBefore(a.plan, k);
+      if (arrive == null) continue;
+      const left = Math.floor((l.until - arrive) / 60000);
+      if (left <= l.min - 2 && a.fired['late' + k] !== l.until) {
+        a.fired['late' + k] = l.until; changed = true;
+        a.alts = { for: 'stay' + k, reason: 'late', at: now, list: null, n: Math.max(0, left), m: l.min };
+        try { a.alts.list = await findStayOptions(a, k, arrive + l.min * 60000); } catch { a.alts.list = []; }
+      }
+    }
     // US-39: a tight change (no missed one): look for options with a comfortable margin
     const missedOne = tripConnections(a.plan).some(c => (c.state === 'missed' || c.next.missing) && depOf(c.next) > now - 10 * 60000);
-    const tight = !missedOne && tripConnections(a.plan).find(c => c.state === 'tight' && depOf(c.cur) > now - 60000);
+    const busy = a.alts && /^(stay|early)/.test(String(a.alts.for)) && now - a.alts.at < 5 * 60000;   // the rider's own options first
+    const tight = !missedOne && !busy && tripConnections(a.plan).find(c => c.state === 'tight' && depOf(c.cur) > now - 60000);
     if (tight && (!a.alts || a.alts.for !== 'tight' + tight.next.dep || now - a.alts.at > 2 * 60000)) {
       a.alts = { for: 'tight' + tight.next.dep, at: now, list: null };
       a.alts.list = await findComfortable(a, tight, boardOf, schedOf);
@@ -2801,9 +3053,10 @@
     } catch { /* no board */ }
     // 3. another route from where the tight ride starts, every change comfortable
     try {
-      if (a.dest && c.cur.from.id && (!isFirst || depOf(c.cur) > now)) {
-        const from = c.cur.from, ctx = { from: { kind: 'stop', id: from.id, name: from.name, coord: from.coord }, to: a.dest };
-        const toC = await candidates(a.dest, 2);
+      const segDest = destAfter(a, plan.indexOf(c.cur));
+      if (segDest && c.cur.from.id && (!isFirst || depOf(c.cur) > now)) {
+        const from = c.cur.from, ctx = { from: { kind: 'stop', id: from.id, name: from.name, coord: from.coord }, to: segDest };
+        const toC = await candidates(segDest, 2);
         const start = new Date(Math.max(now + leadMin * 60000, depOf(c.cur) - 15 * 60000));
         const lists = await Promise.all(toC.filter(b => b.id !== from.id).map(b => fetchConnections({ id: from.id, name: from.name, coord: from.coord, meters: 0 }, b,
           { mode: 'depart', at: start }, null, ctx).catch(() => [])));
@@ -2835,7 +3088,7 @@
   }
 
   async function findAlternatives(a, c, boardOf, schedOf) {
-    const out = [], T = c.cur.toStop, dest = a.dest;
+    const out = [], T = c.cur.toStop, dest = destAfter(a, c.i);
     // 1. the next run of the same line, same direction, that can still be caught
     try {
       const board = await boardOf(c.next.from.id, new Date(c.ready - 5 * 60000));
@@ -2887,17 +3140,25 @@
     const list = getAlarms(), a = list.find(x => x.id === id);
     if (!a || !a.alts || !a.alts.list || !a.alts.list[n]) return;
     const o = a.alts.list[n];
+    let what, firstChanged = false, keepFrom = null;
+    if (o.kind === 'stay' || o.kind === 'early') {
+      const from = o.kind === 'stay' ? o.k + 1 : o.fromIdx;
+      if (o.kind === 'stay') { const st = a.plan[o.k]; st.until = o.leave; st.changed = true; if (a.stayGps) delete a.stayGps[o.k]; delete a.fired['stay' + o.k]; }
+      a.plan = spliceSegment(a.plan, from, o.plan);
+      what = `${o.lines} ${hhmm(new Date(o.dep))}`; keepFrom = from;
+      if (o.kind === 'early') { const keep = { ready: a.fired.ready, leave: a.fired.leave }; syncFirst(a); Object.assign(a.fired, keep); }
+    }
     const forDep = String(a.alts.for).replace(/^tight/, '');
-    const c = tripConnections(a.plan).find(x => String(x.next.dep) === forDep);
-    if (!c) return;
-    let what, firstChanged = false;
-    if (o.kind === 'earlier') {
+    const c = keepFrom != null ? null : tripConnections(a.plan).find(x => String(x.next.dep) === forDep);
+    if (keepFrom == null && !c) return;
+    if (keepFrom != null) { /* applied above */ }
+    else if (o.kind === 'earlier') {
       const r = a.plan[c.i], shift = o.sched - r.dep;
       Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrCur, platformLive: null, arrPlatformLive: null, missing: false });
       r.via.forEach(v => { v.time += shift; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
       what = `${o.line} ${hhmm(new Date(o.dep))}`; firstChanged = true;
     } else if (o.kind === 'replan' && o.fromIdx != null) {
-      a.plan = [...a.plan.slice(0, o.fromIdx), ...o.plan];
+      a.plan = spliceSegment(a.plan, o.fromIdx, o.plan);
       what = o.lines; firstChanged = o.fromIdx <= a.plan.findIndex(l => l.type === 'ride');
     } else if (o.kind === 'next') {
       const r = a.plan[c.k], shift = o.sched - r.dep;
@@ -2906,15 +3167,15 @@
       // later rides are followed live again as they are
       what = `${o.line} ${hhmm(new Date(o.dep))}`;
     } else if (o.kind === 'replan') {
-      a.plan = [...a.plan.slice(0, c.i + 1), ...o.plan];
+      a.plan = spliceSegment(a.plan, c.i + 1, o.plan);
       what = o.lines;
     } else {
-      a.plan = [...a.plan.slice(0, c.i + 1), { type: 'walk', min: o.min, meters: o.meters, start: o.start, end: o.end, edge: 'egress', to: '' }];
+      a.plan = spliceSegment(a.plan, c.i + 1, [{ type: 'walk', min: o.min, meters: o.meters, start: o.start, end: o.end, edge: 'egress', to: '' }]);
       what = t('altFoot', { stop: o.stop }).replace(/^🚶\s*/, '');
     }
     if (firstChanged) syncFirst(a);
     // get-off reminders: rides already done keep theirs, the new ones are planned afresh
-    const keepUpTo = o.kind === 'earlier' ? c.i : o.kind === 'replan' && o.fromIdx != null ? o.fromIdx : c.i + 1;
+    const keepUpTo = keepFrom != null ? keepFrom : o.kind === 'earlier' ? c.i : o.kind === 'replan' && o.fromIdx != null ? o.fromIdx : c.i + 1;
     const nDone = a.plan.slice(0, keepUpTo).filter(l => l.type === 'ride').length;
     const fresh = alightPlan(hydrate(a.plan)).map((x, k) => k < nDone ? Object.assign(a.alights[k] || x, {}) : Object.assign(x, { noShift: true }));
     Object.keys(a.fired).filter(k => /^alight\d+$/.test(k) && +k.slice(6) >= nDone).forEach(k => delete a.fired[k]);
@@ -2936,6 +3197,40 @@
     notify(title, body);
   }
 
+  // US-45: a stay in the followed trip: when, and what to do if it ends earlier or later than planned
+  function altButtons(list, title, detail) {
+    return list.map((o, n) => `<button class="trip-alt${n === 0 ? ' best' : ''}" data-act="alt" data-n="${n}"><span>${esc(title(o))}</span><small>${esc(detail(o))}</small></button>`).join('');
+  }
+  function stayRowHtml(a, l, k, now) {
+    const arrive = arrivalBefore(a.plan, k) || l.from;
+    const head = t(l.back ? 'stayReturn' : 'stayTitle', { place: l.place.name, min: fmtMin(l.min) });
+    const when = t('stayUntil', { from: hhmm(new Date(arrive)), until: hhmm(new Date(l.until)) });
+    const active = l.until > now - 15 * 60000 && arrive - now < 3 * 3600000;
+    const actions = active ? `<div class="stay-actions"><button class="ghost" data-act="stay-now" data-k="${k}">${esc(t('stayNow'))}</button>` +
+      `<button class="ghost" data-act="stay-more" data-k="${k}">${esc(t('stayMore'))}</button></div>` : '';
+    let opts = '';
+    if (a.alts && a.alts.for === 'stay' + k) {
+      const al = a.alts, place = l.place.name;
+      const intro = al.reason === 'short' ? t('stayShort', { place }) : al.reason === 'long' ? t('stayLong', { place })
+        : al.reason === 'late' ? t('stayLate', { n: al.n, m: al.m }) : t('stayOptions', { place });
+      opts = al.list == null ? `<small>${esc(t('altLoading'))}</small>` : !al.list.length ? `<small>${esc(t('stayOptionsNone', { place }))}</small>` :
+        `<small>${esc(intro)}</small>` + altButtons(al.list, o => t('altStay', { lines: o.lines, dep: hhmm(new Date(o.dep)) }),
+          o => t('altStayDetail', { t: hhmm(new Date(o.arrive)), leave: hhmm(new Date(o.leave)) }));
+    }
+    return `<li class="tl stay"><b>${l.back ? '⇄' : '⏸'} ${esc(head)}</b><small>${esc(when)}</small>${actions}${opts}</li>`;
+  }
+  // US-44: left early / at the stop early
+  function earlyHtml(a, now) {
+    const e = a.early, r = a.plan && a.plan.find(l => l.type === 'ride');
+    if (!e || !r || depOf(r) <= now) return '';
+    const n = Math.max(0, Math.floor((depOf(r) - e.eta) / 60000)), line = `${modeName(r.mode)} ${r.label}`;
+    const where = e.atStop ? t('earlyAtStop', { stop: r.from.name, n, line }) : t('earlyOnWay', { stop: r.from.name, t: hhmm(new Date(e.eta)), n, line });
+    const list = a.alts && a.alts.for === 'early' && a.alts.list ? a.alts.list : [];
+    const opts = list.length ? `<small>${esc(t('earlyOptions'))}</small>` + altButtons(list, o => t('altEarly', { lines: o.lines, dep: hhmm(new Date(o.dep)) }),
+      o => t('altEarlyDetail', { t: hhmm(new Date(o.arrive)), n: o.sooner })) : '';
+    return `<div class="early">${e.silenced ? `<div>${esc(t('earlyLeft'))}</div>` : ''}<div>${esc(where)}</div>${opts}</div>`;
+  }
+
   const tripViaOpen = new Set();   // unfolded stop lists of followed rides
   function tripHtml(a) {
     if (!a.plan) return '';
@@ -2954,6 +3249,9 @@
       state = t('tripNowWait', { line: `${modeName(nextRide.mode)} ${nextRide.label}`, t: hhmm(new Date(depOf(nextRide))), stop: nextRide.from.name,
         plat: p ? ` (${t(nextRide.mode === 'train' ? 'track' : 'platform', { p })})` : '' });
     } else state = t('tripNowWalk', { to: placeLabel(a.dest) || t('yourDestination') });
+    const stayNow = plan.find(l => l.type === 'stay' && arrivalBefore(plan, plan.indexOf(l)) <= now && l.until > now);
+    if (stayNow && !onBoard) state = t(stayNow.back ? 'stayReturn' : 'stayTitle', { place: stayNow.place.name, min: fmtMin(stayNow.min) }) + ' · ' +
+      t('stayUntil', { from: hhmm(new Date(arrivalBefore(plan, plan.indexOf(stayNow)))), until: hhmm(new Date(stayNow.until)) });
     const tm = v => hhmm(new Date(v));
     const timeHtml = (planned, real) => real && Math.floor(real / 60000) !== Math.floor(planned / 60000)
       ? `<span class="was">${tm(planned)}</span><time class="late">${tm(real)}</time>` : `<time>${tm(planned)}</time>`;
@@ -2967,6 +3265,7 @@
       return `<div class="wait${c.slack < COMFORT_MIN ? ' changed' : ''}">⏱ ${esc(txt)}</div>`;
     };
     const rows = plan.map((l, k) => {
+      if (l.type === 'stay') return stayRowHtml(a, l, k, now);
       if (l.type === 'walk') {
         const ends = walkEnds(plan, k), end = ends.end;
         if (l.samePlatform && samePlace(ends.start, end)) return samePlatformRow(plan, k, 'tl change');
@@ -3051,7 +3350,7 @@
     const head = lost ? `${esc(t('arriveAt', { t: '' }))}<span class="was">${arrive ? tm(arrive) : ''}</span> <span class="changed">${esc(t('arrivalLost'))}</span>`
       : `${esc(t('arriveAt', { t: arrive ? tm(arrive) : '—' }))} · <small>${esc(t(live ? 'tripLive' : 'tripPlanned'))}</small>`;
     return `<div class="trip"><div class="trip-head"><span>${head}</span></div>` +
-      `<div class="trip-now">${esc(state)}</div>${warn}<ol class="trip-legs">${rows}</ol></div>`;
+      `<div class="trip-now">${esc(state)}</div>${earlyHtml(a, now)}${warn}<ol class="trip-legs">${rows}</ol></div>`;
   }
 
   // ---------- Ringing: banner, sound, vibration, notification ----------
@@ -3294,7 +3593,7 @@
     $('dirToggle').textContent = $('dirs').hidden ? t('chooseDirections') : t('hideDirections');
     if (lastResults && !$('results').hidden) renderResults(lastResults.stations, lastResults.noteKey);
     if (current && lastLoad) { renderLines(); renderDepartures(); renderStatus(); }
-    for (const w of ['from', 'to']) if (places[w]) $(w + 'Q').value = placeLabel(places[w]);
+    for (const w of ['from', 'to', 'via']) if (places[w]) $(w + 'Q').value = placeLabel(places[w]);
     renderAlarms(); renderJourneys();
     renderRecent();
     if (!$('settingsSheet').hidden) renderSettings();
@@ -3315,7 +3614,6 @@
   $('q').addEventListener('keydown', e => {
     if (e.key === 'Enter') { const first = $('results').querySelector('button[data-id]'); if (first) first.click(); }
   });
-  $('allCH').addEventListener('change', () => { const q = $('q').value.trim(); if (q.length >= 2) search(q); });
   $('near').addEventListener('click', nearMe);
   $('lang').addEventListener('change', e => { lang = LANGS.includes(e.target.value) ? e.target.value : 'en'; store.set('lang', lang); applyLanguage(); });
 
@@ -3426,7 +3724,7 @@
 
   // Sprint 6: tabs, journey planner, alarms, settings
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  for (const w of ['from', 'to']) {
+  for (const w of ['from', 'to', 'via']) {
     let deb;
     $(w + 'Q').addEventListener('input', e => {
       places[w] = null; clearTimeout(deb);
@@ -3498,6 +3796,8 @@
     unlockAudio();
     if (b.dataset.act === 'cancel') { saveAlarms(getAlarms().filter(x => x.id !== id)); renderAlarms(); }
     else if (b.dataset.act === 'alt') applyAlternative(a.id, +b.dataset.n);
+    else if (b.dataset.act === 'stay-now') requestStayOptions(a.id, +b.dataset.k, Date.now(), 'now');
+    else if (b.dataset.act === 'stay-more') { const st = a.plan[+b.dataset.k]; requestStayOptions(a.id, +b.dataset.k, Math.max(st.until, Date.now()) + 15 * 60000, 'more'); }
     else if (b.dataset.act === 'via') {   // unfold / fold the stops of a ride (kept open across live refreshes)
       const key = b.dataset.key, open = !tripViaOpen.has(key);
       open ? tripViaOpen.add(key) : tripViaOpen.delete(key);
@@ -3544,7 +3844,13 @@
   });
 
   // ---------- Start-up: straight to the last stop viewed ----------
-  for (const w of ['from', 'to']) places[w] = store.get('journey:' + w, null);
+  for (const w of ['from', 'to', 'via']) places[w] = store.get('journey:' + w, null);
+  renderTripOpts();
+  $('addVia').addEventListener('click', () => { store.set('journey:viaOn', true); renderTripOpts(); $('viaQ').focus(); });
+  $('viaRemove').addEventListener('click', () => { store.set('journey:viaOn', false); places.via = null; store.set('journey:via', null); $('viaQ').value = ''; renderTripOpts(); });
+  $('roundTrip').addEventListener('change', () => { store.set('journey:roundTrip', $('roundTrip').checked); renderTripOpts(); });
+  $('viaStay').addEventListener('change', () => store.set('journey:viaStay', minutesOf('viaStay', 30)));
+  $('returnStay').addEventListener('change', () => store.set('journey:returnStay', minutesOf('returnStay', 60)));
   renderPrio();
   showTab(store.get('tab', 'departures'));
   try { if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js'); } catch { /* notifications fall back */ }
