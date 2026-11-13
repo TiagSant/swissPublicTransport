@@ -140,6 +140,9 @@ with sync_playwright() as p:
     assert "17:50 Genève, Jonction Quai D" in r19 and "2 arrêts" in r19, r19
     assert "Sainte-Clotilde" not in " ".join(det.locator(".leg.walk").first.inner_text().split()), det.locator(".leg.walk").first.inner_text()
     assert "17:53 Genève, Musée d'ethnographie" in r19                        # same arrival
+    import re as _re
+    assert not _re.search(r"\d[.,]\d+ min", det.inner_text()), det.inner_text()          # whole minutes (1.33 was shown)
+    assert "1 min de marche, puis 3 min d’attente" in r19, r19          # 17:46 + 1 min → 17:50
     pg.screenshot(path=str(OUT / "board-earlier.png"))
     ctx.close()
     print("board early → the 19 caught at Jonction (platform D, 17:50) instead of walking 4 min to Sainte-Clotilde; the 19 to Onex ignored")
