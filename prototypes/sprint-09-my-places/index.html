@@ -179,6 +179,8 @@
   .plat-v { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 4px;
     background: var(--text); color: var(--card); font-weight: 800; font-size: .75rem; }
   .plat:active { transform: scale(.96); }
+  .plat.changed { border-color: var(--late, #c62828); color: var(--late, #c62828); }
+  .plat.changed .plat-v { background: var(--late, #c62828); color: #fff; }
   .head-actions { display: flex; gap: 6px; }
   .sheet { position: fixed; inset: 0; z-index: 1000; background: var(--card); display: flex; flex-direction: column; }
   .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px;
@@ -251,6 +253,8 @@
   .jr-detail .btn-primary { margin-top: 4px; }
   .wm { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .8rem; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .wm.a { background: #1a7f37; } .wm.b { background: #c62828; }
+  .wm { min-width: 30px; width: auto; height: 30px; padding: 0 4px; box-sizing: border-box; font-size: .9rem; }
+  .qm.other { width: 24px; height: 24px; font-size: 11px; opacity: .75; }
   .leg-line { display: flex; align-items: center; gap: 8px; font-weight: 600; }
   .leg-stop { font-size: .88rem; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .leg-stop.muted { color: var(--muted); }
@@ -1908,6 +1912,18 @@
       if (l.edge === 'egress' && endPlace) l.end = endPlace;
     });
   }
+  // The two ends of the walk at index k, from the rides around it as they are now: a live platform change, or the
+  // ride of an alternative taken while following the journey, moves the end of the walk with it (BUG-05).
+  // A walk from the start place or to the destination keeps that place.
+  function walkEnds(legs, k) {
+    const l = legs[k];
+    const prev = legs.slice(0, k).reverse().find(x => x.type === 'ride');
+    const next = legs.slice(k + 1).find(x => x.type === 'ride');
+    const off = r => ({ name: r.toStop.name, stopId: r.toStop.id, coord: r.toStop.coord, platform: r.arrPlatformLive || r.arrPlatform || '', mode: r.mode });
+    const on = r => ({ name: r.from.name, stopId: r.from.id, coord: r.from.coord, platform: r.platformLive || r.platform || '', mode: r.mode });
+    return { start: prev && l.edge !== 'access' && prev.toStop ? off(prev) : l.start,
+             end: next && l.edge !== 'egress' && next.from ? on(next) : l.end };
+  }
   // BUG-03: a walk followed by another walk is one walk, from the first start to the last end
   function mergeWalks(legs) {
     for (let i = legs.length - 1; i > 0; i--) {
@@ -2217,19 +2233,24 @@
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
-        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)}</div></li>`;
+        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${l.arrPlatform ? platformChip(l.arrPlatform, l.mode, l.toStop) : ''}</div></li>`;
     }
     return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
       <ul class="legs">${rows}</ul>
       ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('followJourney'))}</button>` : ''}</div>`;
   }
 
-  // US-32: one walk on the map, from its start to its end (platform positions when known)
-  async function openWalkMap(l) {
+  // US-32: one walk on the map, from its start to its end. A stop end is its platform (BUG-05): the platform of the
+  // ride taken there, live, with the stop's other platforms around it so the right one is easy to spot.
+  // While following a journey, the rider's position and the distance to that platform are shown too.
+  async function openWalkMap(legs, k, opts = {}) {
+    const l = legs[k];
+    const { start, end } = walkEnds(legs, k);
     pickState = null;
     $('mapTitle').textContent = t('walkMapTitle', { min: fmtMin(l.min) });
-    const label = e => e.platform ? `${e.name} (${t(e.mode === 'train' ? 'track' : 'platform', { p: e.platform })})` : e.name;
-    $('mapSub').textContent = t('walkFromTo', { a: label(l.start), b: label(l.end) });
+    const kind = e => t(e.mode === 'train' ? 'track' : 'platform', { p: e.platform });
+    const label = e => e && e.platform ? `${e.name} (${kind(e)})` : (e && e.name) || '';
+    $('mapSub').textContent = t('walkFromTo', { a: label(start), b: label(end) });
     $('mapInfo').textContent = '';
     $('walkThere').hidden = true; $('pickConfirm').hidden = true;
     $('mapSheet').hidden = false;
@@ -2237,28 +2258,41 @@
     try { [quays] = await Promise.all([loadQuays(), loadLeaflet()]); }
     catch { $('mapInfo').textContent = t('mapFailed'); return; }
     if ($('mapSheet').hidden) return;
-    const pos = e => {
+    const notes = [];
+    // where an end is: its platform when known, else the stop (or the place)
+    const locate = e => {
+      if (!e) return { pos: null, points: [] };
+      const points = e.stopId ? platformPoints(quays[e.stopId] || {}) : [];
       if (e.platform && e.stopId) {
-        const p = platformPoints(quays[e.stopId] || {}).find(q => q.names.includes(e.platform) || q.names.includes(String(e.platform).toUpperCase()));
-        if (p) return p.pos;
+        const p = points.find(q => q.names.includes(e.platform) || q.names.includes(String(e.platform).toUpperCase()));
+        if (p) return { pos: p.pos, points, target: p };
+        if (points.length) notes.push(t('platformUnknown', { p: `${kind(e)} (${e.name})` }));
       }
-      return e.coord || null;
+      return { pos: e.coord || null, points };
     };
-    const A = pos(l.start), B = pos(l.end);
+    const A = locate(start), B = locate(end);
     ensureMap(); map.invalidateSize();
     mapLayer.clearLayers(); userLayer.clearLayers();
-    const marker = (p, cls, txt, title) => L.marker(p, { icon: L.divIcon({ className: '', html: `<span class="wm ${cls}">${txt}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }), title, keyboard: false }).addTo(mapLayer);
-    if (A) marker(A, 'a', 'A', label(l.start));
-    if (B) marker(B, 'b', 'B', label(l.end));
-    if (A && B) {
-      L.polyline([A, B], { color: '#1c7ed6', weight: 4, dashArray: '2 8', lineCap: 'round' }).addTo(mapLayer);
-      map.fitBounds([A, B], { padding: [50, 50], maxZoom: 19 });
-      const d = distanceM(A, B) * DETOUR;
-      $('mapInfo').textContent = t('walkDist', { d: fmtDistance(d) });
-      $('walkThere').href = `https://www.google.com/maps/dir/?api=1&origin=${A[0]},${A[1]}&destination=${B[0]},${B[1]}&travelmode=walking`;
+    // the other platforms of both stops, small and grey
+    for (const x of [A, B]) for (const p of x.points) if (p !== x.target && !(A.target && p.pos.join() === A.target.pos.join()) && !(B.target && p.pos.join() === B.target.pos.join()))
+      L.marker(p.pos, { icon: L.divIcon({ className: '', html: `<span class="qm other" data-quay="${esc(p.label)}">${esc(p.label)}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
+                        title: p.label, keyboard: false }).addTo(mapLayer);
+    // the two ends: the platform's own letter or number, else A / B
+    const marker = (x, e, cls, fallback) => L.marker(x.pos, {
+      icon: L.divIcon({ className: '', html: `<span class="wm ${cls}" data-end="${cls}"${x.target ? ` data-quay="${esc(e.platform)}"` : ''}>${esc(x.target ? e.platform : fallback)}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }),
+      title: label(e), keyboard: false, zIndexOffset: 1000 }).addTo(mapLayer);
+    if (A.pos) marker(A, start, 'a', 'A');
+    if (B.pos) marker(B, end, 'b', 'B');
+    if (A.pos && B.pos) {
+      L.polyline([A.pos, B.pos], { color: '#1c7ed6', weight: 4, dashArray: '2 8', lineCap: 'round' }).addTo(mapLayer);
+      map.fitBounds([A.pos, B.pos], { padding: [50, 50], maxZoom: 19 });
+      if (!opts.follow) notes.push(t('walkDist', { d: fmtDistance(distanceM(A.pos, B.pos) * DETOUR) }));   // following: the live distance instead
+      $('walkThere').href = `https://www.google.com/maps/dir/?api=1&origin=${A.pos[0]},${A.pos[1]}&destination=${B.pos[0]},${B.pos[1]}&travelmode=walking`;
       $('walkThere').textContent = t('walkDirections');
       $('walkThere').hidden = false;
-    } else if (A || B) map.setView(A || B, 18);
+    } else if (A.pos || B.pos) map.setView(A.pos || B.pos, 18);
+    $('mapInfo').textContent = notes.join(' ');
+    if (opts.follow && B.pos) trackUser(B.pos, notes);   // on the way: where am I, how far to the platform
   }
 
   // ---------- Map picker (US-15) ----------
@@ -2598,7 +2632,7 @@
       if (!board) continue;
       const list = board.stationboard || [];
       const m = list.find(j => String(j.category) === String(r.category) && String(j.number) === String(r.number) && Math.abs(schedOf(j) - r.dep) < 90000);
-      const before = JSON.stringify([r.real, r.arrReal, r.platformLive, r.missing]);
+      const before = JSON.stringify([r.real, r.arrReal, r.platformLive, r.arrPlatformLive, r.missing]);
       if (!m) {
         // the board covers that time but the run is not there: probably cancelled
         r.missing = list.some(j => schedOf(j) > r.dep + 5 * 60000) && r.dep > now;
@@ -2611,6 +2645,8 @@
         const at = id => (m.passList || []).find(x => x.station && x.station.id === id);
         const p = at(r.toStop.id);
         const live = p && (parseTime(p.prognosis && p.prognosis.arrival) || null);
+        const arrPlat = p && ((p.prognosis && p.prognosis.platform) || p.platform) || '';
+        r.arrPlatformLive = arrPlat && arrPlat !== r.arrPlatform ? arrPlat : null;
         r.arrReal = live ? live.getTime() : (shift ? r.arr + shift : null);
         for (const v of r.via) {
           const q = at(v.id), lv = q && parseTime(q.prognosis && (q.prognosis.departure || q.prognosis.arrival));
@@ -2622,7 +2658,7 @@
           fireTrip(t('platformNotify'), t('platformBody', { line: `${modeName(r.mode)} ${r.label}`, p: t(r.mode === 'train' ? 'track' : 'platform', { p: r.platformLive }), stop: r.from.name }));
         }
       }
-      if (JSON.stringify([r.real, r.arrReal, r.platformLive, r.missing]) !== before) changed = true;
+      if (JSON.stringify([r.real, r.arrReal, r.platformLive, r.arrPlatformLive, r.missing]) !== before) changed = true;
     }
     // get-off reminders follow the new live times of the rides
     const h = hydrate(a.plan);
@@ -2794,7 +2830,7 @@
     let what, firstChanged = false;
     if (o.kind === 'earlier') {
       const r = a.plan[c.i], shift = o.sched - r.dep;
-      Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrCur, platformLive: null, missing: false });
+      Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrCur, platformLive: null, arrPlatformLive: null, missing: false });
       r.via.forEach(v => { v.time += shift; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
       what = `${o.line} ${hhmm(new Date(o.dep))}`; firstChanged = true;
     } else if (o.kind === 'replan' && o.fromIdx != null) {
@@ -2802,7 +2838,7 @@
       what = o.lines; firstChanged = o.fromIdx <= a.plan.findIndex(l => l.type === 'ride');
     } else if (o.kind === 'next') {
       const r = a.plan[c.k], shift = o.sched - r.dep;
-      Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrNext, platformLive: null, missing: false });
+      Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrNext, platformLive: null, arrPlatformLive: null, missing: false });
       r.via.forEach(v => { v.time += shift; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
       // later rides are followed live again as they are
       what = `${o.line} ${hhmm(new Date(o.dep))}`;
@@ -2871,15 +2907,20 @@
       if (l.type === 'walk') {
         const map = l.start && l.end && (l.start.coord || l.start.stopId) && (l.end.coord || l.end.stopId)
           ? `<button class="ghost walk-map" data-act="walk-map" data-leg="${k}">${MAP_ICON}${esc(t('walkOnMap'))}</button>` : '';
-        const to = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: (l.end && l.end.name) || l.to || '' });
+        const end = walkEnds(plan, k).end;
+        const toName = end && end.name ? end.name + (end.platform ? ` (${t(end.mode === 'train' ? 'track' : 'platform', { p: end.platform })})` : '') : l.to || '';
+        const to = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: toName });
         return `<li class="tl walk"><span>🚶 ${esc(t('walkMin', { min: fmtMin(l.min) }))} — ${esc(to)}</span>${map}</li>`;
       }
       const done = arrOf(l) < now - 30000, boarded = depOf(l) <= now && !done, isNext = k === curIdx && !boarded;
       const cls = done ? ' done' : boarded ? ' now' : isNext ? ' now' : '';
       const chip = done ? t('chipDone') : boarded ? t('chipOnBoard') : isNext ? t('chipNext') : '';
+      // the platform is a button: tap it to see it on the map (the live one when it changed)
       const plat = l.platformLive
-        ? ` · <span class="changed">${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platformLive }))}</span> <small>(${esc(t('wasPlat', { p: l.platform }))})</small>`
-        : l.platform ? ` · ${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platform }))}` : '';
+        ? ` ${platformChip(l.platformLive, l.mode, l.from).replace('class="plat"', 'class="plat changed"')} <small>(${esc(t('wasPlat', { p: l.platform }))})</small>`
+        : l.platform ? ` ${platformChip(l.platform, l.mode, l.from)}` : '';
+      const arrP = l.arrPlatformLive || l.arrPlatform;
+      const arrPlat = arrP ? ` ${platformChip(arrP, l.mode, l.toStop)}` : '';
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       // number of stops and time on board, intermediate stops with their live times (as when planning)
       const rideMin = Math.max(0, Math.round((arrOf(l) - depOf(l)) / 60000));
@@ -2900,7 +2941,7 @@
         `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) +
         `<div>${timeHtml(l.dep, l.real)} ${esc(l.from.name)}${plat}</div>` +
         (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') + via +
-        `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}</div></li>`;
+        `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}${arrPlat}</div></li>`;
     }).join('');
     // a broken or tight connection, with what can be done
     let warn = '';
@@ -3358,7 +3399,7 @@
     const q = e.target.closest('.plat');
     if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }); return; }
     const w = e.target.closest('.walk-map');
-    if (w) { const j = journeys[+w.dataset.i]; if (j) openWalkMap(j.legs[+w.dataset.leg]); return; }
+    if (w) { const j = journeys[+w.dataset.i]; if (j && j.legs[+w.dataset.leg]) openWalkMap(j.legs, +w.dataset.leg); return; }
     const v = e.target.closest('.via-toggle');
     if (v) { const open = v.getAttribute('aria-expanded') !== 'true'; v.setAttribute('aria-expanded', String(open)); v.nextElementSibling.hidden = !open; return; }
     const ft = e.target.closest('.foot-toggle');
@@ -3382,6 +3423,8 @@
     if (opened && opened.scrollIntoView) opened.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
   $('alarmList').addEventListener('click', e => {
+    const q = e.target.closest('.plat');   // a platform of a followed ride: on the map
+    if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }); return; }
     const b = e.target.closest('button[data-act]'); if (!b) return;
     const id = b.closest('.alarm').dataset.id, a = getAlarms().find(x => x.id === id); if (!a) return;
     unlockAudio();
@@ -3392,7 +3435,7 @@
       open ? tripViaOpen.add(key) : tripViaOpen.delete(key);
       b.setAttribute('aria-expanded', String(open)); b.nextElementSibling.hidden = !open;
     }
-    else if (b.dataset.act === 'walk-map') { const l = a.plan && a.plan[+b.dataset.leg]; if (l) openWalkMap(l); }
+    else if (b.dataset.act === 'walk-map') { if (a.plan && a.plan[+b.dataset.leg]) openWalkMap(a.plan, +b.dataset.leg, { follow: true }); }
     else if (b.dataset.act === 'test-alight') fireAlight(a, 0);
     else fireAlarm(a, b.dataset.act === 'test-ready' ? 'ready' : 'leave');   // test: rings without marking the alarm as done
   });
