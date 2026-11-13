@@ -1,258 +1,193 @@
 {
- "generated": "2026-11-13T04:44Z",
- "ckan_errors": [
-  "business-organisations: HTTP Error 403: Forbidden",
-  "transport-companies: HTTP Error 403: Forbidden",
-  "business-organisation: HTTP Error 403: Forbidden",
-  "transport-company: HTTP Error 403: Forbidden"
+ "generated": "2026-11-13T04:49Z",
+ "company_header": [
+  "sboid",
+  "said",
+  "validfrom",
+  "validto",
+  "organisationnumber",
+  "status",
+  "descriptionde",
+  "descriptionfr",
+  "descriptionit",
+  "descriptionen",
+  "abbreviationde",
+  "abbreviationfr",
+  "abbreviationit",
+  "abbreviationen",
+  "businesstypesid",
+  "businesstypesde",
+  "businesstypesit",
+  "businesstypesfr",
+  "transportcompanynumber",
+  "transportcompanyabbreviation",
+  "transportcompanybusinessregistername",
+  "creationtime",
+  "editiontime"
  ],
+ "companies_source": "https://data.opentransportdata.swiss/dataset/business-organisation-v2/resource_permalink/full-business-organisation.csv",
+ "companies": 1288,
+ "company_samples": {
+  "881": {
+   "abbr": "TPG",
+   "name": "Transports Publics Genevois"
+  },
+  "11": {
+   "abbr": "SBB",
+   "name": "Schweizerische Bundesbahnen SBB"
+  },
+  "199": {
+   "abbr": "MGsa",
+   "name": "Mouettes genevoises SA"
+  },
+  "801": {
+   "abbr": "PAG",
+   "name": "PostAuto AG"
+  },
+  "151": {
+   "abbr": "TL",
+   "name": "Transports Publics de la Région Lausannoise sa"
+  }
+ },
  "overpass": "https://overpass-api.de/api/interpreter",
- "routes": 7967,
- "used": 0,
- "without_colour_or_ref": 2675,
- "operators": 0,
- "lines": 0,
+ "routes": 7180,
+ "without_colour_or_ref": 2403,
+ "operators": 80,
+ "lines": 1360,
  "unmatched_operators": [
-  [
-   "PAG",
-   2156
-  ],
-  [
-   "VBZ",
-   251
-  ],
-  [
-   "PAZ",
-   219
-  ],
-  [
-   "SBB",
-   189
-  ],
-  [
-   "TPG",
-   104
-  ],
-  [
-   "BSGU",
-   97
-  ],
-  [
-   "TL",
-   94
-  ],
-  [
-   "BVB",
-   91
-  ],
-  [
-   "ZVB",
-   84
-  ],
-  [
-   "VBSH",
-   80
-  ],
-  [
-   "Bernmobil",
-   67
-  ],
-  [
-   "RVBW",
-   62
-  ],
-  [
-   "TRAVYS",
-   58
-  ],
-  [
-   "BOGG",
-   57
-  ],
-  [
-   "SBW",
-   53
-  ],
-  [
-   "BOS/wimo",
-   52
-  ],
-  [
-   "AVA-szr",
-   50
-  ],
-  [
-   "MBC Auto",
-   49
-  ],
-  [
-   "AAGS",
-   48
-  ],
-  [
-   "RBL",
-   42
-  ],
-  [
-   "BLS",
-   40
-  ],
-  [
-   "BBA",
-   39
-  ],
-  [
-   "VB",
-   38
-  ],
-  [
-   "VBSG",
-   36
-  ],
-  [
-   "TPG: Globe Limo",
-   36
-  ],
-  [
-   "TPL",
-   35
-  ],
-  [
-   "BOS/rtb",
-   35
-  ],
-  [
-   "AAGL",
-   35
-  ],
-  [
-   "TPF Auto",
-   34
-  ],
-  [
-   "BLT Auto",
-   34
-  ],
-  [
-   "THB",
-   32
-  ],
-  [
-   "AAGU",
-   32
-  ],
-  [
-   "BSF",
-   32
-  ],
-  [
-   "SBF",
-   30
-  ],
-  [
-   "RhB",
-   30
-  ],
-  [
-   "VMCV",
-   29
-  ],
-  [
-   "TRN/tc",
-   28
-  ],
-  [
-   "REGO",
-   28
-  ],
-  [
-   "TN",
-   26
-  ],
-  [
-   "TPG: RATP Dev",
-   22
-  ],
-  [
-   "STI",
-   22
-  ],
-  [
-   "VZO",
-   22
-  ],
-  [
-   "VBD",
-   22
-  ],
-  [
-   "VSK",
-   22
-  ],
   [
    "Verkehrsbetrieb LIECHTENSTEINmobil",
    21
   ],
   [
-   "SZU Auto",
-   20
+   "Südbadenbus GmbH",
+   10
   ],
   [
-   "TPN",
-   18
+   "Transports Publics Neuchâtelois SA",
+   10
   ],
   [
-   "Treni Regionali Ticino Lombardia",
-   17
+   "Stadtbus Tuttlingen Klink GmbH",
+   4
   ],
   [
-   "TSD-asdt",
-   17
-  ],
-  [
-   "SOB",
-   16
-  ],
-  [
-   "THURBO",
-   16
-  ],
-  [
-   "Lemanis",
-   15
-  ],
-  [
-   "BLT",
-   14
-  ],
-  [
-   "RBS",
-   14
-  ],
-  [
-   "TPF",
-   14
-  ],
-  [
-   "BuS/eb",
-   14
+   "PAG Graubünden",
+   4
   ],
   [
    "SNCF Voyageurs",
-   13
+   2
   ],
   [
-   "ZB",
-   12
+   "Südwestdeutsche Landesverkehrs-AG Weil am Rhein Lörrach",
+   2
   ],
   [
-   "SZU",
-   12
+   "Postauto Graubünden",
+   2
   ],
   [
-   "TRN/Autovr",
-   12
+   "?",
+   2
+  ],
+  [
+   "Commune de riddes",
+   2
+  ],
+  [
+   "Commune de riddes BCR",
+   2
+  ],
+  [
+   "Service d'automobiles TRN (vr)",
+   2
+  ],
+  [
+   "Region Alps",
+   1
   ]
  ],
- "per_operator": {}
+ "per_operator": {
+  "AAGL": 10,
+  "AAGS": 12,
+  "AAGU": 8,
+  "ALPBUS": 3,
+  "ARL": 1,
+  "ASM": 3,
+  "AVA": 6,
+  "AVA-SZR": 13,
+  "AVB": 2,
+  "AVG": 2,
+  "AWA": 1,
+  "BBA": 11,
+  "BCS": 4,
+  "BERNMOBIL": 27,
+  "BLABLACAR": 1,
+  "BLT": 18,
+  "BNP": 3,
+  "BOGG": 17,
+  "BOS": 28,
+  "BRER": 1,
+  "BSF": 8,
+  "BSGU": 20,
+  "BUCHARD": 3,
+  "BUS": 8,
+  "BVB": 22,
+  "BWS": 1,
+  "CGN": 4,
+  "CH-GR": 1,
+  "CHUR": 2,
+  "DISTRIBUS": 3,
+  "FB": 1,
+  "FLIXBUS": 1,
+  "MBC": 15,
+  "MOONLINER": 1,
+  "OBSM": 1,
+  "OSF": 4,
+  "OSTWIND": 3,
+  "PA": 2,
+  "PAG": 458,
+  "PAZ": 88,
+  "PBZ": 1,
+  "RA": 5,
+  "RBL": 14,
+  "RBS": 1,
+  "REGO": 7,
+  "RHB": 1,
+  "RVBW": 18,
+  "SBB-EV": 1,
+  "SBF": 10,
+  "SBW": 21,
+  "SMGN": 4,
+  "STI": 10,
+  "STPS": 1,
+  "SVB": 4,
+  "SZU": 7,
+  "TL": 40,
+  "TMR": 5,
+  "TN": 9,
+  "TPC": 8,
+  "TPF": 15,
+  "TPG": 75,
+  "TPL": 15,
+  "TPN": 4,
+  "TRANSDEV": 1,
+  "TRAVYS": 13,
+  "TRN": 19,
+  "TSD-ASDT": 4,
+  "VB": 12,
+  "VBD": 7,
+  "VBG": 7,
+  "VBH": 4,
+  "VBSG": 12,
+  "VBSH": 21,
+  "VBZ": 105,
+  "VFD": 1,
+  "VMCV": 13,
+  "VSK": 6,
+  "VZO": 14,
+  "ZVB": 27,
+  "ZVV": 1
+ }
 }
