@@ -1985,7 +1985,7 @@
       const pr = p.prognosis || {};
       const live = parseTime(pr.arrival) || parseTime(pr.departure);
       const depAt = parseTime(pr.departure) || tsOr(p.departureTimestamp, p.departure) || live || planned;
-      return { name: st.name || '', id: st.id || null, coord: coordOf(st), time: live || planned, live: !!live, depAt };
+      return { name: st.name || '', id: st.id || null, coord: coordOf(st), time: live || planned, planned, live: !!live, depAt };
     }).filter(v => v.name);
   }
   // Where each walk starts and ends (US-32): a place, or a stop and its platform
@@ -2171,8 +2171,8 @@
   // The same ride, staying on to its onward stop n (the stops passed become intermediate stops)
   function extendRide(r, n) {
     const from = r.onwardIdx == null ? -1 : r.onwardIdx, s = r.onward[n];
-    const passed = [{ name: r.toStop.name, id: r.toStop.id, coord: r.toStop.coord, time: r.arrReal || r.arr, live: !!r.arrReal, depAt: r.arrReal || r.arr },
-      ...r.onward.slice(from + 1, n).map(b => ({ name: b.name, id: b.id, coord: b.coord, time: new Date(b.at), live: b.live, depAt: new Date(b.at) }))];
+    const passed = [{ name: r.toStop.name, id: r.toStop.id, coord: r.toStop.coord, time: r.arrReal || r.arr, planned: r.arr, live: !!r.arrReal, depAt: r.arrReal || r.arr },
+      ...r.onward.slice(from + 1, n).map(b => ({ name: b.name, id: b.id, coord: b.coord, time: new Date(b.at), planned: new Date(b.planned), live: b.live, depAt: new Date(b.at) }))];
     return Object.assign({}, r, { toStop: { id: s.id, name: s.name, coord: s.coord }, arr: new Date(s.planned), arrReal: s.live ? new Date(s.at) : null,
       arrPlatform: s.platform || '', stops: r.stops + passed.length, via: [...(r.via || []), ...passed], onwardIdx: n, stayedFrom: r.stayedFrom || r.toStop.name });
   }
@@ -2351,7 +2351,7 @@
   }
 
   async function searchJourneys() {
-    searchGen++;
+    searchGen++; journeyOrder = null;
     const { from, to } = places;
     const status = $('journeyStatus');
     if (!from || !to) { status.textContent = t('chooseBoth'); return; }
@@ -2568,12 +2568,19 @@
   function transfersText(n) { return n === 0 ? t('direct') : n === 1 ? t('transfer1') : t('transfersN', { n }); }
 
   let openJourney = null;   // key of the journey whose details are open (US-28)
+  // BUG-09: the results keep the order they were first shown in. Work done afterwards (staying on, walking along
+  // the streets, a journey opened) changes times, and re-sorting moved the journey being looked at, or pushed it
+  // out of the list. Only a new search or another priority sorts again.
+  let journeyOrder = null;
   function renderJourneys() {
     const box = $('journeyResults');
     if (!journeyBase.length) { box.hidden = true; return; }
     journeys = journeyBase.map(displayJourney);
     const mode = readWhen().mode;
-    const ranked = rankJourneys(journeys, getPrio(), mode);
+    const keyOf = j => (j.base || j).key;
+    if (!journeyOrder) journeyOrder = rankJourneys(journeys, getPrio(), mode).map(keyOf);
+    const pos = j => { const n = journeyOrder.indexOf(keyOf(j)); return n < 0 ? journeyOrder.length : n; };
+    const ranked = journeys.slice().sort((x, y) => pos(x) - pos(y));
     const fastest = rankJourneys(journeys, 'fast', mode)[0], leastWalk = rankJourneys(journeys, 'walk', mode)[0];
     journeys = ranked;
     box.hidden = false;
@@ -2978,7 +2985,8 @@
       created0: (f.real || f.dep).getTime(),   // first departure when the alarm was set, to shift the get-off times with live data
       alights: alightPlan(j),
       // US-38: the whole journey, followed live
-      plan: planOf(j), dest: j.segments > 1 ? tripPoints().pts.slice(-1)[0] : places.to, rev: 0
+      plan: planOf(j), dest: j.segments > 1 ? tripPoints().pts.slice(-1)[0] : places.to, rev: 0,
+      runCheck: 1, viaCheck: 1, changeWalks: 1,   // the one-time fixes for journeys followed before don't apply to a new one
     };
     // US-33: set after the first vehicle left → already on board: no departure alarms, only get-off reminders.
     // Set after the leave time → only "Leave" rings (at once). Set after the get-ready time → "Get ready" rings at once.
@@ -3134,7 +3142,7 @@
       ? { type: 'ride', mode: l.mode, label: l.label, style: l.style, color: l.color, category: l.category, number: l.number, to: l.to,
           from: l.from, toStop: l.toStop, dep: ms(l.dep), real: ms(l.real), arr: ms(l.arr), arrReal: ms(l.arrReal),
           platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops,
-          via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), depAt: ms(v.depAt), live: !!v.live })) }
+          via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), planned: ms(v.planned || v.time), depAt: ms(v.depAt), live: !!v.live })) }
       : l.type === 'stay' ? { type: 'stay', min: l.min, from: ms(l.from), until: ms(l.until), back: !!l.back, place: l.place }
       : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '',
           samePlatform: !!l.samePlatform, apiMin: l.apiMin || null });
@@ -3144,7 +3152,7 @@
     const D = v => v != null ? new Date(v) : null;
     const legs = plan.map(l => l.type !== 'ride' ? Object.assign({}, l) : Object.assign({}, l, {
       dep: D(l.dep), real: D(l.real), arr: D(l.arr), arrReal: D(l.arrReal),
-      via: l.via.map(v => Object.assign({}, v, { time: D(v.time), depAt: D(v.depAt) })) }));
+      via: l.via.map(v => Object.assign({}, v, { time: D(v.time), planned: D(v.planned), depAt: D(v.depAt) })) }));
     return { legs, rides: legs.filter(l => l.type === 'ride') };
   }
   const depOf = r => r.real || r.dep, arrOf = r => r.arrReal || r.arr;
@@ -3210,6 +3218,14 @@
         sooner: Math.floor(endAt / 60000) - Math.floor(jj.arriveAt.getTime() / 60000),
         lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
   }
+  // Intermediate stops always between departure and arrival, in order; when their times are not credible (stops
+  // after the arrival, out of order: piled-up shifts from before BUG-09), spread evenly over the ride
+  function viaInOrder(r) {
+    const lo = r.real || r.dep, hi = r.arrReal || r.arr, vs = r.via || [];
+    if (!vs.length || !lo || !hi) return;
+    const ok = vs.every((v, n) => v.time >= lo - 60000 && v.time <= hi + 60000 && (n === 0 || v.time >= vs[n - 1].time));
+    if (!ok) vs.forEach((v, n) => { v.time = Math.round(lo + (hi - lo) * (n + 1) / (vs.length + 1)); v.planned = r.dep + (r.arr - r.dep) * (n + 1) / (vs.length + 1); v.shift = 0; });
+  }
   async function refreshTrip(a, boardOf, schedOf) {
     const now = Date.now();
     let changed = false;
@@ -3218,6 +3234,8 @@
       for (const r of a.plan) if (r.type === 'ride') Object.assign(r, { real: null, arrReal: null, platformLive: null, arrPlatformLive: null, missing: false });
       a.runCheck = 1; changed = true;
     }
+    // BUG-09: journeys followed before: credible times for their stops, once
+    if (!a.viaCheck) { a.plan.filter(l => l.type === 'ride').forEach(viaInOrder); a.viaCheck = 1; changed = true; }
     // BUG-08: journeys followed before: a change of platform without its walk gets it, once
     if (!a.changeWalks) {
       const plan = addChangeWalks(a.plan);
@@ -3246,10 +3264,16 @@
         const live = p && (parseTime(p.prognosis && p.prognosis.arrival) || null);
         r.arrPlatformLive = p ? announcedPlatform(p.platform, p.prognosis && p.prognosis.platform, r.arrPlatform) : null;
         r.arrReal = live ? live.getTime() : (shift ? r.arr + shift : null);
+        // BUG-09: each stop keeps its planned time; its live time is the API's, or the planned one moved by the
+        // ride's current delay — computed afresh, never added up — and always between the ride's departure and arrival
+        const lo = r.real || r.dep, hi = r.arrReal || r.arr;
         for (const v of r.via) {
+          if (v.planned == null) v.planned = v.time - (v.shift || 0);
           const q = at(v.id), lv = q && parseTime(q.prognosis && (q.prognosis.departure || q.prognosis.arrival));
-          if (lv) { v.time = lv.getTime(); v.live = true; } else if (shift) { v.time = v.time + shift - (v.shift || 0); v.shift = shift; v.live = true; }
+          const t0 = lv ? lv.getTime() : v.planned + shift;
+          v.time = Math.min(Math.max(t0, lo), hi); v.live = !!(lv || shift); v.shift = shift;
         }
+        viaInOrder(r);
         // a platform change for a ride still to take rings once
         if (r.platformLive && r.dep > now && !(a.fired['plat' + r.dep] === r.platformLive)) {
           a.fired['plat' + r.dep] = r.platformLive;
@@ -3598,11 +3622,15 @@
       const nStops = l.stops != null ? l.stops : l.via.length + 1;
       const count = (nStops === 1 ? t('stops1') : t('stopsCount', { n: nStops })) + ' · ' + fmtDuration(rideMin);
       const vkey = `${a.id}#${l.dep}#${k}`, unfolded = tripViaOpen.has(vkey);
-      const nextVia = boarded ? l.via.findIndex(v => v.time > now) : -1;
+      // stops passed: by time, or by position when a recent precise one says the vehicle is already further
+      let nextVia = boarded ? l.via.findIndex(v => v.time > now) : -1;
+      const fix = boarded && gps.fix && now - gps.fix.t < GPS_FRESH_MS ? gps.fix.p : null;
+      if (fix) { const near = l.via.findIndex(v => v.coord && distanceM(fix, v.coord) <= NEAR_M); if (near >= 0 && (nextVia < 0 || near + 1 > nextVia)) nextVia = near + 1 < l.via.length ? near + 1 : -1; }
+      const passedUpTo = nextVia < 0 ? (boarded ? l.via.length : 0) : nextVia;
       const via = l.via.length
         ? `<button class="via-toggle" data-act="via" data-key="${esc(vkey)}" aria-expanded="${unfolded}">${esc(count)}</button>` +
           `<ul class="via"${unfolded ? '' : ' hidden'}>${l.via.map((v, n) => {
-            const last = n === l.via.length - 1, passed = boarded && v.time < now;
+            const last = n === l.via.length - 1, passed = boarded && n < passedUpTo;
             const cls = [last ? 'next-off' : '', passed ? 'passed' : '', n === nextVia ? 'here' : ''].filter(Boolean).join(' ');
             const note = last ? ` <small>· ${esc(t('nextOff'))}</small>` : n === nextVia ? ` <small>· ${esc(t('nextStopShort'))}</small>` : '';
             return `<li${cls ? ` class="${cls}"` : ''}><time${v.live ? ' class="live"' : ''}>${v.time ? tm(v.time) : ''}</time><span>${esc(v.name)}${note}</span></li>`;
@@ -4066,7 +4094,7 @@
       $('whenAt').value = apiDateTime(d).replace(' ', 'T');
     }
   });
-  document.querySelectorAll('#prio button').forEach(b => b.addEventListener('click', () => { store.set('prio', b.dataset.prio); renderPrio(); renderJourneys(); }));
+  document.querySelectorAll('#prio button').forEach(b => b.addEventListener('click', () => { store.set('prio', b.dataset.prio); renderPrio(); journeyOrder = null; renderJourneys(); }));
   $('searchJourney').addEventListener('click', searchJourneys);
   $('journeyList').addEventListener('click', e => {
     const q = e.target.closest('.plat');
