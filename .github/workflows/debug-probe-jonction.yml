@@ -6,49 +6,57 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Real data around Sainte-Clotilde / Jonction
+      - name: Jonction platforms and trips through Jonction
         env:
           OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
         run: |
           python3 - <<'PY'
-          import json, os, urllib.request, urllib.parse, datetime as dt, re
-          def get(u):
-              with urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "swissPublicTransport-debug"}), timeout=60) as r:
-                  return json.load(r)
+          import json, os, re, urllib.request, urllib.parse, datetime as dt
           V1 = "https://transport.opendata.ch/v1"
-          for q in ["Genève, Sainte-Clotilde", "Genève, Jonction", "Genève, Musée d'ethnographie", "Petit-Lancy, Les Esserts"]:
-              st = get(f"{V1}/locations?type=station&query={urllib.parse.quote(q)}").get("stations", [])[:2]
-              print("LOC", q, "->", [(s.get("id"), s.get("name"), (s.get("coordinate") or {}).get("x"), (s.get("coordinate") or {}).get("y")) for s in st])
-          now = dt.datetime.now(dt.timezone(dt.timedelta(hours=1)))
-          when = (now + dt.timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M")
-          c = get(f"{V1}/connections?from={urllib.parse.quote('Genève, Musée d’ethnographie'.replace('’', chr(39)))}&to={urllib.parse.quote('Petit-Lancy, Les Esserts')}&date={when[:10]}&time={when[11:]}&limit=6")
-          for k, con in enumerate(c.get("connections", [])):
-              secs = []
-              for s in con["sections"]:
-                  d, a = s["departure"], s["arrival"]
-                  if s.get("journey"):
-                      j = s["journey"]; secs.append(f"{j['category']}{j['number']}→{j['to']} {d['station']['name']}[{d['station']['id']}] {d['departure'][11:16]} pl={d.get('platform')} → {a['station']['name']}[{a['station']['id']}] {a['arrival'][11:16]} pl={a.get('platform')}")
-                  else:
-                      secs.append(f"walk {(s.get('walk') or {}).get('duration')} {d['station']['name']}→{a['station']['name']}")
-              print("CON", k, " | ".join(secs))
-          # the board where the 19 leaves the journey
-          sc = get(f"{V1}/locations?type=station&query={urllib.parse.quote('Genève, Sainte-Clotilde')}")["stations"][0]
-          b = get(f"{V1}/stationboard?id={sc['id']}&limit=40&datetime={urllib.parse.quote(when)}")
-          for e in b.get("stationboard", []):
-              if e.get("number") != "19": continue
-              pl = e.get("passList") or []
-              print("BOARD19", e["category"], e["number"], "to", e["to"], "dep", e["stop"].get("departure"), "pl", e["stop"].get("platform"), "passList:",
-                    [(p["station"].get("id"), p["station"].get("name"), (p.get("arrival") or "")[11:16], p.get("arrivalTimestamp"), (p["station"].get("coordinate") or {}).get("x"), p.get("platform")) for p in pl[:4]])
-          # OJP: the same board with onward stops
-          tok = os.environ.get("OJP_TOKEN")
-          if tok:
-              ts = (now + dt.timedelta(minutes=20)).astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-              body = f'''<?xml version="1.0" encoding="UTF-8"?><OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0"><OJPRequest><siri:ServiceRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><siri:RequestorRef>debug</siri:RequestorRef><OJPStopEventRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><Location><PlaceRef><StopPlaceRef>{sc['id']}</StopPlaceRef></PlaceRef><DepArrTime>{ts}</DepArrTime></Location><Params><NumberOfResults>20</NumberOfResults><StopEventType>departure</StopEventType><IncludePreviousCalls>false</IncludePreviousCalls><IncludeOnwardCalls>true</IncludeOnwardCalls><UseRealtimeData>full</UseRealtimeData></Params></OJPStopEventRequest></siri:ServiceRequest></OJPRequest></OJP>'''
+          def get(u):
+              with urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "swissPublicTransport-debug"}), timeout=60) as r: return json.load(r)
+          tok = os.environ["OJP_TOKEN"]
+          def ojp(body):
               req = urllib.request.Request("https://api.opentransportdata.swiss/ojp20", data=body.encode(), headers={"Authorization": "Bearer " + tok, "Content-Type": "application/xml"})
-              x = urllib.request.urlopen(req, timeout=60).read().decode()
+              return urllib.request.urlopen(req, timeout=60).read().decode()
+          tz = dt.timezone(dt.timedelta(hours=1)); now = dt.datetime.now(tz)
+          for label, t in (("now+15", now + dt.timedelta(minutes=15)), ("17:00", now.replace(hour=17, minute=0))):
+              when = t.strftime("%Y-%m-%d %H:%M"); ts = t.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+              print("=====", label, when)
+              b = get(f"{V1}/stationboard?id=8587062&limit=60&datetime={urllib.parse.quote(when)}")
+              seen = set()
+              for e in b["stationboard"]:
+                  k = (e["category"], e["number"], e["to"], e["stop"].get("platform"))
+                  if e["number"] in ("2", "19", "14") and k not in seen:
+                      seen.add(k); print("V1-BOARD Jonction", *k)
+              x = ojp(f'<?xml version="1.0" encoding="UTF-8"?><OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0"><OJPRequest><siri:ServiceRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><siri:RequestorRef>debug</siri:RequestorRef><OJPStopEventRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><Location><PlaceRef><StopPlaceRef>8587062</StopPlaceRef></PlaceRef><DepArrTime>{ts}</DepArrTime></Location><Params><NumberOfResults>60</NumberOfResults><StopEventType>departure</StopEventType><IncludeOnwardCalls>false</IncludeOnwardCalls></Params></OJPStopEventRequest></siri:ServiceRequest></OJPRequest></OJP>')
+              seen = set()
               for ev in re.findall(r"<StopEvent>.*?</StopEvent>", x, re.S):
-                  if "<PublicCode>19</PublicCode>" not in ev: continue
-                  onward = re.findall(r"<OnwardCall>.*?<StopPointName><Text[^>]*>([^<]+)</Text>.*?(?:<ServiceArrival><TimetabledTime>([^<]+)</TimetabledTime>)?", ev, re.S)
-                  dest = re.search(r"<DestinationText><Text[^>]*>([^<]+)", ev)
-                  print("OJP19 to", dest and dest.group(1), "onward:", onward[:3])
+                  code = re.search(r"<PublicCode>([^<]+)", ev); q = re.search(r"<PlannedQuay><Text[^>]*>([^<]+)", ev); d = re.search(r"<DestinationText><Text[^>]*>([^<]+)", ev)
+                  k = (code and code.group(1), d and d.group(1), q and q.group(1))
+                  if k[0] in ("2", "19", "14") and k not in seen: seen.add(k); print("OJP-BOARD Jonction", *k)
+              for pl in re.findall(r"<Place><StopPoint>.*?</Place>", x, re.S):
+                  ref = re.search(r"<siri:StopPointRef>([^<]+)", pl); code = re.search(r"<Value>([^<]+)</Value>", pl)
+                  lon = re.search(r"<siri:Longitude>([^<]+)", pl); lat = re.search(r"<siri:Latitude>([^<]+)", pl)
+                  print("OJP-QUAY", ref and ref.group(1), code and code.group(1), lat and lat.group(1), lon and lon.group(1))
+              for a, z in (("8592908", "8587418"), ("8592868", "8587418"), ("8592908", "8587062")):
+                  c = get(f"{V1}/connections?from={a}&to={z}&date={when[:10]}&time={when[11:]}&limit=4")
+                  for n, con in enumerate(c.get("connections", [])):
+                      secs = []
+                      for s in con["sections"]:
+                          d, r = s["departure"], s["arrival"]
+                          if s.get("journey"):
+                              j = s["journey"]; secs.append(f"{j['category']}{j['number']} {d['station']['name']} {d['departure'][11:16]} pl={d.get('platform')} → {r['station']['name']} {r['arrival'][11:16]} pl={r.get('platform')}")
+                          else: secs.append(f"walk {(s.get('walk') or {}).get('duration')}s {d['station']['name']}→{r['station']['name']}")
+                      print(f"V1-TRIP {a}->{z} #{n}", " | ".join(secs))
+              y = ojp(f'<?xml version="1.0" encoding="UTF-8"?><OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0"><OJPRequest><siri:ServiceRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><siri:RequestorRef>debug</siri:RequestorRef><OJPTripRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><Origin><PlaceRef><StopPlaceRef>8592868</StopPlaceRef></PlaceRef><DepArrTime>{ts}</DepArrTime></Origin><Destination><PlaceRef><StopPlaceRef>8587418</StopPlaceRef></PlaceRef></Destination><Params><NumberOfResults>4</NumberOfResults><IncludeIntermediateStops>true</IncludeIntermediateStops></Params></OJPTripRequest></siri:ServiceRequest></OJPRequest></OJP>')
+              for n, trip in enumerate(re.findall(r"<Trip>.*?</Trip>", y, re.S)):
+                  legs = []
+                  for leg in re.findall(r"<Leg>.*?</Leg>", trip, re.S):
+                      if "<TimedLeg>" in leg:
+                          code = re.search(r"<PublicCode>([^<]+)", leg); names = re.findall(r"<StopPointName><Text[^>]*>([^<]+)", leg); quays = re.findall(r"<PlannedQuay><Text[^>]*>([^<]+)", leg)
+                          legs.append(f"{code and code.group(1)} {names[0]} q={quays[0] if quays else None} -> {names[-1]} q={quays[-1] if quays else None} (via {', '.join(names[1:-1])})")
+                      else:
+                          dur = re.search(r"<Duration>([^<]+)", leg); legs.append(f"{'transfer' if 'TransferLeg' in leg else 'walk'} {dur and dur.group(1)}")
+                  print(f"OJP-TRIP #{n}", " | ".join(legs))
           PY
