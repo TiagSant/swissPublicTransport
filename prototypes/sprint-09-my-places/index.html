@@ -263,9 +263,7 @@
   .place.via { border-left: 3px solid var(--accent); padding-left: 8px; }
   .jw.stay { font-weight: 700; }
   .stay-on { font-size: .82rem; color: #1a7f37; margin: 4px 0 2px; }
-  .stay-on .stay-on-toggle { font-size: .8rem; padding: 2px 8px; margin-left: 4px; }
-  .stay-on.offer .stay-on-toggle { color: #1a7f37; border-color: #1a7f37; margin-left: 0; }
-  @media (prefers-color-scheme: dark) { .stay-on, .stay-on.offer .stay-on-toggle { color: #6fdc8c; border-color: #6fdc8c; } }
+  @media (prefers-color-scheme: dark) { .stay-on { color: #6fdc8c; } }
   .wait-total.changed { color: #b26a00; font-weight: 600; }
   .leg .wait { font-size: .8rem; color: var(--muted); margin: 2px 0; }
   .leg .wait.changed { color: #b26a00; font-weight: 600; }
@@ -628,7 +626,7 @@
       removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
       lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
       dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators and © OpenStreetMap contributors (ODbL) · Walking routes: OSRM, FOSSGIS',
-      stayOnNote: '↷ Staying on to {stop}: {saved} min less walking', stayOnUndo: 'Get off at {stop} instead', stayOnOffer: '↷ Stay on to {stop}: {saved} min less walking',
+      stayOnNote: '↷ Staying on to {stop}: {saved} min less walking',
       footOfferStayOn: '🚶 Stay on the {line} to {from}, then walk', walkDistRoute: 'About {d} on foot along the streets.',
       realWalkSetting: 'Walking routes along the streets', realWalkNote: 'Walking routes come from the OpenStreetMap server of FOSSGIS (OSRM): the start and end of each walk are sent to it. Off: straight line × 1.3.',
       noStop: 'No stop found.', searchFailed: 'Search failed (network?).', geoUnavailable: 'Geolocation not available.',
@@ -745,7 +743,7 @@
       removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
       lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
       dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants et © contributeurs OpenStreetMap (ODbL) · Itinéraires à pied : OSRM, FOSSGIS',
-      stayOnNote: '↷ Rester jusqu\u2019à {stop} : {saved} min de marche en moins', stayOnUndo: 'Descendre plutôt à {stop}', stayOnOffer: '↷ Rester jusqu\u2019à {stop} : {saved} min de marche en moins',
+      stayOnNote: '↷ Rester jusqu\u2019à {stop} : {saved} min de marche en moins',
       footOfferStayOn: '🚶 Rester dans le {line} jusqu\u2019à {from}, puis à pied', walkDistRoute: 'Environ {d} à pied par les rues.',
       realWalkSetting: 'Marche par les rues (itinéraire réel)', realWalkNote: 'Les itinéraires à pied viennent du serveur OpenStreetMap de FOSSGIS (OSRM) : le début et la fin de chaque marche lui sont envoyés. Désactivé : ligne droite × 1,3.',
       noStop: 'Aucun arrêt trouvé.', searchFailed: 'Recherche impossible (réseau ?).', geoUnavailable: 'Géolocalisation non disponible.',
@@ -2157,15 +2155,14 @@
     });
     return best;
   }
-  // The journey with those changes applied (or offered, when the rider prefers the planned stop)
-  const stayOnOff = new Set();   // "get off where planned" choices, by journey and ride
+  // The journey with those changes applied. Getting off where the API planned has nothing to offer (no time
+  // gained, more walking): it is not offered (PO decision).
   function withStayOn(j) {
     if (!j.stayOns || !j.stayOns.length) return j;
     let legs = j.legs.slice();
     for (const a of j.stayOns.slice().sort((x, y) => y.i - x.i)) {
-      const cur = legs[a.i], next = legs[a.k], key = j.key + '#' + a.i;
-      if (stayOnOff.has(key)) { legs[a.i] = Object.assign({}, cur, { stayOffer: Object.assign({ key }, a) }); continue; }
-      const ext = Object.assign(extendRide(cur, a.n), { stayedOn: Object.assign({ key }, a) });
+      const cur = legs[a.i], next = legs[a.k];
+      const ext = Object.assign(extendRide(cur, a.n), { stayedOn: a });
       const s = cur.onward[a.n];
       const walk = { type: 'walk', min: a.min, edge: 'transfer', to: next.from.name,
         start: { name: s.name, stopId: s.id, coord: s.coord, platform: s.platform, mode: cur.mode },
@@ -2576,9 +2573,7 @@
       }
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       const W = journeyWaits(j), change = W.byRide.get(k);
-      const so = l.stayedOn ? `<div class="stay-on">${esc(t('stayOnNote', { stop: l.stayedOn.stop, saved: l.stayedOn.saved }))} ` +
-          `<button class="ghost stay-on-toggle" data-key="${esc(l.stayedOn.key)}">${esc(t('stayOnUndo', { stop: l.stayedFrom }))}</button></div>`
-        : l.stayOffer ? `<div class="stay-on offer"><button class="ghost stay-on-toggle" data-key="${esc(l.stayOffer.key)}">${esc(t('stayOnOffer', { stop: l.stayOffer.stop, saved: l.stayOffer.saved }))}</button></div>` : '';
+      const so = l.stayedOn ? `<div class="stay-on">${esc(t('stayOnNote', { stop: l.stayedOn.stop, saved: l.stayedOn.saved }))}</div>` : '';
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
         ${change ? changeWaitHtml(W.plan, change) : ''}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
@@ -4014,8 +4009,6 @@
     if (w) { const j = journeys[+w.dataset.i]; if (j && j.legs[+w.dataset.leg]) openWalkMap(j.legs, +w.dataset.leg); return; }
     const v = e.target.closest('.via-toggle');
     if (v) { const open = v.getAttribute('aria-expanded') !== 'true'; v.setAttribute('aria-expanded', String(open)); v.nextElementSibling.hidden = !open; return; }
-    const so = e.target.closest('.stay-on-toggle');
-    if (so) { if (stayOnOff.has(so.dataset.key)) stayOnOff.delete(so.dataset.key); else stayOnOff.add(so.dataset.key); renderJourneys(); return; }
     const ft = e.target.closest('.foot-toggle');
     if (ft) {
       const j = journeys[+ft.dataset.i]; if (!j) return;
