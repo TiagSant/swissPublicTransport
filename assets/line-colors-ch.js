@@ -6,7 +6,7 @@
  * numbers: company number (OJP OperatorRef) → abbreviation
  */
 window.LINE_COLORS_CH = {
- "generated": "2026-11-13T04:51Z",
+ "generated": "2026-11-13T05:02Z",
  "source": "OpenStreetMap contributors (ODbL 1.0); operators: ATLAS, opentransportdata.swiss",
  "operators": {
   "AAGL": {

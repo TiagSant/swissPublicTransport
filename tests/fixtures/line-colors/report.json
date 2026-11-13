@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T04:51Z",
+ "generated": "2026-11-13T05:02Z",
  "company_header": [
   "sboid",
   "said",
@@ -49,6 +49,9 @@
    "name": "Transports Publics de la Région Lausannoise sa"
   }
  },
+ "overpass_errors": [
+  "https://overpass-api.de/api/interpreter: HTTP Error 502: Bad Gateway"
+ ],
  "overpass": "https://overpass-api.de/api/interpreter",
  "ambiguous_lines": {
   "PAG": 15
