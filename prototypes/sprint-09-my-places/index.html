@@ -260,6 +260,9 @@
   .stay-row input { width: 4.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
   .place.via { border-left: 3px solid var(--accent); padding-left: 8px; }
   .jw.stay { font-weight: 700; }
+  .wait-total.changed { color: #b26a00; font-weight: 600; }
+  .leg .wait { font-size: .8rem; color: var(--muted); margin: 2px 0; }
+  .leg .wait.changed { color: #b26a00; font-weight: 600; }
   .leg.stay, .tl.stay { list-style: none; margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px dashed var(--line); }
   .leg.stay b, .tl.stay b { display: block; }
   .stay-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
@@ -638,7 +641,7 @@
       nearStop: '{d} from {name}', leaveNow: 'Leave now', departAt: 'Depart at', arriveBy: 'Arrive by',
       fastest: 'Fastest', leastWalking: 'Least walking', searchJourney: 'Search', chooseBoth: 'Choose a start and a destination.',
       noStopNear: 'No stop within 1.2 km of {name}.', noJourney: 'No connection found.', journeyFailed: 'Journey search failed (network?).',
-      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', noWalk: 'no walking', onTime: 'on time',
+      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', noWalk: 'no walking', waitTotal: '{min} min waiting', noWait: 'no time to spare', onTime: 'on time',
       walkMin: 'Walk {min} min', walkTo: 'to {name}', walkToDest: 'to your destination', stopsCount: '{n} stops', back: '‹ Back',
       stops1: '1 stop', nextStopShort: 'next stop', showStops: '{n} — show', hideStops: '{n} — hide', nextOff: 'get off at the next stop',
       walkOnMap: 'Map', walkMapTitle: 'Walk {min} min', walkFromTo: '{a} → {b}', yourStart: 'Your start', yourDestination: 'Your destination',
@@ -752,7 +755,7 @@
       nearStop: 'à {d} de {name}', leaveNow: 'Partir maintenant', departAt: 'Départ à', arriveBy: 'Arrivée avant',
       fastest: 'Le plus rapide', leastWalking: 'Le moins de marche', searchJourney: 'Rechercher', chooseBoth: 'Choisissez un départ et une arrivée.',
       noStopNear: 'Aucun arrêt à moins de 1,2 km : {name}.', noJourney: 'Aucune liaison trouvée.', journeyFailed: 'Recherche d\u2019itinéraire impossible (réseau ?).',
-      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', noWalk: 'pas de marche', onTime: 'à l\u2019heure',
+      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', noWalk: 'pas de marche', waitTotal: '{min} min d\u2019attente', noWait: 'aucune marge', onTime: 'à l\u2019heure',
       walkMin: 'Marche {min} min', walkTo: 'jusqu\u2019à {name}', walkToDest: 'jusqu\u2019à votre destination', stopsCount: '{n} arrêts', back: '‹ Retour',
       stops1: '1 arrêt', nextStopShort: 'prochain arrêt', showStops: '{n} — afficher', hideStops: '{n} — masquer', nextOff: 'descendez au prochain arrêt',
       walkOnMap: 'Plan', walkMapTitle: 'Marche {min} min', walkFromTo: '{a} → {b}', yourStart: 'Votre départ', yourDestination: 'Votre destination',
@@ -2294,6 +2297,13 @@
       : l.type === 'walk' ? `<span class="jw">🚶${fmtMin(l.min)}′</span>`
       : lineIdHtml(l.mode, l.style, l.label, true)).join('<span class="jsep">›</span>');
   }
+  // US-47: the waiting at the changes, next to the walking, before choosing (orange when a change is tight)
+  function waitTotalHtml(j) {
+    const W = journeyWaits(j);
+    if (!W.n) return '';
+    const txt = W.total ? t('waitTotal', { min: W.total }) : t('noWait');
+    return ` · <span class="wait-total${W.tight ? ' changed' : ''}">${esc(txt)}</span>`;
+  }
   // A trip in parts: "Stopover", "Round trip", or both
   const tripKind = j => [j.legs.some(l => l.type === 'stay' && !l.back) ? t('stopover') : '', j.legs.some(l => l.type === 'stay' && l.back) ? t('roundTrip') : ''].filter(Boolean).join(' · ');
   function transfersText(n) { return n === 0 ? t('direct') : n === 1 ? t('transfer1') : t('transfersN', { n }); }
@@ -2323,7 +2333,7 @@
         <div class="jr-top"><b>${hhmm(j.leaveAt)} → ${hhmm(j.arriveAt)}</b><span class="jr-dur">${fmtDuration(j.durationMin)}</span></div>
         <div class="jr-segs">${rideIds(j)}</div>
         <div class="jr-meta">${j.segments > 1 ? esc(tripKind(j)) + (j.transfers ? ' · ' + esc(transfersText(j.transfers)) : '') + ' · '
-          : j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(Math.round(j.walkMin) ? t('walkTotal', { min: fmtMin(j.walkMin) }) : t('noWalk'))}${live}${tags}</div>
+          : j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(Math.round(j.walkMin) ? t('walkTotal', { min: fmtMin(j.walkMin) }) : t('noWalk'))}${waitTotalHtml(j)}${live}${tags}</div>
       </button>${open ? journeyDetailHtml(j, i, openVia) : ''}</li>`;
     }).join('');
   }
@@ -2363,7 +2373,9 @@
           }).join('')}</ul>`;
       }
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
+      const W = journeyWaits(j), change = W.byRide.get(k);
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
+        ${change ? changeWaitHtml(W.plan, change) : ''}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
         <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${l.arrPlatform ? platformChip(l.arrPlatform, l.mode, l.toStop) : ''}</div></li>`;
@@ -2372,6 +2384,24 @@
     return `<div class="jr-detail"><div class="jr-meta">${esc(route)}</div>
       <ul class="legs">${rows}</ul>
       ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('followJourney'))}</button>` : ''}</div>`;
+  }
+
+  // Walk and wait at a change, on the ride taken after it: when planning (US-47) as when following (US-39).
+  // A change on the same platform already says its wait on its own row.
+  function changeWaitHtml(plan, c) {
+    const onSpot = plan.slice(c.i + 1, c.k).some((l, n) => l.samePlatform && (({ start, end }) => samePlace(start, end))(walkEnds(plan, c.i + 1 + n)));
+    if (onSpot && c.slack >= COMFORT_MIN) return '';
+    const vars = { walk: c.walk, wait: Math.max(0, c.slack) };
+    const txt = c.slack < 0 ? t('waitMissed') : c.slack === 0 ? t(c.walk ? 'waitNoneWalk' : 'waitNone', vars) : t(c.walk ? 'waitAfterWalk' : 'waitOnly', vars);
+    return `<div class="wait${c.slack < COMFORT_MIN ? ' changed' : ''}">⏱ ${esc(txt)}</div>`;
+  }
+  // Waiting at the changes of a journey, in total, and whether one of them is tight
+  function journeyWaits(j) {
+    if (!j._waits || j._waits.legs !== j.legs) {   // a walk/bus variant has its own legs
+      const plan = planOf(j), cs = tripConnections(plan);
+      j._waits = { legs: j.legs, plan, byRide: new Map(cs.map(c => [c.k, c])), total: cs.reduce((x, c) => x + Math.max(0, c.slack), 0), tight: cs.some(c => c.slack < COMFORT_MIN), n: cs.length };
+    }
+    return j._waits;
   }
 
   // A change on the same platform (BUG-06): the wait, no walk. The platform is not repeated: it is on the ride
@@ -3260,9 +3290,7 @@
     const changes = new Map(tripConnections(plan).map(c => [c.k, c]));
     const waitHtml = k => {
       const c = changes.get(k); if (!c || arrOf(c.cur) < now - 60000 && depOf(c.next) < now) return '';
-      const vars = { walk: c.walk, wait: Math.max(0, c.slack) };
-      const txt = c.slack < 0 ? t('waitMissed') : c.slack === 0 ? t(c.walk ? 'waitNoneWalk' : 'waitNone', vars) : t(c.walk ? 'waitAfterWalk' : 'waitOnly', vars);
-      return `<div class="wait${c.slack < COMFORT_MIN ? ' changed' : ''}">⏱ ${esc(txt)}</div>`;
+      return changeWaitHtml(plan, c);
     };
     const rows = plan.map((l, k) => {
       if (l.type === 'stay') return stayRowHtml(a, l, k, now);
