@@ -35,5 +35,6 @@ jobs:
           git add tests/fixtures/ojp
           if git diff --cached --quiet; then echo "No change"; else
             git commit -m "OJP probe: real answers for Geneva ($(date -u +%F))"
+            git pull --rebase
             git push
           fi
