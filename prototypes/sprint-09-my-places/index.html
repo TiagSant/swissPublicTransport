@@ -2257,14 +2257,14 @@
       ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('followJourney'))}</button>` : ''}</div>`;
   }
 
-  // A change on the same platform (BUG-06): the platform (tappable) and the wait, no walk
+  // A change on the same platform (BUG-06): the wait, no walk. The platform is not repeated: it is on the ride
+  // arriving just above and on the ride leaving just below.
   function samePlatformRow(legs, k, cls) {
-    const { end } = walkEnds(legs, k);
     const prev = legs.slice(0, k).reverse().find(x => x.type === 'ride'), next = legs.slice(k + 1).find(x => x.type === 'ride');
     const time = v => v == null ? null : +v;
     const arr = prev && time(prev.arrReal || prev.arr), dep = next && time(next.real || next.dep);
     const wait = arr && dep ? Math.max(0, Math.round((dep - arr) / 60000)) : null;
-    return `<li class="${cls}"><span class="leg-ico">⇄</span><div>${esc(t('samePlatform'))} ${platformChip(end.platform, end.mode, { id: end.stopId, name: end.name, coord: end.coord })}` +
+    return `<li class="${cls}"><span class="leg-ico">⇄</span><div>${esc(t('samePlatform'))}` +
       `${wait ? ` · ${esc(t('sameWait', { n: wait }))}` : ''}</div></li>`;
   }
 
@@ -2391,7 +2391,7 @@
       const prevStop = prev || { id: r.from.id, name: r.from.name, coord: r.from.coord };
       return { at: at ? at.getTime() : null, boardAt: (r.real || r.dep).getTime(), stop: r.toStop.name, stopId: r.toStop.id, stopCoord: r.toStop.coord || null,
                prevId: prevStop.id || null, prevName: prevStop.name, prevCoord: prevStop.coord || null,
-               category: r.category, number: r.number, mode: r.mode, label: r.label,
+               category: r.category, number: r.number, to: r.to, mode: r.mode, label: r.label,
                next: next ? { mode: next.mode, label: next.label, platform: next.platform, dep: (next.real || next.dep).getTime() } : null,
                walkEnd };
     }).filter(x => x.at);
@@ -2495,7 +2495,7 @@
       from: placeLabel(places.from), to: placeLabel(places.to), origin: places.from && places.from.coord,
       accessMeters: j.accessMeters, apiWalkBefore: Math.max(0, j.apiWalkBefore || 0),
       first: { stopId: f.from.id, stopName: f.from.name, stopCoord: f.from.coord, category: f.category, number: f.number,
-               mode: f.mode, label: f.label, style: f.style, to: f.to, sched: f.dep.getTime(), platform: f.platform },
+               mode: f.mode, label: f.label, style: f.style, to: f.to, toStopId: f.toStop.id, sched: f.dep.getTime(), platform: f.platform },
       live: f.real ? { dep: f.real.getTime(), at: Date.now() } : null,
       created0: (f.real || f.dep).getTime(),   // first departure when the alarm was set, to shift the get-off times with live data
       alights: alightPlan(j),
@@ -2567,6 +2567,37 @@
     if (changed || kept.length !== list.length) { saveAlarms(kept); renderAlarms(); }
   }
 
+  // BUG-07: the run we follow, on a live departure board. The same line also leaves from the same stop in the other
+  // direction (tram 14 at Les Esserts: Meyrin from platform A, Bernex from B, often in the same minute), so the
+  // direction must match too: the get-off stop among its next stops, else its terminus. The closest time wins.
+  const nameWords = s => new Set(String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  function sameTerminus(x, y) {
+    const a = nameWords(x), b = nameWords(y);
+    if (!a.size || !b.size) return null;   // unknown
+    const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+    return [...small].every(w => big.has(w));   // "Meyrin, Gravière" = "Meyrin-Gravière", "Carouge GE, Rondeau" = "Carouge-Rondeau"
+  }
+  function findRun(list, want, sched, schedOf, tol = 90000) {
+    const near = (list || []).filter(j => String(j.category) === String(want.category) && String(j.number) === String(want.number)
+      && Math.abs(schedOf(j) - sched) < tol);
+    const direction = j => {
+      const ids = (j.passList || []).slice(1).map(p => p.station && p.station.id).filter(Boolean);
+      if (want.toStopId && ids.length) return ids.includes(want.toStopId);
+      const same = sameTerminus(want.to, j.to);
+      return same == null ? true : same;
+    };
+    const run = near.filter(direction).sort((x, y) => Math.abs(schedOf(x) - sched) - Math.abs(schedOf(y) - sched))[0] || null;
+    return { run, lineThere: near.length > 0 };   // lineThere: the line runs then, maybe in the other direction only
+  }
+  // A platform change is what the board announces: its live platform differs from its own planned one.
+  // (A planned platform that merely reads differently from the journey's is not a change.)
+  function announcedPlatform(planned, live, ours) {
+    const up = v => String(v || '').trim().toUpperCase();
+    if (!up(live)) return null;
+    if (up(planned) ? up(live) === up(planned) : up(live) === up(ours)) return null;
+    return up(live) === up(ours) ? null : String(live).trim();
+  }
+
   // US-17: follow the first vehicle on live data while the alarm is pending
   async function refreshAlarmsLive() {
     const list = getAlarms();
@@ -2580,8 +2611,7 @@
       for (const [n, x] of (a.alights || []).entries()) {
         if (a.fired['alight' + n] || !x.prevId || x.at - now > 3600000 || now - alightAt(a, x) > 15 * 60000) continue;
         const r = await boardOf(x.prevId, new Date(Math.min(x.at, now) - LOOKBACK_MIN * 60000));
-        const m = r && (r.stationboard || []).find(j => String(j.category) === String(x.category) && String(j.number) === String(x.number)
-          && Math.abs(schedOf(j) - x.at) < 90000);
+        const m = r && findRun(r.stationboard, { category: x.category, number: x.number, toStopId: x.stopId, to: x.to }, x.at, schedOf).run;
         if (!m) continue;
         const nm = normalize(m), liveAt = nm.real ? nm.real.getTime() : x.at;
         if (x.liveAt !== liveAt) { x.liveAt = liveAt; changed = true; }
@@ -2589,8 +2619,7 @@
       if (a.fired.leave) continue;
       try {
         const r = await data.board(a.first.stopId, new Date(a.first.sched - LOOKBACK_MIN * 60000));
-        const m = (r.stationboard || []).find(j => String(j.category) === String(a.first.category) && String(j.number) === String(a.first.number)
-          && Math.abs(schedOf(j) - a.first.sched) < 60000);
+        const m = findRun(r.stationboard, a.first, a.first.sched, schedOf, 60000).run;
         if (!m) continue;
         const n = normalize(m);
         if (n.real) { a.live = { dep: n.real.getTime(), at: Date.now() }; changed = true; }
@@ -2655,27 +2684,32 @@
   async function refreshTrip(a, boardOf, schedOf) {
     const now = Date.now();
     let changed = false;
+    // BUG-07: live data taken before runs were matched by direction may come from the other direction: start afresh once
+    if (!a.runCheck) {
+      for (const r of a.plan) if (r.type === 'ride') Object.assign(r, { real: null, arrReal: null, platformLive: null, arrPlatformLive: null, missing: false });
+      a.runCheck = 1; changed = true;
+    }
     for (const r of a.plan) {
       if (r.type !== 'ride' || arrOf(r) < now - 120000 || r.dep - now > 90 * 60000 || !r.from.id) continue;
       const board = await boardOf(r.from.id, new Date(Math.min(r.dep, now) - LOOKBACK_MIN * 60000));
       if (!board) continue;
       const list = board.stationboard || [];
-      const m = list.find(j => String(j.category) === String(r.category) && String(j.number) === String(r.number) && Math.abs(schedOf(j) - r.dep) < 90000);
+      const found = findRun(list, { category: r.category, number: r.number, toStopId: r.toStop.id, to: r.to }, r.dep, schedOf);
+      const m = found.run;
       const before = JSON.stringify([r.real, r.arrReal, r.platformLive, r.arrPlatformLive, r.missing]);
       if (!m) {
-        // the board covers that time but the run is not there: probably cancelled
-        r.missing = list.some(j => schedOf(j) > r.dep + 5 * 60000) && r.dep > now;
+        // the board covers that time but the line is not there at all: probably cancelled
+        // (only the other direction there: we can't tell, nothing changes)
+        r.missing = !found.lineThere && list.some(j => schedOf(j) > r.dep + 5 * 60000) && r.dep > now;
       } else {
         const nm = normalize(m), shift = nm.real ? nm.real.getTime() - r.dep : 0;
         r.missing = false;
         r.real = nm.real ? nm.real.getTime() : null;
-        const plat = (m.stop && ((m.stop.prognosis && m.stop.prognosis.platform) || m.stop.platform)) || '';
-        r.platformLive = plat && plat !== r.platform ? plat : null;
+        r.platformLive = announcedPlatform(m.stop && m.stop.platform, m.stop && m.stop.prognosis && m.stop.prognosis.platform, r.platform);
         const at = id => (m.passList || []).find(x => x.station && x.station.id === id);
         const p = at(r.toStop.id);
         const live = p && (parseTime(p.prognosis && p.prognosis.arrival) || null);
-        const arrPlat = p && ((p.prognosis && p.prognosis.platform) || p.platform) || '';
-        r.arrPlatformLive = arrPlat && arrPlat !== r.arrPlatform ? arrPlat : null;
+        r.arrPlatformLive = p ? announcedPlatform(p.platform, p.prognosis && p.prognosis.platform, r.arrPlatform) : null;
         r.arrReal = live ? live.getTime() : (shift ? r.arr + shift : null);
         for (const v of r.via) {
           const q = at(v.id), lv = q && parseTime(q.prognosis && (q.prognosis.departure || q.prognosis.arrival));

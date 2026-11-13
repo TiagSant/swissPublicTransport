@@ -35,14 +35,14 @@ def plan(): return {"sections": [
     {"journey": None, "walk": {"duration": 120}, "departure": end(BELAIR, 15, "departure"), "arrival": end(BELAIR, 17, "arrival")},
     section("B", "3", "Genève, gare Cornavin", [call(BELAIR, dep=20), call(CORNAVIN, arr=26)], BELAIR, CORNAVIN, 20, 26, LIVE["planned"], "H")]}
 
-def entry(cat, num, to, s, m, plat, nxt):
+def entry(cat, num, to, s, m, plat, nxt, planned=None):
     return {"category": cat, "number": num, "to": to, "operator": "TPG",
             "stop": {"station": s, "departure": fmt(at(m)), "departureTimestamp": int(at(m).timestamp()),
-                     "prognosis": {"departure": fmt(at(m)), "platform": plat}, "platform": plat, "delay": 0},
+                     "prognosis": {"departure": fmt(at(m)), "platform": plat}, "platform": planned or plat, "delay": 0},
             "passList": [{"station": s}] + [{"station": x, "arrival": fmt(at(mm)), "prognosis": {"arrival": fmt(at(mm))}} for x, mm in nxt]}
 def boards(stop_id):
     if stop_id == PLAINPALAIS["id"]: return [entry("T", "12", "Genève, Bel-Air", PLAINPALAIS, 10, "C", [(BELAIR, 15)])]
-    if stop_id == BELAIR["id"]: return [entry("B", "3", "Genève, gare Cornavin", BELAIR, 20, LIVE["bus_platform"], [(CORNAVIN, 26)])]
+    if stop_id == BELAIR["id"]: return [entry("B", "3", "Genève, gare Cornavin", BELAIR, 20, LIVE["bus_platform"], [(CORNAVIN, 26)], planned=LIVE["planned"])]
     return []
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
@@ -137,7 +137,7 @@ with sync_playwright() as p:
     assert detail.locator(".leg.walk").count() == 0, detail.inner_text()
     row = detail.locator(".leg.change")
     assert row.count() == 1 and "Same platform, no walking" in row.inner_text() and "5 min wait" in row.inner_text(), row.all_inner_texts()
-    assert row.locator(".plat .plat-v").inner_text() == "B"
+    assert row.locator(".plat").count() == 0                          # the platform is on the rides above and below
     meta = pg.locator("#journeyList .jr-meta").first.inner_text()
     assert meta.startswith("1 change · no walking"), meta
     pg.screenshot(path=str(OUT / "same-platform-plan.png"))
