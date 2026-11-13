@@ -1,0 +1,40 @@
+name: Update line colours
+
+# Rebuilds assets/line-colors-ch.js from OpenStreetMap (colours) and ATLAS (operators).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 3 1 * *"   # monthly, 1st day 03:41 UTC
+  push:
+    paths:
+      - scripts/build_line_colors.py
+      - .github/workflows/update-line-colors.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build assets/line-colors-ch.js
+        run: |
+          mkdir -p tests/fixtures/line-colors
+          python scripts/build_line_colors.py assets/line-colors-ch.js tests/fixtures/line-colors/report.json
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/line-colors-ch.js tests/fixtures/line-colors/report.json
+          if git diff --cached --quiet; then
+            echo "No change"
+          else
+            git commit -m "Update line colours from OpenStreetMap ($(date -u +%F))"
+            git pull --rebase
+            git push
+          fi
