@@ -284,6 +284,11 @@
   .trip-alt small { color: var(--muted); }
   .trip-alt.best { border-color: #1a7f37; }
   .tl .wait { font-size: .8rem; color: var(--muted); }
+  .tl .via { margin: 2px 0; }
+  .tl .via li::before { left: -20.5px; }
+  .tl .via li.passed { opacity: .5; }
+  .tl .via li.here span { font-weight: 600; }
+  .tl.done .via-toggle, .tl.done .ride-meta { opacity: .9; }
   .tl .wait.changed { color: #b26a00; font-weight: 600; }
   @media (prefers-color-scheme: dark) { .tl .changed { color: #ff8a80; } .trip-warn { border-color: #ff8a80; } .trip-alt.best { border-color: #6fdc8c; } }
   .note { color: var(--muted); font-size: .72rem; margin: 6px 0 0; }
@@ -602,7 +607,7 @@
       noStopNear: 'No stop within 1.2 km of {name}.', noJourney: 'No connection found.', journeyFailed: 'Journey search failed (network?).',
       direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', onTime: 'on time',
       walkMin: 'Walk {min} min', walkTo: 'to {name}', walkToDest: 'to your destination', stopsCount: '{n} stops', back: '‹ Back',
-      stops1: '1 stop', showStops: '{n} — show', hideStops: '{n} — hide', nextOff: 'get off at the next stop',
+      stops1: '1 stop', nextStopShort: 'next stop', showStops: '{n} — show', hideStops: '{n} — hide', nextOff: 'get off at the next stop',
       walkOnMap: 'Map', walkMapTitle: 'Walk {min} min', walkFromTo: '{a} → {b}', yourStart: 'Your start', yourDestination: 'Your destination',
       walkDist: 'about {d} on foot', walkDirections: '🚶 Directions',
       alightSetting: 'Remind me one stop before I get off', alightTitle: 'Next stop: get off',
@@ -707,7 +712,7 @@
       noStopNear: 'Aucun arrêt à moins de 1,2 km : {name}.', noJourney: 'Aucune liaison trouvée.', journeyFailed: 'Recherche d\u2019itinéraire impossible (réseau ?).',
       direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', onTime: 'à l\u2019heure',
       walkMin: 'Marche {min} min', walkTo: 'jusqu\u2019à {name}', walkToDest: 'jusqu\u2019à votre destination', stopsCount: '{n} arrêts', back: '‹ Retour',
-      stops1: '1 arrêt', showStops: '{n} — afficher', hideStops: '{n} — masquer', nextOff: 'descendez au prochain arrêt',
+      stops1: '1 arrêt', nextStopShort: 'prochain arrêt', showStops: '{n} — afficher', hideStops: '{n} — masquer', nextOff: 'descendez au prochain arrêt',
       walkOnMap: 'Plan', walkMapTitle: 'Marche {min} min', walkFromTo: '{a} → {b}', yourStart: 'Votre départ', yourDestination: 'Votre destination',
       walkDist: 'environ {d} à pied', walkDirections: '🚶 Itinéraire à pied',
       alightSetting: 'Me prévenir un arrêt avant de descendre', alightTitle: 'Prochain arrêt : descendez',
@@ -2810,6 +2815,7 @@
     notify(title, body);
   }
 
+  const tripViaOpen = new Set();   // unfolded stop lists of followed rides
   function tripHtml(a) {
     if (!a.plan) return '';
     const now = Date.now(), plan = a.plan;
@@ -2853,10 +2859,25 @@
         ? ` · <span class="changed">${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platformLive }))}</span> <small>(${esc(t('wasPlat', { p: l.platform }))})</small>`
         : l.platform ? ` · ${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platform }))}` : '';
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
+      // number of stops and time on board, intermediate stops with their live times (as when planning)
+      const rideMin = Math.max(0, Math.round((arrOf(l) - depOf(l)) / 60000));
+      const nStops = l.stops != null ? l.stops : l.via.length + 1;
+      const count = (nStops === 1 ? t('stops1') : t('stopsCount', { n: nStops })) + ' · ' + fmtDuration(rideMin);
+      const vkey = `${a.id}#${l.dep}#${k}`, unfolded = tripViaOpen.has(vkey);
+      const nextVia = boarded ? l.via.findIndex(v => v.time > now) : -1;
+      const via = l.via.length
+        ? `<button class="via-toggle" data-act="via" data-key="${esc(vkey)}" aria-expanded="${unfolded}">${esc(count)}</button>` +
+          `<ul class="via"${unfolded ? '' : ' hidden'}>${l.via.map((v, n) => {
+            const last = n === l.via.length - 1, passed = boarded && v.time < now;
+            const cls = [last ? 'next-off' : '', passed ? 'passed' : '', n === nextVia ? 'here' : ''].filter(Boolean).join(' ');
+            const note = last ? ` <small>· ${esc(t('nextOff'))}</small>` : n === nextVia ? ` <small>· ${esc(t('nextStopShort'))}</small>` : '';
+            return `<li${cls ? ` class="${cls}"` : ''}><time${v.live ? ' class="live"' : ''}>${v.time ? tm(v.time) : ''}</time><span>${esc(v.name)}${note}</span></li>`;
+          }).join('')}</ul>`
+        : `<div class="ride-meta">${esc(count)}</div>`;
       return `<li class="tl ride${cls}"${colour}><div class="tl-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span>→ ${esc(l.to)}</span>` +
         `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) +
         `<div>${timeHtml(l.dep, l.real)} ${esc(l.from.name)}${plat}</div>` +
-        (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') +
+        (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') + via +
         `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}</div></li>`;
     }).join('');
     // a broken or tight connection, with what can be done
@@ -3344,6 +3365,11 @@
     unlockAudio();
     if (b.dataset.act === 'cancel') { saveAlarms(getAlarms().filter(x => x.id !== id)); renderAlarms(); }
     else if (b.dataset.act === 'alt') applyAlternative(a.id, +b.dataset.n);
+    else if (b.dataset.act === 'via') {   // unfold / fold the stops of a ride (kept open across live refreshes)
+      const key = b.dataset.key, open = !tripViaOpen.has(key);
+      open ? tripViaOpen.add(key) : tripViaOpen.delete(key);
+      b.setAttribute('aria-expanded', String(open)); b.nextElementSibling.hidden = !open;
+    }
     else if (b.dataset.act === 'walk-map') { const l = a.plan && a.plan[+b.dataset.leg]; if (l) openWalkMap(l); }
     else if (b.dataset.act === 'test-alight') fireAlight(a, 0);
     else fireAlarm(a, b.dataset.act === 'test-ready' ? 'ready' : 'leave');   // test: rings without marking the alarm as done
