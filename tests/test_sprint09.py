@@ -174,7 +174,7 @@ with sync_playwright() as p:
     pg.click("#clearPlaces"); assert chips(pg) == [] and pg.is_visible("#placesHint")
     pg.click("#toastUndo"); assert len(chips(pg)) == 3
     # French
-    pg.click("#lang"); assert chips(pg)[:2] == ["🏠 Domicile", "💼 Travail"], chips(pg); pg.click("#lang")
+    pg.select_option("#lang", "fr"); assert chips(pg)[:2] == ["🏠 Domicile", "💼 Travail"], chips(pg); pg.select_option("#lang", "en")
     pg.screenshot(path=str(OUT / "sprint09-places.png"), full_page=True)
 
     # A saved place is a starting point like a point on the map: walk shown with its name

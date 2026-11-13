@@ -53,7 +53,8 @@ def board_entry(cat, num, to, s, m, delay, plat, nxt):
 def boards(stop_id):
     d = LIVE["bus_delay"]
     if stop_id == COMMUNES["id"]:
-        return [board_entry("B", "21", "Genève, Plainpalais", COMMUNES, 10, d, "A", [(ACACIAS, 16), (PLAINPALAIS, 22)])]
+        return [board_entry("B", "21", "Genève, Plainpalais", COMMUNES, 5, 0, "A", [(ACACIAS, 11), (PLAINPALAIS, 17)]),   # an earlier run
+                board_entry("B", "21", "Genève, Plainpalais", COMMUNES, 10, d, "A", [(ACACIAS, 16), (PLAINPALAIS, 22)])]
     if stop_id == ACACIAS["id"]:
         return [board_entry("B", "21", "Genève, Plainpalais", ACACIAS, 16, d, "", [(PLAINPALAIS, 22)])]
     if stop_id == PLAINPALAIS["id"]:
@@ -173,10 +174,34 @@ with sync_playwright() as p:
     assert "Plainpalais" in plan and "Bel-Air" not in plan, plan
     print("on foot     →", trip(pg).locator(".trip-head").inner_text(), "|", plan)
     # French
-    pg.click("#lang"); assert "trajets suivis" in pg.inner_text("#alarmCard").lower() and "Finir à pied" not in pg.inner_text("#alarmCard"); pg.click("#lang")
+    pg.select_option("#lang", "fr"); assert "trajets suivis" in pg.inner_text("#alarmCard").lower() and "Finir à pied" not in pg.inner_text("#alarmCard"); pg.select_option("#lang", "en")
     ctx.close()
 
-    # Another route
+    # US-39: a tight change (bus 5 min late: arrives 07:57, 1 min walk, tram at 07:58) — plain wording, comfortable options
+    LIVE.update(bus_delay=5, tram_platform="C")
+    ctx, pg = session(b); dismiss(pg)
+    refresh(pg); dismiss(pg)
+    pg.wait_for_function("document.querySelector('#alarmList .trip-warn') && document.querySelectorAll('#alarmList .trip-alt').length > 0")
+    warn = trip(pg).locator(".trip-warn").inner_text()
+    assert "Tight connection at Genève, Plainpalais" in warn, warn
+    assert "1 min walk in the 1 min between your arrival (07:57) and the departure (07:58): no time to spare — the slightest delay and you miss it." in warn, warn
+    opts = trip(pg).locator(".trip-alt").all_inner_texts()
+    assert any(o.startswith("Earlier Bus 21 at 07:35") and "10 min margin at the change · leave 07:34" in o for o in opts), opts
+    assert any(o.startswith("Tram 12 next run at 08:06") and "8 min margin" in o for o in opts), opts
+    legs = trip(pg).locator(".trip-legs > li")
+    assert "Change: 1 min walk, no time to spare" in legs.nth(2).inner_text(), legs.nth(2).inner_text()
+    print("tight       →", warn.split("\n")[1], "|", [o.replace("\n", " · ") for o in opts])
+    pg.screenshot(path=str(OUT / "trip-tight.png"), full_page=True)
+    # take the earlier bus: departure alarms move with it, the change becomes comfortable, the wait is shown live
+    trip(pg).locator(".trip-alt", has_text="Earlier Bus 21").click()
+    assert trip(pg).locator(".trip-warn").count() == 0, trip(pg).inner_text()
+    assert "07:35" in pg.locator("#alarmList .al-times").inner_text(), pg.locator("#alarmList .al-times").inner_text()
+    assert "Change: 1 min walk, then 10 min wait" in legs.nth(2).inner_text(), legs.nth(2).inner_text()
+    print("earlier bus →", pg.locator("#alarmList .al-times").inner_text().replace("\n", " "), "|", legs.nth(2).locator(".wait").inner_text())
+    ctx.close()
+
+    # Another route (back to the missed case)
+    LIVE.update(bus_delay=9, tram_platform="C")
     ctx, pg = session(b); dismiss(pg)
     refresh(pg); dismiss(pg)
     if pg.is_visible("#alarmBanner"): pg.click("#abOk")
