@@ -6,7 +6,7 @@
  * numbers: company number (OJP OperatorRef) → abbreviation
  */
 window.LINE_COLORS_CH = {
- "generated": "2026-11-13T04:49Z",
+ "generated": "2026-11-13T04:51Z",
  "source": "OpenStreetMap contributors (ODbL 1.0); operators: ATLAS, opentransportdata.swiss",
  "operators": {
   "AAGL": {
@@ -24,7 +24,7 @@ window.LINE_COLORS_CH = {
     ],
     "72": [
      "#607A8F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "76": [
@@ -49,17 +49,17 @@ window.LINE_COLORS_CH = {
     ],
     "82": [
      "#1AAA3F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "83": [
      "#2A90D0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "n53": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -94,7 +94,7 @@ window.LINE_COLORS_CH = {
     ],
     "506": [
      "#0089CF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "507": [
@@ -109,7 +109,7 @@ window.LINE_COLORS_CH = {
     ],
     "523": [
      "#009570",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "529": [
@@ -134,7 +134,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "401": [
      "#EA1A2A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "402": [
@@ -184,7 +184,7 @@ window.LINE_COLORS_CH = {
     ],
     "272": [
      "#009C98",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "274": [
@@ -234,7 +234,7 @@ window.LINE_COLORS_CH = {
     ],
     "340": [
      "#3FA030",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "444": [
@@ -274,7 +274,7 @@ window.LINE_COLORS_CH = {
     ],
     "603": [
      "#009247",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "604": [
@@ -289,7 +289,7 @@ window.LINE_COLORS_CH = {
     ],
     "606": [
      "#ED028C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "608": [
@@ -349,7 +349,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "122": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "123": [
@@ -374,12 +374,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "1": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "2": [
      "#00AA33",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "3": [
@@ -439,12 +439,12 @@ window.LINE_COLORS_CH = {
     ],
     "12": [
      "#0080FF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "13": [
      "#808040",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "14": [
@@ -459,7 +459,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "10": [
      "#00A54F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "11": [
@@ -474,7 +474,7 @@ window.LINE_COLORS_CH = {
     ],
     "16": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "17": [
@@ -519,12 +519,12 @@ window.LINE_COLORS_CH = {
     ],
     "6": [
      "#008AC5",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "7": [
      "#EC1F25",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "8": [
@@ -599,7 +599,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "82": [
      "#EE0064",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -619,7 +619,7 @@ window.LINE_COLORS_CH = {
     ],
     "12": [
      "#9471AD",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "17": [
@@ -704,12 +704,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "803": [
      "#E63023",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "804": [
      "#009640",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "805": [
@@ -724,7 +724,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "501": [
      "#EA1A2A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "502": [
@@ -769,7 +769,7 @@ window.LINE_COLORS_CH = {
     ],
     "517": [
      "#9A6AAF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "519": [
@@ -814,12 +814,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "251": [
      "#EA1F2F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "252": [
      "#00AA50",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "253": [
@@ -839,7 +839,7 @@ window.LINE_COLORS_CH = {
     ],
     "321": [
      "#918F90",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "322": [
@@ -849,7 +849,7 @@ window.LINE_COLORS_CH = {
     ],
     "323": [
      "#918F90",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "331": [
@@ -869,7 +869,7 @@ window.LINE_COLORS_CH = {
     ],
     "420": [
      "#BA7AAA",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "701": [
@@ -899,7 +899,7 @@ window.LINE_COLORS_CH = {
     ],
     "706": [
      "#9070B0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "722": [
@@ -929,7 +929,7 @@ window.LINE_COLORS_CH = {
     ],
     "736": [
      "#EA5080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "737": [
@@ -949,7 +949,7 @@ window.LINE_COLORS_CH = {
     ],
     "761": [
      "#EA600A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -979,7 +979,7 @@ window.LINE_COLORS_CH = {
     ],
     "106": [
      "#E93990",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "107": [
@@ -989,12 +989,12 @@ window.LINE_COLORS_CH = {
     ],
     "109": [
      "#109970",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "347": [
      "#2A8FCA",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "348": [
@@ -1004,7 +1004,7 @@ window.LINE_COLORS_CH = {
     ],
     "pe": [
      "#0A8F40",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1019,7 +1019,7 @@ window.LINE_COLORS_CH = {
     ],
     "10": [
      "#0A80A0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "16": [
@@ -1029,7 +1029,7 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#EE2020",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "20": [
@@ -1069,7 +1069,7 @@ window.LINE_COLORS_CH = {
     ],
     "27": [
      "#EF5B5B",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "28": [
@@ -1104,7 +1104,7 @@ window.LINE_COLORS_CH = {
     ],
     "9": [
      "#D960A0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "m51": [
@@ -1124,7 +1124,7 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#1193CA",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "3": [
@@ -1149,12 +1149,12 @@ window.LINE_COLORS_CH = {
     ],
     "6": [
      "#439CD9",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "601": [
      "#4AA356",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "602": [
@@ -1164,7 +1164,7 @@ window.LINE_COLORS_CH = {
     ],
     "606": [
      "#439CD9",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "608": [
@@ -1174,7 +1174,7 @@ window.LINE_COLORS_CH = {
     ],
     "9": [
      "#BF682F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1194,7 +1194,7 @@ window.LINE_COLORS_CH = {
     ],
     "15": [
      "#009640",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "16": [
@@ -1204,12 +1204,12 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#A68351",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "21": [
      "#00A295",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "3": [
@@ -1219,57 +1219,57 @@ window.LINE_COLORS_CH = {
     ],
     "30": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "31": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "32": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "33": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "34": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "35": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "36": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "38": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "42": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "45": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "46": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "48": [
@@ -1279,7 +1279,7 @@ window.LINE_COLORS_CH = {
     ],
     "50": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "6": [
@@ -1309,7 +1309,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "n1": [
      "#E04A5E",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "n2": [
@@ -1324,7 +1324,7 @@ window.LINE_COLORS_CH = {
     ],
     "n4": [
      "#1187B3",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1344,12 +1344,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "10": [
      "#4AA356",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "11": [
      "#4AA356",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1379,7 +1379,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "s18": [
      "#EB3C2E",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1434,22 +1434,22 @@ window.LINE_COLORS_CH = {
     ],
     "730": [
      "#7B7979",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "735": [
      "#EC008C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "736": [
      "#9390C0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "740": [
      "#F14624",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "742": [
@@ -1469,7 +1469,7 @@ window.LINE_COLORS_CH = {
     ],
     "760": [
      "#1C9894",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1489,7 +1489,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "609": [
      "#BF682F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1509,7 +1509,7 @@ window.LINE_COLORS_CH = {
     ],
     "3": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "4": [
@@ -1544,12 +1544,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "493": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "494": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -1562,17 +1562,7 @@ window.LINE_COLORS_CH = {
      "#000000",
      "pill"
     ],
-    "1": [
-     "#305FEF",
-     "#FFFFFF",
-     "pill"
-    ],
     "100": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "101": [
      "#FFCC00",
      "#000000",
      "pill"
@@ -1632,21 +1622,6 @@ window.LINE_COLORS_CH = {
      "#000000",
      "pill"
     ],
-    "113": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "114": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "115": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
     "116": [
      "#FFCC00",
      "#000000",
@@ -1699,11 +1674,6 @@ window.LINE_COLORS_CH = {
     ],
     "124": [
      "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "125": [
-     "#BF897B",
      "#000000",
      "pill"
     ],
@@ -1909,7 +1879,7 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#FC202F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "20": [
@@ -2062,17 +2032,7 @@ window.LINE_COLORS_CH = {
      "#000000",
      "pill"
     ],
-    "232": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
     "233": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "234": [
      "#FFCC00",
      "#000000",
      "pill"
@@ -2214,7 +2174,7 @@ window.LINE_COLORS_CH = {
     ],
     "31.101": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "31.102": [
@@ -2229,7 +2189,7 @@ window.LINE_COLORS_CH = {
     ],
     "31.104": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "31.105": [
@@ -2839,7 +2799,7 @@ window.LINE_COLORS_CH = {
     ],
     "51": [
      "#FC262F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "510": [
@@ -3197,11 +3157,6 @@ window.LINE_COLORS_CH = {
      "#FFFFFF",
      "pill"
     ],
-    "70": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
     "701": [
      "#FFCC00",
      "#000000",
@@ -3222,11 +3177,6 @@ window.LINE_COLORS_CH = {
      "#000000",
      "pill"
     ],
-    "71": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
     "711": [
      "#FFCC00",
      "#000000",
@@ -3238,11 +3188,6 @@ window.LINE_COLORS_CH = {
      "pill"
     ],
     "713": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "72": [
      "#FFCC00",
      "#000000",
      "pill"
@@ -3288,11 +3233,6 @@ window.LINE_COLORS_CH = {
      "pill"
     ],
     "728": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "73": [
      "#FFCC00",
      "#000000",
      "pill"
@@ -3349,11 +3289,6 @@ window.LINE_COLORS_CH = {
     ],
     "768": [
      "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "77": [
-     "#96E9FF",
      "#000000",
      "pill"
     ],
@@ -3467,11 +3402,6 @@ window.LINE_COLORS_CH = {
      "#000000",
      "pill"
     ],
-    "822": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
     "823": [
      "#FFCC00",
      "#000000",
@@ -3498,11 +3428,6 @@ window.LINE_COLORS_CH = {
      "pill"
     ],
     "830": [
-     "#FFCC00",
-     "#000000",
-     "pill"
-    ],
-    "831": [
      "#FFCC00",
      "#000000",
      "pill"
@@ -3554,12 +3479,12 @@ window.LINE_COLORS_CH = {
     ],
     "841": [
      "#19A83D",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "842": [
      "#19A83D",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "846": [
@@ -3644,7 +3569,7 @@ window.LINE_COLORS_CH = {
     ],
     "908": [
      "#EF1F20",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "913": [
@@ -3714,7 +3639,7 @@ window.LINE_COLORS_CH = {
     ],
     "951": [
      "#EB3323",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "952": [
@@ -3794,12 +3719,12 @@ window.LINE_COLORS_CH = {
     ],
     "ow1": [
      "#EE1D23",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "ow2": [
      "#0C944A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "ow3": [
@@ -3809,7 +3734,7 @@ window.LINE_COLORS_CH = {
     ],
     "ow4": [
      "#ED028C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "ow5": [
@@ -4309,27 +4234,27 @@ window.LINE_COLORS_CH = {
    "lines": {
     "483": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "491": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "492": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "493": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "494": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -4349,7 +4274,7 @@ window.LINE_COLORS_CH = {
     ],
     "382": [
      "#EE1F20",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "389": [
@@ -4429,7 +4354,7 @@ window.LINE_COLORS_CH = {
     ],
     "151": [
      "#FA0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "152": [
@@ -4454,7 +4379,7 @@ window.LINE_COLORS_CH = {
     ],
     "731": [
      "#009933",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -4474,7 +4399,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "1": [
      "#EE0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "10": [
@@ -4499,7 +4424,7 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#0099DF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "3": [
@@ -4509,12 +4434,12 @@ window.LINE_COLORS_CH = {
     ],
     "4": [
      "#1AAA50",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "5": [
      "#DF3090",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "6": [
@@ -4584,7 +4509,7 @@ window.LINE_COLORS_CH = {
     ],
     "802": [
      "#EA102F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "803": [
@@ -4609,7 +4534,7 @@ window.LINE_COLORS_CH = {
     ],
     "812": [
      "#2F90DA",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "813": [
@@ -4649,12 +4574,12 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "22": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "3": [
@@ -4669,7 +4594,7 @@ window.LINE_COLORS_CH = {
     ],
     "5": [
      "#0086C6",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "610": [
@@ -4694,12 +4619,12 @@ window.LINE_COLORS_CH = {
     ],
     "7": [
      "#E73089",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "9": [
      "#EA7020",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "n1": [
@@ -4744,22 +4669,22 @@ window.LINE_COLORS_CH = {
    "lines": {
     "m1": [
      "#1E90FF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "m2": [
      "#1E90FF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "m3": [
      "#1E90FF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "m4": [
      "#1E90FF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -4779,7 +4704,7 @@ window.LINE_COLORS_CH = {
     ],
     "122": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "123": [
@@ -4849,7 +4774,7 @@ window.LINE_COLORS_CH = {
     ],
     "m78": [
      "#009790",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -4899,7 +4824,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "1": [
      "#F2665E",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "13": [
@@ -4934,12 +4859,12 @@ window.LINE_COLORS_CH = {
     ],
     "20": [
      "#DE761C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "21": [
      "#C95789",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "24": [
@@ -4959,17 +4884,17 @@ window.LINE_COLORS_CH = {
     ],
     "31": [
      "#5C8CA2",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "32": [
      "#AC6FB8",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "33": [
      "#378E2E",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "35": [
@@ -4984,12 +4909,12 @@ window.LINE_COLORS_CH = {
     ],
     "38": [
      "#B48535",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "4": [
      "#00A651",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "41": [
@@ -5014,7 +4939,7 @@ window.LINE_COLORS_CH = {
     ],
     "46": [
      "#859200",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "47": [
@@ -5024,7 +4949,7 @@ window.LINE_COLORS_CH = {
     ],
     "48": [
      "#8C52FF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "49": [
@@ -5034,7 +4959,7 @@ window.LINE_COLORS_CH = {
     ],
     "54": [
      "#CC6600",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "56": [
@@ -5049,7 +4974,7 @@ window.LINE_COLORS_CH = {
     ],
     "6": [
      "#2475DC",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "60": [
@@ -5104,7 +5029,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "1": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "2": [
@@ -5139,7 +5064,7 @@ window.LINE_COLORS_CH = {
     ],
     "102": [
      "#4D92CE",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "106": [
@@ -5149,7 +5074,7 @@ window.LINE_COLORS_CH = {
     ],
     "107": [
      "#EA1829",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "109": [
@@ -5214,12 +5139,12 @@ window.LINE_COLORS_CH = {
     ],
     "81": [
      "#20A050",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "82": [
      "#20A050",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -5234,12 +5159,12 @@ window.LINE_COLORS_CH = {
     ],
     "11": [
      "#01A487",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "12": [
      "#017DBD",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "120": [
@@ -5264,7 +5189,7 @@ window.LINE_COLORS_CH = {
     ],
     "201": [
      "#FF0F00",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "202": [
@@ -5284,7 +5209,7 @@ window.LINE_COLORS_CH = {
     ],
     "5": [
      "#008AC9",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "6": [
@@ -5294,7 +5219,7 @@ window.LINE_COLORS_CH = {
     ],
     "8": [
      "#E43789",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "9": [
@@ -5359,7 +5284,7 @@ window.LINE_COLORS_CH = {
     ],
     "20": [
      "#00A828",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "21": [
@@ -5524,12 +5449,12 @@ window.LINE_COLORS_CH = {
     ],
     "6": [
      "#008CBE",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "60": [
      "#EC619F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "61": [
@@ -5539,7 +5464,7 @@ window.LINE_COLORS_CH = {
     ],
     "64": [
      "#EC619F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "66": [
@@ -5554,7 +5479,7 @@ window.LINE_COLORS_CH = {
     ],
     "68": [
      "#EC619F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "69": [
@@ -5564,7 +5489,7 @@ window.LINE_COLORS_CH = {
     ],
     "7": [
      "#00A828",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "70": [
@@ -5619,7 +5544,7 @@ window.LINE_COLORS_CH = {
     ],
     "82": [
      "#EC619F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "83": [
@@ -5639,12 +5564,12 @@ window.LINE_COLORS_CH = {
     ],
     "91": [
      "#7D7D7D",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "92": [
      "#7D7D7D",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "a": [
@@ -5689,7 +5614,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "1": [
      "#EC1B14",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "10": [
@@ -5734,7 +5659,7 @@ window.LINE_COLORS_CH = {
     ],
     "4": [
      "#A97254",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "5": [
@@ -5744,12 +5669,12 @@ window.LINE_COLORS_CH = {
     ],
     "6": [
      "#7B6FB1",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "7": [
      "#009F3C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "8": [
@@ -5804,12 +5729,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "601": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "602": [
      "#006FFF",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "603": [
@@ -5879,7 +5804,7 @@ window.LINE_COLORS_CH = {
     ],
     "302": [
      "#EA1A2A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "303": [
@@ -5889,7 +5814,7 @@ window.LINE_COLORS_CH = {
     ],
     "304": [
      "#00905A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "310": [
@@ -5909,7 +5834,7 @@ window.LINE_COLORS_CH = {
     ],
     "352": [
      "#EA1A2A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "353": [
@@ -5919,12 +5844,12 @@ window.LINE_COLORS_CH = {
     ],
     "354": [
      "#00905A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "360": [
      "#4696D2",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "361": [
@@ -5934,7 +5859,7 @@ window.LINE_COLORS_CH = {
     ],
     "370": [
      "#EA008C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "422": [
@@ -5944,27 +5869,27 @@ window.LINE_COLORS_CH = {
     ],
     "423": [
      "#0F9259",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "425": [
      "#EA008C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "426": [
      "#5194D0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "590": [
      "#EA1829",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "591": [
      "#0F9259",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -5974,22 +5899,22 @@ window.LINE_COLORS_CH = {
    "lines": {
     "371": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "372": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "373": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "374": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -5999,7 +5924,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "1": [
      "#EE3030",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "11": [
@@ -6014,7 +5939,7 @@ window.LINE_COLORS_CH = {
     ],
     "3": [
      "#EF509F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "4": [
@@ -6069,17 +5994,17 @@ window.LINE_COLORS_CH = {
     ],
     "303": [
      "#CB4B41",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "304": [
      "#CB4B41",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "308": [
      "#D5749D",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "310": [
@@ -6094,7 +6019,7 @@ window.LINE_COLORS_CH = {
     ],
     "313": [
      "#009551",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -6144,12 +6069,12 @@ window.LINE_COLORS_CH = {
    "lines": {
     "172": [
      "#FF0000",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "173": [
      "#808080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "174": [
@@ -6189,7 +6114,7 @@ window.LINE_COLORS_CH = {
     ],
     "2": [
      "#EF59A1",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "3": [
@@ -6204,7 +6129,7 @@ window.LINE_COLORS_CH = {
     ],
     "5": [
      "#1D90D0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "6": [
@@ -6214,7 +6139,7 @@ window.LINE_COLORS_CH = {
     ],
     "7": [
      "#00A54F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "8": [
@@ -6254,7 +6179,7 @@ window.LINE_COLORS_CH = {
     ],
     "24": [
      "#EA4A90",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "25": [
@@ -6274,7 +6199,7 @@ window.LINE_COLORS_CH = {
     ],
     "3": [
      "#D94F10",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "4": [
@@ -6284,7 +6209,7 @@ window.LINE_COLORS_CH = {
     ],
     "5": [
      "#208AAA",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "6": [
@@ -6349,7 +6274,7 @@ window.LINE_COLORS_CH = {
     ],
     "11": [
      "#00923C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "12": [
@@ -6364,7 +6289,7 @@ window.LINE_COLORS_CH = {
     ],
     "14": [
      "#0093D0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "15": [
@@ -6424,7 +6349,7 @@ window.LINE_COLORS_CH = {
     ],
     "3": [
      "#00923C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "301": [
@@ -6434,7 +6359,7 @@ window.LINE_COLORS_CH = {
     ],
     "302": [
      "#00892F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "305": [
@@ -6449,12 +6374,12 @@ window.LINE_COLORS_CH = {
     ],
     "307": [
      "#CA7D3C",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "309": [
      "#008DC5",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "31": [
@@ -6479,7 +6404,7 @@ window.LINE_COLORS_CH = {
     ],
     "325": [
      "#EB3596",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "33": [
@@ -6549,7 +6474,7 @@ window.LINE_COLORS_CH = {
     ],
     "6": [
      "#BE8543",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "61": [
@@ -6594,7 +6519,7 @@ window.LINE_COLORS_CH = {
     ],
     "701": [
      "#008DC5",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "703": [
@@ -6609,7 +6534,7 @@ window.LINE_COLORS_CH = {
     ],
     "705": [
      "#00892F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "706": [
@@ -6874,7 +6799,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "73": [
      "#EE0064",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ]
    }
@@ -6894,7 +6819,7 @@ window.LINE_COLORS_CH = {
     ],
     "203": [
      "#608FA0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "204": [
@@ -6904,7 +6829,7 @@ window.LINE_COLORS_CH = {
     ],
     "205": [
      "#4DA354",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "206": [
@@ -6929,17 +6854,17 @@ window.LINE_COLORS_CH = {
     ],
     "212": [
      "#608FA0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "213": [
      "#E02080",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "215": [
      "#EA601A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "216": [
@@ -7064,7 +6989,7 @@ window.LINE_COLORS_CH = {
    "lines": {
     "601": [
      "#EE2915",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "602": [
@@ -7084,7 +7009,7 @@ window.LINE_COLORS_CH = {
     ],
     "605": [
      "#0A8A3A",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "606": [
@@ -7094,7 +7019,7 @@ window.LINE_COLORS_CH = {
     ],
     "607": [
      "#5F8F60",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "609": [
@@ -7119,7 +7044,7 @@ window.LINE_COLORS_CH = {
     ],
     "613": [
      "#2A7AC0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "614": [
@@ -7129,12 +7054,12 @@ window.LINE_COLORS_CH = {
     ],
     "616": [
      "#E9693F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "622": [
      "#6C7F99",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "626": [
@@ -7144,7 +7069,7 @@ window.LINE_COLORS_CH = {
     ],
     "631": [
      "#EA3A8F",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "632": [
@@ -7164,7 +7089,7 @@ window.LINE_COLORS_CH = {
     ],
     "641": [
      "#2A99D0",
-     "#000000",
+     "#FFFFFF",
      "pill"
     ],
     "642": [

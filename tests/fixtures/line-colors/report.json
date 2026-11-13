@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-13T04:49Z",
+ "generated": "2026-11-13T04:51Z",
  "company_header": [
   "sboid",
   "said",
@@ -50,10 +50,13 @@
   }
  },
  "overpass": "https://overpass-api.de/api/interpreter",
+ "ambiguous_lines": {
+  "PAG": 15
+ },
  "routes": 7180,
  "without_colour_or_ref": 2403,
  "operators": 80,
- "lines": 1360,
+ "lines": 1345,
  "unmatched_operators": [
   [
    "Verkehrsbetrieb LIECHTENSTEINmobil",
@@ -147,7 +150,7 @@
   "OSF": 4,
   "OSTWIND": 3,
   "PA": 2,
-  "PAG": 458,
+  "PAG": 443,
   "PAZ": 88,
   "PBZ": 1,
   "RA": 5,
