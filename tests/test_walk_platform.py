@@ -22,7 +22,7 @@ def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type":
 PLAINPALAIS = st("8587391", "Genève, Plainpalais", 46.198300, 6.141600)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 CORNAVIN = st("8587057", "Genève, gare Cornavin", 46.209652, 6.14233)
-LIVE = {"bus_platform": "D"}
+LIVE = {"bus_platform": "D", "planned": "D"}
 
 def end(s, m, kind, plat=""):
     return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
@@ -30,10 +30,10 @@ def call(s, arr=None, dep=None): return {"station": s, "arrival": fmt(at(arr)) i
 def section(cat, num, to, calls, a, b, ma, mb, plat, arr_plat):
     return {"journey": {"category": cat, "number": num, "to": to, "operator": "TPG", "passList": calls}, "walk": None,
             "departure": end(a, ma, "departure", plat), "arrival": end(b, mb, "arrival", arr_plat)}
-PLAN = {"sections": [
+def plan(): return {"sections": [
     section("T", "12", "Genève, Bel-Air", [call(PLAINPALAIS, dep=10), call(BELAIR, arr=15)], PLAINPALAIS, BELAIR, 10, 15, "C", "B"),
     {"journey": None, "walk": {"duration": 120}, "departure": end(BELAIR, 15, "departure"), "arrival": end(BELAIR, 17, "arrival")},
-    section("B", "3", "Genève, gare Cornavin", [call(BELAIR, dep=20), call(CORNAVIN, arr=26)], BELAIR, CORNAVIN, 20, 26, "D", "H")]}
+    section("B", "3", "Genève, gare Cornavin", [call(BELAIR, dep=20), call(CORNAVIN, arr=26)], BELAIR, CORNAVIN, 20, 26, LIVE["planned"], "H")]}
 
 def entry(cat, num, to, s, m, plat, nxt):
     return {"category": cat, "number": num, "to": to, "operator": "TPG",
@@ -46,7 +46,7 @@ def boards(stop_id):
     return []
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
-    if u.path.endswith("/connections"): body = {"connections": [PLAN]}
+    if u.path.endswith("/connections"): body = {"connections": [plan()]}
     elif u.path.endswith("/locations"): body = {"stations": [CORNAVIN]}
     else: body = {"station": {"id": q["id"][0]}, "stationboard": boards(q["id"][0])}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
@@ -58,21 +58,24 @@ def walk_map_ends(pg):
 errors = []
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROME_PATH"))
-    ctx = b.new_context(viewport={"width": 390, "height": 900}, locale="en-US", timezone_id="Europe/Zurich",
-                        permissions=["geolocation"], geolocation={"latitude": 46.2046, "longitude": 6.1440})
-    ctx.route("https://transport.opendata.ch/**", api)
-    if LEAFLET_DIR: ctx.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=str(Path(LEAFLET_DIR) / r.request.url.rsplit("/", 1)[-1])))
-    if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
-    pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
-    pg.clock.install(time=NOW.timestamp())
-    pg.goto(PAGE)
-    pg.evaluate("""() => {
-      localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8587391', name: 'Genève, Plainpalais', coord: [46.1983, 6.1416] }));
-      localStorage.setItem('tpp:journey:to', JSON.stringify({ kind: 'stop', id: '8587057', name: 'Genève, gare Cornavin', coord: [46.209652, 6.14233] }));
-      localStorage.setItem('tpp:settings', JSON.stringify({ footMaxMin: 0 }));
-      localStorage.setItem('tpp:tab', '"journey"'); }""")
-    pg.reload()
-    pg.click("#searchJourney"); pg.locator("#journeyList .jr").first.click()
+    def start(b):
+      ctx = b.new_context(viewport={"width": 390, "height": 900}, locale="en-US", timezone_id="Europe/Zurich",
+                          permissions=["geolocation"], geolocation={"latitude": 46.2046, "longitude": 6.1440})
+      ctx.route("https://transport.opendata.ch/**", api)
+      if LEAFLET_DIR: ctx.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=str(Path(LEAFLET_DIR) / r.request.url.rsplit("/", 1)[-1])))
+      if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
+      pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
+      pg.clock.install(time=NOW.timestamp())
+      pg.goto(PAGE)
+      pg.evaluate("""() => {
+        localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8587391', name: 'Genève, Plainpalais', coord: [46.1983, 6.1416] }));
+        localStorage.setItem('tpp:journey:to', JSON.stringify({ kind: 'stop', id: '8587057', name: 'Genève, gare Cornavin', coord: [46.209652, 6.14233] }));
+        localStorage.setItem('tpp:settings', JSON.stringify({ footMaxMin: 0 }));
+        localStorage.setItem('tpp:tab', '"journey"'); }""")
+      pg.reload()
+      pg.click("#searchJourney"); pg.locator("#journeyList .jr").first.click()
+      return ctx, pg
+    ctx, pg = start(b)
 
     # Planning: the walk goes from the tram's arrival platform to the bus's platform
     detail = pg.locator("#journeyList .jr-detail").first
@@ -123,6 +126,38 @@ with sync_playwright() as p:
     assert pg.inner_text("#mapTitle") == "Platform G" and pg.inner_text("#mapSheet .qm.target") == "G"
     pg.click("#mapClose")
     print("live change → bus moved to G: chip, walk label and walk map end on G; position and distance shown")
+    ctx.close()
+
+    # BUG-06: the bus leaves from the very platform the tram arrives at: a change on the spot, not a walk
+    LIVE.update(planned="B", bus_platform="B")
+    ctx, pg = start(b)
+    jr = pg.locator("#journeyList .jr").first
+    assert jr.locator(".jw").count() == 0, jr.inner_text()             # no walk in the summary line
+    detail = pg.locator("#journeyList .jr-detail").first
+    assert detail.locator(".leg.walk").count() == 0, detail.inner_text()
+    row = detail.locator(".leg.change")
+    assert row.count() == 1 and "Same platform, no walking" in row.inner_text() and "5 min wait" in row.inner_text(), row.all_inner_texts()
+    assert row.locator(".plat .plat-v").inner_text() == "B"
+    meta = pg.locator("#journeyList .jr-meta").first.inner_text()
+    assert meta.startswith("1 change · no walking"), meta
+    pg.screenshot(path=str(OUT / "same-platform-plan.png"))
+    pg.click("#journeyList .set-alarms"); pg.wait_for_selector("#alarmList .trip")
+    while pg.is_visible("#alarmBanner"): pg.click("#abOk")
+    trip = pg.locator("#alarmList .trip").first
+    assert trip.locator(".tl.walk").count() == 0 and "Same platform, no walking" in trip.locator(".tl.change").inner_text(), trip.inner_text()
+    assert "5 min wait" in trip.inner_text(), trip.inner_text()          # the change: all waiting, no walking
+    # the bus moves to G: it is a walk again, with its map
+    LIVE["bus_platform"] = "G"
+    pg.clock.run_for(61000); pg.wait_for_timeout(400)
+    while pg.is_visible("#alarmBanner"): pg.click("#abOk")
+    trip = pg.locator("#alarmList .trip").first
+    w = trip.locator(".tl.walk")
+    assert w.count() == 1 and "Platform changed: go to Genève, Bel-Air (Platform G)" in w.inner_text(), trip.inner_text()
+    w.locator(".walk-map").click()
+    a, bb, _ = walk_map_ends(pg)
+    assert (a, bb) == ("B", "G"), (a, bb)
+    pg.screenshot(path=str(OUT / "same-platform-moved.png"))
+    print("same quay   → no walk, '5 min wait'; bus moved to G → 'Platform changed', walk map B → G")
     b.close()
 
 print("errors:", errors); assert not errors
