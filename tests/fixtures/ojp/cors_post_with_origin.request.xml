@@ -5,10 +5,10 @@
     <siri:ServiceRequestContext>
       <siri:Language>fr</siri:Language>
     </siri:ServiceRequestContext>
-    <siri:RequestTimestamp>2026-11-13T13:48:50.885Z</siri:RequestTimestamp>
+    <siri:RequestTimestamp>2026-11-13T13:50:37.619Z</siri:RequestTimestamp>
     <siri:RequestorRef>swissPublicTransport_prototype</siri:RequestorRef>
     <OJPLocationInformationRequest>
-      <siri:RequestTimestamp>2026-11-13T13:48:50.885Z</siri:RequestTimestamp>
+      <siri:RequestTimestamp>2026-11-13T13:50:37.619Z</siri:RequestTimestamp>
       <InitialInput>
         <Name>Cornavin</Name>
       </InitialInput>

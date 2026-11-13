@@ -1,306 +1,306 @@
 {
-  "probedAt": "2026-11-13T13:48:09.097Z",
+  "probedAt": "2026-11-13T13:49:56.131Z",
   "endpoint": "https://api.opentransportdata.swiss/ojp20",
   "sdk": "0.23.5",
   "requests": {
     "lir_name_belair": {
       "status": 200,
-      "ms": 608,
-      "bytes": 7602,
+      "ms": 590,
+      "bytes": 7601,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:11 GMT",
+        "date": "Fri, 13 Nov 2026 13:49:58 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "49",
-        "x-ratelimit-reset": "1794577691"
+        "x-ratelimit-reset": "1794577798"
       }
     },
     "lir_name_esserts": {
       "status": 200,
-      "ms": 174,
-      "bytes": 7509,
+      "ms": 133,
+      "bytes": 7506,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:12 GMT",
+        "date": "Fri, 13 Nov 2026 13:49:59 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "48",
-        "x-ratelimit-reset": "1794577692"
+        "x-ratelimit-reset": "1794577799"
       }
     },
     "lir_coords_point": {
       "status": 200,
-      "ms": 166,
+      "ms": 145,
       "bytes": 1224,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:14 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:01 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "47",
-        "x-ratelimit-reset": "1794577694"
+        "x-ratelimit-reset": "1794577801"
       }
     },
     "lir_bbox_point": {
       "status": 200,
-      "ms": 165,
-      "bytes": 3213,
+      "ms": 140,
+      "bytes": 3211,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:16 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:03 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "46",
-        "x-ratelimit-reset": "1794577696"
+        "x-ratelimit-reset": "1794577803"
       }
     },
     "ser_belair": {
       "status": 200,
-      "ms": 539,
-      "bytes": 443757,
+      "ms": 348,
+      "bytes": 414602,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:17 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:04 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "45",
-        "x-ratelimit-reset": "1794577697"
+        "x-ratelimit-reset": "1794577804"
       }
     },
     "ser_geneve_gare": {
       "status": 200,
-      "ms": 207,
-      "bytes": 230455,
+      "ms": 596,
+      "bytes": 232841,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:19 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:06 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "44",
-        "x-ratelimit-reset": "1794577699"
+        "x-ratelimit-reset": "1794577806"
       }
     },
     "ser_paquis_lac": {
       "status": 200,
-      "ms": 173,
+      "ms": 444,
       "bytes": 31160,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:21 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:08 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "43",
-        "x-ratelimit-reset": "1794577701"
+        "x-ratelimit-reset": "1794577808"
       }
     },
     "ser_esserts": {
       "status": 200,
-      "ms": 217,
-      "bytes": 316880,
+      "ms": 308,
+      "bytes": 326136,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:23 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:10 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "42",
-        "x-ratelimit-reset": "1794577703"
+        "x-ratelimit-reset": "1794577810"
       }
     },
     "tr_stops": {
       "status": 200,
-      "ms": 395,
-      "bytes": 93158,
+      "ms": 361,
+      "bytes": 100759,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:25 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:12 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "41",
-        "x-ratelimit-reset": "1794577704"
+        "x-ratelimit-reset": "1794577812"
       }
     },
     "tr_coords": {
       "status": 200,
-      "ms": 588,
-      "bytes": 223438,
+      "ms": 504,
+      "bytes": 223440,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:27 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:14 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "40",
-        "x-ratelimit-reset": "1794577706"
+        "x-ratelimit-reset": "1794577814"
       }
     },
     "tir_from_belair": {
       "status": 200,
-      "ms": 188,
+      "ms": 789,
       "bytes": 40961,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:28 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:16 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "39",
-        "x-ratelimit-reset": "1794577708"
+        "x-ratelimit-reset": "1794577816"
       }
     },
     "app_lir_name_zone_belair": {
       "status": 200,
-      "ms": 504,
-      "bytes": 12782,
-      "headers": {
-        "content-encoding": "gzip",
-        "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:30 GMT",
-        "x-ratelimit-limit": "50",
-        "x-ratelimit-remaining": "38",
-        "x-ratelimit-reset": "1794577710"
-      }
-    },
-    "app_lir_name_zone_gare": {
-      "status": 200,
-      "ms": 182,
+      "ms": 146,
       "bytes": 12783,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:32 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:18 GMT",
+        "x-ratelimit-limit": "50",
+        "x-ratelimit-remaining": "38",
+        "x-ratelimit-reset": "1794577818"
+      }
+    },
+    "app_lir_name_zone_gare": {
+      "status": 200,
+      "ms": 147,
+      "bytes": 12783,
+      "headers": {
+        "content-encoding": "gzip",
+        "content-type": "application/xml",
+        "date": "Fri, 13 Nov 2026 13:50:20 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "37",
-        "x-ratelimit-reset": "1794577712"
+        "x-ratelimit-reset": "1794577820"
       }
     },
     "app_lir_zone_esserts": {
       "status": 200,
-      "ms": 170,
+      "ms": 133,
       "bytes": 3806,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:34 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:21 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "36",
-        "x-ratelimit-reset": "1794577714"
+        "x-ratelimit-reset": "1794577821"
       }
     },
     "app_ser_esserts_full": {
       "status": 200,
-      "ms": 1542,
-      "bytes": 1520461,
+      "ms": 995,
+      "bytes": 1523535,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:36 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:24 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "35",
-        "x-ratelimit-reset": "1794577716"
+        "x-ratelimit-reset": "1794577823"
       }
     },
     "app_ser_esserts_light": {
       "status": 200,
-      "ms": 763,
-      "bytes": 333971,
+      "ms": 728,
+      "bytes": 334112,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:39 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:26 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "34",
-        "x-ratelimit-reset": "1794577719"
+        "x-ratelimit-reset": "1794577825"
       }
     },
     "app_ser_belair_light": {
       "status": 200,
-      "ms": 879,
-      "bytes": 337586,
+      "ms": 836,
+      "bytes": 337550,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:42 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:28 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "33",
-        "x-ratelimit-reset": "1794577721"
+        "x-ratelimit-reset": "1794577828"
       }
     },
     "app_lir_address_rhone": {
       "status": 200,
-      "ms": 161,
-      "bytes": 1943,
+      "ms": 131,
+      "bytes": 1944,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:43 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:30 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "32",
-        "x-ratelimit-reset": "1794577723"
+        "x-ratelimit-reset": "1794577830"
       }
     },
     "app_lir_poi_palexpo": {
       "status": 200,
-      "ms": 161,
+      "ms": 131,
       "bytes": 2559,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:45 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:32 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "31",
-        "x-ratelimit-reset": "1794577725"
+        "x-ratelimit-reset": "1794577832"
       }
     },
     "app_lir_address_lancy": {
       "status": 200,
-      "ms": 160,
-      "bytes": 8507,
+      "ms": 132,
+      "bytes": 8508,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:47 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:33 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "30",
-        "x-ratelimit-reset": "1794577726"
+        "x-ratelimit-reset": "1794577833"
       }
     },
     "app_tr_depart": {
       "status": 200,
-      "ms": 340,
-      "bytes": 50592,
+      "ms": 309,
+      "bytes": 50585,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:48 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:35 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "29",
-        "x-ratelimit-reset": "1794577728"
+        "x-ratelimit-reset": "1794577835"
       }
     },
     "app_tr_arrive": {
       "status": 200,
-      "ms": 314,
+      "ms": 290,
       "bytes": 42712,
       "headers": {
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:50 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:37 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "28",
-        "x-ratelimit-reset": "1794577730"
+        "x-ratelimit-reset": "1794577837"
       }
     },
     "cors_post_with_origin": {
       "status": 200,
-      "ms": 160,
-      "bytes": 2229,
+      "ms": 445,
+      "bytes": 2230,
       "headers": {
         "access-control-allow-origin": "*",
         "content-encoding": "gzip",
         "content-type": "application/xml",
-        "date": "Fri, 13 Nov 2026 13:48:52 GMT",
+        "date": "Fri, 13 Nov 2026 13:50:39 GMT",
         "x-ratelimit-limit": "50",
         "x-ratelimit-remaining": "27",
-        "x-ratelimit-reset": "1794577732"
+        "x-ratelimit-reset": "1794577839"
       }
     }
   },
@@ -318,10 +318,10 @@
       "access-control-allow-origin": "*",
       "content-encoding": "gzip",
       "content-type": "application/xml",
-      "date": "Fri, 13 Nov 2026 13:48:52 GMT",
+      "date": "Fri, 13 Nov 2026 13:50:39 GMT",
       "x-ratelimit-limit": "50",
       "x-ratelimit-remaining": "27",
-      "x-ratelimit-reset": "1794577732"
+      "x-ratelimit-reset": "1794577839"
     },
     "browserCanCall": true
   }
