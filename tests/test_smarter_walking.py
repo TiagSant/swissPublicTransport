@@ -24,6 +24,7 @@ STECLO = st("8592908", "Genève, Sainte-Clotilde", 46.19981, 6.132825)
 JONCTION = st("8587062", "Genève, Jonction", 46.200787, 6.12969)
 ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
 VOIRIE = st("8587014", "Genève, Voirie", 46.20300, 6.12800)
+PALLADIUM = st("8587019", "Genève, Palladium", 46.20400, 6.12900)
 PLAIN = st("8587391", "Genève, Plainpalais", 46.19830, 6.14160)
 CIRQUE = st("8587015", "Genève, Place du Cirque", 46.20040, 6.14080)
 ECOLE = st("8587016", "Genève, École-de-Médecine", 46.19760, 6.13880)
@@ -45,6 +46,9 @@ def board_entry(cat, num, to, here, t0, nxt, no_coord=False, plat=""):
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 
 def connections(frm, to):
+    if S["case"] == "C":   # the PO's case, 13.11.2026 17:37: tram 14 to Jonction, walk 4 min to Sainte-Clotilde, bus 19
+        return [{"sections": [ride("T", "14", "Meyrin-Gravière", ESSERTS, JONCTION, at(9), at(16), "A", "B"), walk(JONCTION, at(16), at(20)),
+                              ride("B", "19", "Vernier-Village", STECLO, MUSEE, at(22), at(23), "H", "K")]}]
     if S["case"] == "A":
         return [{"sections": [ride("B", "19", "Onex, cité", MUSEE, STECLO, at(7), at(9), "J", "G"), walk(STECLO, at(9), at(13)),
                               ride("T", "14", "Bernex, Vailly", JONCTION, ESSERTS, at(15), at(20), "A", "B")]}]
@@ -58,6 +62,10 @@ def board(stop_id):
     if S["case"] == "A" and stop_id == JONCTION["id"]:   # the platform of the 19 at Jonction: on Jonction's own board
         return [board_entry("B", "19", "Onex, cité", JONCTION, at(10), [(VOIRIE, at(13))], plat="C"),
                 board_entry("B", "19", "Vernier, village", JONCTION, at(10), [(STECLO, at(11))], plat="D")]
+    if S["case"] == "C" and stop_id == JONCTION["id"]:   # the 19 to Vernier goes through Jonction (platform D) 2 min before
+        return [board_entry("B", "19", "Vernier-Village", JONCTION, at(20), [(STECLO, at(22)), (MUSEE, at(23))], plat="D"),
+                board_entry("B", "19", "Onex, cité", JONCTION, at(20), [(VOIRIE, at(22))], plat="C"),
+                board_entry("T", "14", "Meyrin-Gravière", JONCTION, at(16), [(PALLADIUM, at(18))], plat="B")]
     if S["case"] == "B" and stop_id == CIRQUE["id"]:
         return [board_entry("B", "1", "Genève, Rond-Point de Plainpalais", CIRQUE, at(10), [(ECOLE, at(11)), (GARE, at(13))])]
     return []
@@ -122,6 +130,19 @@ with sync_playwright() as p:
     assert S["routes"] == 0, "street routes are off in this session"
     ctx.close()
     print("change      → stay on the 19 to Jonction (real ids, board without positions): 1 min instead of 4; the planned stop not offered; followed as shown; the 19 to Vernier ignored")
+
+    # ---- C: board the 19 earlier, at Jonction, instead of walking to Sainte-Clotilde
+    ctx, pg = session(b, "C", dt.datetime(2026, 11, 13, 17, 30, tzinfo=tz),
+                      {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(ESSERTS), "journey:to": STOP(MUSEE)})
+    pg.wait_for_function("[...document.querySelectorAll('#journeyList .jr .jw')].length && ![...document.querySelectorAll('#journeyList .jr .jw')].some(e => e.textContent.includes('4'))", timeout=10000)
+    pg.locator("#journeyList .jr").first.click(); det = pg.locator("#journeyList .jr-detail").first
+    r19 = " ".join(det.locator(".leg.ride").nth(1).inner_text().split())
+    assert "17:50 Genève, Jonction Quai D" in r19 and "2 arrêts" in r19, r19
+    assert "Sainte-Clotilde" not in " ".join(det.locator(".leg.walk").first.inner_text().split()), det.locator(".leg.walk").first.inner_text()
+    assert "17:53 Genève, Musée d'ethnographie" in r19                        # same arrival
+    pg.screenshot(path=str(OUT / "board-earlier.png"))
+    ctx.close()
+    print("board early → the 19 caught at Jonction (platform D, 17:50) instead of walking 4 min to Sainte-Clotilde; the 19 to Onex ignored")
 
     # ---- B: stay on the 1 to École-de-Médecine, then on foot; streets for the walks
     ctx, pg = session(b, "B", dt.datetime(2026, 11, 13, 10, 0, tzinfo=tz),

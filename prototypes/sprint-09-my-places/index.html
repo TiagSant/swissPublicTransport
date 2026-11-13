@@ -2176,24 +2176,71 @@
     return Object.assign({}, r, { toStop: { id: s.id, name: s.name, coord: s.coord }, arr: new Date(s.planned), arrReal: s.live ? new Date(s.at) : null,
       arrPlatform: s.platform || '', stops: r.stops + passed.length, via: [...(r.via || []), ...passed], onwardIdx: n, stayedFrom: r.stayedFrom || r.toStop.name });
   }
-  // US-50: at a change, staying on to the connection's stop (or closer to it) when the change still works with
-  // its margin (a comfortable change stays comfortable) and it saves walking
-  function bestStayOn(j, c, quays) {
+  // US-50 / US-53: at a change, the best place for it among the stops both vehicles serve. Staying on the first
+  // one a few stops more (its next stops are known), boarding the second one earlier (it goes through the stop
+  // where the first one leaves the rider, or a later one), or both — when the change still works with its margin
+  // (a comfortable change stays comfortable) and it saves walking. Same vehicles, so the same arrival.
+  async function runThrough(s, next) {
+    // the second vehicle's run, seen from the stop s: same line, passing next.from at next.dep
+    if (!s.id) return null;
+    const b = await boardNear(s.id, +next.dep - 5 * 60000);
+    const schedOf = j => { const x = tsOr(j.stop.departureTimestamp, j.stop.departure); return x ? x.getTime() : 0; };
+    const timeOf = p => { const x = tsOr(p.arrivalTimestamp, p.arrival) || tsOr(p.departureTimestamp, p.departure); return x ? +x : null; };
+    for (const run of (b && b.stationboard) || []) {
+      if (String(run.category) !== String(next.category) || String(run.number) !== String(next.number)) continue;
+      const pl = run.passList || [];
+      const idx = pl.findIndex((p, n) => n > 0 && p.station && String(p.station.id) === String(next.from.id));
+      if (idx < 0 || Math.abs((timeOf(pl[idx]) || 0) - +next.dep) > 120000) continue;
+      const planned = schedOf(run), live = parseTime(run.stop.prognosis && run.stop.prognosis.departure);
+      const delay = live ? +live - planned : (run.stop.delay ? run.stop.delay * 60000 : 0);
+      const between = pl.slice(1, idx).map(p => { const t0 = timeOf(p); return t0 && p.station ? { name: p.station.name, id: p.station.id, coord: coordOf(p.station), planned: t0, at: t0 + delay, live: !!delay } : null; });
+      if (between.some(x => !x)) return null;
+      return { planned, depAt: planned + delay, live: !!live || !!delay, platform: (run.stop.prognosis && run.stop.prognosis.platform) || run.stop.platform || '', between };
+    }
+    return null;
+  }
+  async function bestChange(j, c, quays) {
     const cur = j.legs[c.i], next = j.legs[c.k];
-    if (!cur.onward || !cur.onward.length || c.walk < 2) return null;
+    if (c.walk < 2) return null;
     const target = platformPos(quays, next.from.id, next.from.coord, next.platform);
     if (!target) return null;
     const need = Math.max(1, Math.min(c.slack, COMFORT_MIN));
+    // where the rider can be: the planned stop (n = -1) or one of the first vehicle's next stops
+    const here = { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, at: +arrOf(cur), planned: +cur.arr, platform: cur.arrPlatformLive || cur.arrPlatform || '' };
+    const spots = [{ n: -1, s: here }, ...(cur.onward || []).map((s, n) => ({ n, s }))];
     let best = null;
-    cur.onward.forEach((s, n) => {
-      const same = (s.id && s.id === next.from.id) || fold(s.name) === fold(next.from.name);
+    const consider = (n, s, board) => {
+      const to = board ? platformPos(quays, s.id, s.coord, board.platform) : target;
       const from = platformPos(quays, s.id, s.coord, s.platform);
-      const min = Math.max(same ? 1 : 0.5, walkMinutes(distanceM(from, target)));
-      const slack = Math.floor((+depOf(next) - (s.at + min * 60000)) / 60000);
+      if (!from || !to) return;
+      const same = board ? true : (s.id && s.id === next.from.id) || fold(s.name) === fold(next.from.name);
+      const samePlace = board && s.platform && board.platform && String(s.platform).toUpperCase() === String(board.platform).toUpperCase();
+      const min = samePlace ? 0 : Math.max(same ? 1 : 0.5, walkMinutes(distanceM(from, to)));
+      const dep = board ? board.depAt : +depOf(next);
+      const slack = Math.floor((dep - (s.at + min * 60000)) / 60000);
       if (slack < need || min > c.walk - 1) return;
-      if (!best || min < best.min) best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name };
-    });
+      if (!best || min < best.min || (min === best.min && n < best.n)) best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name, board: board || null };
+    };
+    spots.forEach(({ n, s }) => { if (n >= 0) consider(n, s, null); });   // staying on (US-50)
+    // boarding earlier (US-53): where the second vehicle passes before its planned stop; stops near it only
+    for (const { n, s } of spots.slice(0, 4)) {
+      if (!s.id || String(s.id) === String(next.from.id) || !s.coord || !next.from.coord || distanceM(s.coord, next.from.coord) > 1200) continue;
+      const board = await runThrough(s, next);
+      if (board) {
+        if (!s.platform && n >= 0) await platformAt(cur.onward[n], cur);
+        consider(n, n >= 0 ? cur.onward[n] : here, board);
+      }
+    }
     return best;
+  }
+  // The second ride boarded earlier, at s: the stops passed before its planned stop become intermediate stops
+  function boardEarlier(next, b, s) {
+    const at = x => new Date(x);
+    return Object.assign({}, next, { from: { id: s.id, name: s.name, coord: s.coord }, dep: at(b.planned), real: b.live ? at(b.depAt) : null,
+      platform: b.platform || '', platformLive: null, stops: next.stops + b.between.length + 1, boardedFrom: next.from.name,
+      via: [...b.between.map(x => ({ name: x.name, id: x.id, coord: x.coord, time: at(x.at), planned: at(x.planned), live: x.live, depAt: at(x.at) })),
+            { name: next.from.name, id: next.from.id, coord: next.from.coord, time: next.real || next.dep, planned: next.dep, live: !!next.real, depAt: next.real || next.dep },
+            ...(next.via || [])] });
   }
   // The journey with those changes applied, silently: getting off where the API planned has nothing to offer
   // (no time gained, more walking), so it is neither offered nor mentioned (PO decision).
@@ -2202,12 +2249,13 @@
     let legs = j.legs.slice();
     for (const a of j.stayOns.slice().sort((x, y) => y.i - x.i)) {
       const cur = legs[a.i], next = legs[a.k];
-      const ext = Object.assign(extendRide(cur, a.n), { stayedOn: a });
-      const s = cur.onward[a.n];
-      const walk = { type: 'walk', min: a.min, edge: 'transfer', to: next.from.name,
+      const ext = a.n >= 0 ? Object.assign(extendRide(cur, a.n), { stayedOn: a }) : cur;
+      const s = a.n >= 0 ? cur.onward[a.n] : { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, platform: cur.arrPlatform };
+      const nx = a.board ? boardEarlier(next, a.board, s) : next;
+      const walk = { type: 'walk', min: a.min, edge: 'transfer', to: nx.from.name,
         start: { name: s.name, stopId: s.id, coord: s.coord, platform: s.platform, mode: cur.mode },
-        end: { name: next.from.name, stopId: next.from.id, coord: next.from.coord, platform: next.platform, mode: next.mode } };
-      legs = [...legs.slice(0, a.i), ext, walk, ...legs.slice(a.k)];
+        end: { name: nx.from.name, stopId: nx.from.id, coord: nx.from.coord, platform: nx.platform, mode: nx.mode } };
+      legs = [...legs.slice(0, a.i), ext, walk, nx, ...legs.slice(a.k + 1)];
     }
     markSamePlatform(legs);
     legs = addChangeWalks(legs);
@@ -2295,11 +2343,15 @@
         }
         for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
         const cs = tripConnections(planOf(j));
-        j.stayOns = cs.map(c => bestStayOn(j, c, quays)).filter(Boolean);
+        const found = [];
+        for (const c of cs) found.push(await bestChange(j, c, quays));
+        j.stayOns = found.filter(Boolean);
         // the platform where the rider now gets off (shown, and the change walked from it), then the choice again
-        if (j.stayOns.length) {
-          for (const a of j.stayOns) await platformAt(j.legs[a.i].onward[a.n], j.legs[a.i]);
-          j.stayOns = cs.map(c => bestStayOn(j, c, quays)).filter(Boolean);
+        if (j.stayOns.some(a => a.n >= 0 && !j.legs[a.i].onward[a.n].platform)) {
+          for (const a of j.stayOns) if (a.n >= 0) await platformAt(j.legs[a.i].onward[a.n], j.legs[a.i]);
+          const again = [];
+          for (const c of cs) again.push(await bestChange(j, c, quays));
+          j.stayOns = again.filter(Boolean);
         }
         if (!(j.segments > 1)) await routeWalks(j);   // a trip in parts keeps its planned stays
         // the walk at the end, from the best stop: its street route in the cache for footAlternative
@@ -2384,7 +2436,7 @@
       for (const k of new Set(journeyBase.filter(j => !(j.segments > 1)).flatMap(j => [footAlternative(j), startAlternative(j)]).filter(Boolean).map(x => x.key))) recordFoot(k, 'shown');
       status.textContent = journeyBase.length ? '' : t('noJourney');
       renderJourneys();
-      enrichJourneys(rankJourneys(journeyBase, getPrio(), readWhen().mode).slice(0, 6));
+      enrichJourneys(rankJourneys(journeyBase, getPrio(), readWhen().mode).slice(0, 8));   // every journey shown
     } catch (e) {
       if (e.name === 'AbortError') return;
       if (e.noStop) { status.textContent = t('noStopNear', { name: placeLabel(e.noStop) }); $('journeyResults').hidden = true; return; }
