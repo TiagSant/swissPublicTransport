@@ -5,11 +5,11 @@
     <siri:ServiceRequestContext>
       <siri:Language>fr</siri:Language>
     </siri:ServiceRequestContext>
-    <siri:RequestTimestamp>2026-11-13T13:15:37.750Z</siri:RequestTimestamp>
+    <siri:RequestTimestamp>2026-11-13T13:48:27.350Z</siri:RequestTimestamp>
     <siri:RequestorRef>swissPublicTransport_prototype</siri:RequestorRef>
     <OJPTripInfoRequest>
-      <siri:RequestTimestamp>2026-11-13T13:15:37.750Z</siri:RequestTimestamp>
-      <JourneyRef>ch:1:sjyid:100680:HAS-26-07-7-Lun-Ven-34988678</JourneyRef>
+      <siri:RequestTimestamp>2026-11-13T13:48:27.350Z</siri:RequestTimestamp>
+      <JourneyRef>ch:1:sjyid:100680:HAS-26-03-0-Lun-Ven-33839168</JourneyRef>
       <OperatingDayRef>2026-11-13</OperatingDayRef>
       <Params>
         <IncludeCalls>true</IncludeCalls>
