@@ -2109,9 +2109,13 @@
     const run = b && findRun(b.stationboard || [], { category: r.category, number: r.number, to: r.to }, +r.arr, schedOf, 150000).run;
     if (!run) return [];
     const delay = r.arrReal ? +r.arrReal - +r.arr : 0, out = [];
+    // a stop without its position on the board (light official-data boards remembered before): the middle of its
+    // platforms (ATLAS)
+    const quays = await loadQuays().catch(() => ({}));
+    const centre = id => { const pts = Object.values((id && quays[id]) || {}); return pts.length ? [pts.reduce((x, q) => x + q[0], 0) / pts.length, pts.reduce((x, q) => x + q[1], 0) / pts.length] : null; };
     for (const p of (run.passList || []).slice(1, 1 + ONWARD_MAX)) {
       const st = p.station || {}, planned = tsOr(p.arrivalTimestamp, p.arrival) || tsOr(p.departureTimestamp, p.departure);
-      const pr = p.prognosis || {}, live = parseTime(pr.arrival), coord = coordOf(st);
+      const pr = p.prognosis || {}, live = parseTime(pr.arrival), coord = coordOf(st) || centre(st.id && String(st.id));
       if (!planned || !coord || !st.name) break;   // a time and a position are needed
       out.push({ id: st.id ? String(st.id) : null, name: st.name, coord, planned: +planned, at: live ? +live : +planned + delay,
                  live: !!live || !!r.arrReal, platform: pr.platform || p.platform || '' });

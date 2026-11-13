@@ -2,7 +2,7 @@
 
 transport.opendata.ch and the OSRM foot server (routing.openstreetmap.de) are mocked.
 A (16:50): bus 19 Musée d'ethnographie 16:57 → Sainte-Clotilde 16:59, walk 4 min (API), tram 14 Jonction 17:05.
-   The 19 goes on to Jonction (17:01): stay on → 1 min change instead of 4 min walk.
+   The 19 goes on to Jonction (17:00): stay on → 1 min change instead of 4 min walk.
 B (10:00): bus 1 Plainpalais 10:05 → Place du Cirque 10:10, bus 2 Cirque 10:14 → Musée 10:20, then walk to an address
    next to École-de-Médecine. The 1 goes on to École-de-Médecine (10:11): stay on, then 1 min on foot."""
 import os, json, math, datetime as dt
@@ -18,10 +18,11 @@ LEAFLET_DIR, TILE = os.environ.get("LEAFLET_DIR"), os.environ.get("TILE_PNG")
 tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-MUSEE = st("8587011", "Genève, Musée d'ethnographie", 46.19780, 6.13830)
-STECLO = st("8587012", "Genève, Sainte-Clotilde", 46.20050, 6.13420)
-JONCTION = st("8587013", "Genève, Jonction", 46.20180, 6.13050)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.18860, 6.11530)
+# real ids and positions (transport.opendata.ch, 13.11.2026)
+MUSEE = st("8592868", "Genève, Musée d'ethnographie", 46.197808, 6.136266)
+STECLO = st("8592908", "Genève, Sainte-Clotilde", 46.19981, 6.132825)
+JONCTION = st("8587062", "Genève, Jonction", 46.200787, 6.12969)
+ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
 VOIRIE = st("8587014", "Genève, Voirie", 46.20300, 6.12800)
 PLAIN = st("8587391", "Genève, Plainpalais", 46.19830, 6.14160)
 CIRQUE = st("8587015", "Genève, Place du Cirque", 46.20040, 6.14080)
@@ -36,10 +37,11 @@ def ride(cat, num, to, a, b, t0, t1, p0, p1):
     return {"journey": {"category": cat, "number": num, "to": to, "operator": "TPG", "passList": calls}, "walk": None,
             "departure": end(a, t0, "departure", p0), "arrival": end(b, t1, "arrival", p1)}
 def walk(a, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - t0).total_seconds())}, "departure": end(a, t0, "departure", ""), "arrival": end(a, t1, "arrival", "")}
-def board_entry(cat, num, to, here, t0, nxt):
+def board_entry(cat, num, to, here, t0, nxt, no_coord=False):
+    strip = lambda s: {k: v for k, v in s.items() if k != "coordinate"} if no_coord else s
     return {"category": cat, "number": num, "to": to, "operator": "TPG",
             "stop": {"station": here, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()), "prognosis": {}, "platform": "", "delay": 0},
-            "passList": [{"station": here}] + [{"station": s, "arrival": fmt(t), "arrivalTimestamp": int(t.timestamp()), "prognosis": {}} for s, t in nxt]}
+            "passList": [{"station": here}] + [{"station": strip(s), "arrival": fmt(t), "arrivalTimestamp": int(t.timestamp()), "prognosis": {}} for s, t in nxt]}
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 
 def connections(frm, to):
@@ -50,7 +52,8 @@ def connections(frm, to):
                           ride("B", "2", "Genève, Musée d'ethnographie", CIRQUE, MUSEE, at(14), at(20), "D", "J")]}]
 def board(stop_id):
     if S["case"] == "A" and stop_id == STECLO["id"]:
-        return [board_entry("B", "19", "Onex, cité", STECLO, at(9), [(JONCTION, at(11)), (VOIRIE, at(13))]),
+        # as on the real board: Jonction 1 min after Sainte-Clotilde; here without positions (light official-data board)
+        return [board_entry("B", "19", "Onex, cité", STECLO, at(9), [(JONCTION, at(10)), (VOIRIE, at(13))], no_coord=True),
                 board_entry("B", "19", "Vernier-Village", STECLO, at(9), [(MUSEE, at(11))])]          # other direction, same minute
     if S["case"] == "B" and stop_id == CIRQUE["id"]:
         return [board_entry("B", "1", "Genève, Rond-Point de Plainpalais", CIRQUE, at(10), [(ECOLE, at(11)), (GARE, at(13))])]
@@ -99,10 +102,10 @@ with sync_playwright() as p:
     pg.wait_for_function("document.querySelector('#journeyList .jr .jw') && ![...document.querySelectorAll('#journeyList .jr .jw')].some(e => e.textContent.includes('4'))", timeout=10000)
     jr = pg.locator("#journeyList .jr").first
     meta = jr.locator(".jr-meta").inner_text()
-    assert "1 min de marche" in meta and "3 min d’attente" in meta, meta
+    assert "1 min de marche" in meta and "4 min d’attente" in meta, meta
     jr.click(); det = pg.locator("#journeyList .jr-detail").first
     r19 = det.locator(".leg.ride").first
-    assert "17:01 Genève, Jonction" in " ".join(r19.inner_text().split()), r19.inner_text()
+    assert "17:00 Genève, Jonction" in " ".join(r19.inner_text().split()), r19.inner_text()
     assert "2 arrêts" in r19.inner_text(), r19.inner_text()            # Sainte-Clotilde now passed on board
     assert "Marche 1 min — jusqu’à Genève, Jonction" in " ".join(det.locator(".leg.walk").first.inner_text().split()), det.locator(".leg.walk").first.inner_text()
     pg.screenshot(path=str(OUT / "stay-on-plan.png"))
@@ -115,7 +118,7 @@ with sync_playwright() as p:
     assert pl[0]["toStop"]["name"] == "Genève, Jonction" and pl[1]["type"] == "walk" and round(pl[1]["min"]) == 1, pl[:2]
     assert S["routes"] == 0, "street routes are off in this session"
     ctx.close()
-    print("change      → stay on the 19 to Jonction: 1 min instead of 4; the planned stop not offered; followed as shown; the 19 to Vernier ignored")
+    print("change      → stay on the 19 to Jonction (real ids, board without positions): 1 min instead of 4; the planned stop not offered; followed as shown; the 19 to Vernier ignored")
 
     # ---- B: stay on the 1 to École-de-Médecine, then on foot; streets for the walks
     ctx, pg = session(b, "B", dt.datetime(2026, 11, 13, 10, 0, tzinfo=tz),
