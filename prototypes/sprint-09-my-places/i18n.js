@@ -294,7 +294,8 @@ window.EXTRA_STRINGS = {
    "cableway": "Seilbahn",
    "metro": "Metro",
    "other": "Andere"
-  }
+  },
+  "nextStopShort": "nächste Haltestelle"
  },
  "it": {
   "title": "Partenze",
@@ -589,7 +590,8 @@ window.EXTRA_STRINGS = {
    "cableway": "Funivia",
    "metro": "Metro",
    "other": "Altro"
-  }
+  },
+  "nextStopShort": "prossima fermata"
  },
  "rm": {
   "title": "Partenzas",
@@ -884,6 +886,7 @@ window.EXTRA_STRINGS = {
    "cableway": "Pendiculara",
    "metro": "Metro",
    "other": "Auter"
-  }
+  },
+  "nextStopShort": "proxima fermada"
  }
 };

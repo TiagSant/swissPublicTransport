@@ -112,6 +112,12 @@ with sync_playwright() as p:
     assert legs.count() == 4, legs.all_inner_texts()        # bus, walk, tram, walk: the whole journey
     assert "Next: Bus 21 at 07:40 from Lancy, Communes-Réunies (Platform A)" in trip(pg).inner_text(), trip(pg).inner_text()
     arrive0 = re.search(r"Arrive (\d\d:\d\d)", trip(pg).inner_text()).group(1)
+    # Stops and time on board, unfoldable, as when planning
+    tog = legs.nth(0).locator(".via-toggle")
+    assert tog.inner_text().startswith("2 stops · 12 min"), tog.inner_text()
+    tog.click()
+    assert "07:46" in legs.nth(0).locator(".via").inner_text() and "Genève, Acacias" in legs.nth(0).locator(".via").inner_text()
+    assert "get off at the next stop" in legs.nth(0).locator(".via li").last.inner_text()
     print("followed    →", trip(pg).locator(".trip-head").inner_text(), "|", trip(pg).locator(".trip-now").inner_text())
 
     # Live: the tram's platform changes → shown and rung once
@@ -128,6 +134,10 @@ with sync_playwright() as p:
     dismiss(pg)
     assert pg.get_attribute("#alarmBanner", "data-kind") == "trip" and "Connection missed" in pg.inner_text("#abTitle"), pg.inner_text("#alarmBanner")
     pg.click("#abOk")
+    # the unfolded stops stay open across live refreshes and show the live times
+    assert legs.nth(0).locator(".via").is_visible() and "07:55" in legs.nth(0).locator(".via").inner_text(), legs.nth(0).inner_text()
+    assert legs.nth(0).locator(".via-toggle").inner_text().startswith("2 stops · 12 min")
+    print("stops       →", legs.nth(0).locator(".via-toggle").inner_text(), "|", legs.nth(0).locator(".via").inner_text().replace("\n", " "))
     warn = trip(pg).locator(".trip-warn").inner_text()
     assert "Connection missed at Genève, Plainpalais" in warn and "You arrive at 08:02, the Tram 12 leaves at 07:58." in warn, warn
     assert "07:40" in legs.nth(0).inner_text() and "07:49" in legs.nth(0).inner_text(), "planned time struck through, live time shown"
@@ -155,6 +165,16 @@ with sync_playwright() as p:
     assert "08:06" in legs.nth(2).inner_text() and trip(pg).locator(".trip-warn").count() == 0
     print("next tram   → arrive", arrive0, "→", arrive1, "|", plan)
     pg.screenshot(path=str(OUT / "trip-updated.png"), full_page=True)
+
+    # On board (07:52, after Acacias 07:55? no: bus 9 min late leaves 07:49, Acacias 07:55): next stop marked
+    pg.clock.run_for(20 * 60000 - 4 * 61000); pg.wait_for_timeout(300)
+    dismiss(pg)
+    if pg.is_visible("#alarmBanner"): pg.click("#abOk")
+    pg.evaluate("document.querySelectorAll('#alarmList .via-toggle')[0].getAttribute('aria-expanded') === 'true' || document.querySelectorAll('#alarmList .via-toggle')[0].click()")
+    first = trip(pg).locator(".trip-legs > li").nth(0)
+    print("on board    →", first.locator(".chip").inner_text() if first.locator(".chip").count() else "-", "|", first.locator(".via").inner_text().replace("\n", " "))
+    assert "on board" in first.locator(".chip").inner_text()
+    assert first.locator(".via li.here").count() == 1 or first.locator(".via li.passed").count() == 1
 
     # Walks of the followed journey on the map
     pg.clock.resume()
