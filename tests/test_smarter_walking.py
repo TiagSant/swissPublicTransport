@@ -103,12 +103,11 @@ with sync_playwright() as p:
     jr.click(); det = pg.locator("#journeyList .jr-detail").first
     r19 = det.locator(".leg.ride").first
     assert "17:01 Genève, Jonction" in " ".join(r19.inner_text().split()), r19.inner_text()
-    assert "Rester jusqu’à Genève, Jonction : 3 min de marche en moins" in r19.locator(".stay-on").inner_text()
     assert "2 arrêts" in r19.inner_text(), r19.inner_text()            # Sainte-Clotilde now passed on board
     assert "Marche 1 min — jusqu’à Genève, Jonction" in " ".join(det.locator(".leg.walk").first.inner_text().split()), det.locator(".leg.walk").first.inner_text()
     pg.screenshot(path=str(OUT / "stay-on-plan.png"))
     # nothing to gain at Sainte-Clotilde: no way back to it is offered (PO)
-    assert det.locator(".stay-on-toggle").count() == 0 and "Sainte-Clotilde" not in det.locator(".leg.ride").first.locator(".stay-on").inner_text()
+    assert det.locator(".stay-on, .stay-on-toggle").count() == 0 and "Sainte-Clotilde" not in det.inner_text()   # neither offered nor mentioned
     # followed as shown
     pg.click("#journeyList .jr-detail .set-alarms"); pg.wait_for_selector("#alarmList .trip")
     while pg.is_visible("#alarmBanner"): pg.click("#abOk")

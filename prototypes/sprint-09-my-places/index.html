@@ -262,8 +262,6 @@
   .stay-row input { width: 4.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
   .place.via { border-left: 3px solid var(--accent); padding-left: 8px; }
   .jw.stay { font-weight: 700; }
-  .stay-on { font-size: .82rem; color: #1a7f37; margin: 4px 0 2px; }
-  @media (prefers-color-scheme: dark) { .stay-on { color: #6fdc8c; } }
   .wait-total.changed { color: #b26a00; font-weight: 600; }
   .leg .wait { font-size: .8rem; color: var(--muted); margin: 2px 0; }
   .leg .wait.changed { color: #b26a00; font-weight: 600; }
@@ -626,7 +624,6 @@
       removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
       lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
       dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators and © OpenStreetMap contributors (ODbL) · Walking routes: OSRM, FOSSGIS',
-      stayOnNote: '↷ Staying on to {stop}: {saved} min less walking',
       footOfferStayOn: '🚶 Stay on the {line} to {from}, then walk', walkDistRoute: 'About {d} on foot along the streets.',
       realWalkSetting: 'Walking routes along the streets', realWalkNote: 'Walking routes come from the OpenStreetMap server of FOSSGIS (OSRM): the start and end of each walk are sent to it. Off: straight line × 1.3.',
       noStop: 'No stop found.', searchFailed: 'Search failed (network?).', geoUnavailable: 'Geolocation not available.',
@@ -743,7 +740,6 @@
       removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
       lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
       dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants et © contributeurs OpenStreetMap (ODbL) · Itinéraires à pied : OSRM, FOSSGIS',
-      stayOnNote: '↷ Rester jusqu\u2019à {stop} : {saved} min de marche en moins',
       footOfferStayOn: '🚶 Rester dans le {line} jusqu\u2019à {from}, puis à pied', walkDistRoute: 'Environ {d} à pied par les rues.',
       realWalkSetting: 'Marche par les rues (itinéraire réel)', realWalkNote: 'Les itinéraires à pied viennent du serveur OpenStreetMap de FOSSGIS (OSRM) : le début et la fin de chaque marche lui sont envoyés. Désactivé : ligne droite × 1,3.',
       noStop: 'Aucun arrêt trouvé.', searchFailed: 'Recherche impossible (réseau ?).', geoUnavailable: 'Géolocalisation non disponible.',
@@ -2155,8 +2151,8 @@
     });
     return best;
   }
-  // The journey with those changes applied. Getting off where the API planned has nothing to offer (no time
-  // gained, more walking): it is not offered (PO decision).
+  // The journey with those changes applied, silently: getting off where the API planned has nothing to offer
+  // (no time gained, more walking), so it is neither offered nor mentioned (PO decision).
   function withStayOn(j) {
     if (!j.stayOns || !j.stayOns.length) return j;
     let legs = j.legs.slice();
@@ -2573,12 +2569,11 @@
       }
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       const W = journeyWaits(j), change = W.byRide.get(k);
-      const so = l.stayedOn ? `<div class="stay-on">${esc(t('stayOnNote', { stop: l.stayedOn.stop, saved: l.stayedOn.saved }))}</div>` : '';
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
         ${change ? changeWaitHtml(W.plan, change) : ''}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
-        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div>${so}</li>`;
+        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div></li>`;
     }
     const route = j.segments > 1 ? tripPoints().pts.map(placeLabel).join(' → ') : `${placeLabel(places.from)} → ${placeLabel(places.to)}`;
     return `<div class="jr-detail"><div class="jr-meta">${esc(route)}</div>
