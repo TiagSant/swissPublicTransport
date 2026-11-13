@@ -93,11 +93,11 @@ def colour(value):
 
 
 def text_on(bg):
-    """Black or white text, whichever contrasts more (WCAG relative luminance)."""
+    """White text like on Swiss line badges, unless white would be hard to read (contrast below 3:1, WCAG large/bold text)."""
     r, g, b = (int(bg[i:i + 2], 16) / 255 for i in (1, 3, 5))
     lin = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
     L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
-    return "#000000" if (L + 0.05) / 0.05 > 1.05 / (L + 0.05) else "#FFFFFF"
+    return "#FFFFFF" if 1.05 / (L + 0.05) >= 3 else "#000000"
 
 
 # ---------- Official companies ----------
@@ -205,8 +205,23 @@ def build(routes, comps, report):
     names = {}
     for num, c in comps.items():
         names.setdefault(c["abbr"].upper(), c["name"])
-    operators = {k: {"name": names.get(k, ""), "lines": {ref: [*cnt.most_common(1)[0][0], "pill"] for ref, cnt in sorted(v.items())}}
-                 for k, v in sorted(lines.items())}
+    # One number used in several regions (PostAuto "1" in Sion and in Frauenfeld…) with different colours: no colour
+    ambiguous = collections.Counter()
+    def pick(cnt):
+        (best, n), total = cnt.most_common(1)[0], sum(cnt.values())
+        return best if len(cnt) == 1 or n / total >= 0.75 else None
+    operators = {}
+    for k, v in sorted(lines.items()):
+        kept = {}
+        for ref, cnt in sorted(v.items()):
+            best = pick(cnt)
+            if best:
+                kept[ref] = [*best, "pill"]
+            else:
+                ambiguous[k] += 1
+        if kept:
+            operators[k] = {"name": names.get(k, ""), "lines": kept}
+    report["ambiguous_lines"] = dict(ambiguous.most_common())
     report.update(routes=len(routes), without_colour_or_ref=skipped, operators=len(operators),
                   lines=sum(len(o["lines"]) for o in operators.values()), unmatched_operators=unmatched.most_common(40),
                   per_operator={k: len(o["lines"]) for k, o in operators.items()})
