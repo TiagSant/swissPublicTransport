@@ -125,7 +125,9 @@ with sync_playwright() as p:
     refresh(pg)
     assert pg.get_attribute("#alarmBanner", "data-kind") == "trip" and "Tram 12 now leaves from Platform D" in pg.inner_text("#abBody"), pg.inner_text("#alarmBanner")
     pg.click("#abOk")
-    assert "Platform D (was C)" in legs.nth(2).inner_text() and legs.nth(2).locator(".changed").count() == 1, legs.nth(2).inner_text()
+    # the new platform is a button (tap → map), the old one in brackets (BUG-05)
+    assert legs.nth(2).locator(".plat.changed .plat-v").inner_text() == "D" and "(was C)" in legs.nth(2).inner_text() \
+        and legs.nth(2).locator(".changed").count() == 1, legs.nth(2).inner_text()
     refresh(pg); assert pg.is_hidden("#alarmBanner"), "the same platform change rings only once"
 
     # Live: bus 21 is 9 min late → arrives 08:01, +1 min walk: the 07:58 tram is missed
