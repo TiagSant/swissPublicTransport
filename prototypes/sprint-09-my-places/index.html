@@ -11,6 +11,9 @@
            Same at the start: walk to where the second ride leaves instead of taking the first one.
   - US-38: a followed journey shows every step live (delays, platforms, progress); a missed connection is detected
            and alternatives are offered: the next run of the same line, another route, or finishing on foot.
+  - US-39: a tight connection says it plainly (walk vs time between the rides) and offers options with a comfortable
+           margin: an earlier first bus, a later run, another route; the waiting time at each change, live.
+  - US-40: German, Italian and Romansh, in addition to English and French.
   Sprint 8: journey details
   - US-28: the details of a journey open inside the result, one at a time.
   - US-29: each ride is drawn in the colour of its line.
@@ -52,6 +55,7 @@
 <title>Unireso departures — Sprint 9 prototype</title>
 <script src="../../assets/line-colors.js"></script>
 <script src="../../assets/ojp.js"></script>
+<script src="i18n.js"></script>
 <style>
   :root {
     --bg: #f4f6f9; --card: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
@@ -70,7 +74,7 @@
   header h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
   header h1 span { color: var(--accent); }
   header .right { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .75rem; }
-  .lang { border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: .75rem; font-weight: 700; color: var(--muted); background: none; }
+  .lang { border: 1px solid var(--line); border-radius: 8px; padding: 3px 4px; font-size: .75rem; font-weight: 700; color: var(--muted); background: none; font-family: inherit; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
   .search-row { display: flex; gap: 8px; }
   input[type=search] { flex: 1; min-width: 0; font-size: 1rem; padding: 11px 12px; border-radius: 10px;
@@ -279,6 +283,8 @@
   .trip-alt { text-align: left; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; padding: 7px 10px; font: inherit; font-size: .85rem; cursor: pointer; display: grid; gap: 1px; }
   .trip-alt small { color: var(--muted); }
   .trip-alt.best { border-color: #1a7f37; }
+  .tl .wait { font-size: .8rem; color: var(--muted); }
+  .tl .wait.changed { color: #b26a00; font-weight: 600; }
   @media (prefers-color-scheme: dark) { .tl .changed { color: #ff8a80; } .trip-warn { border-color: #ff8a80; } .trip-alt.best { border-color: #6fdc8c; } }
   .note { color: var(--muted); font-size: .72rem; margin: 6px 0 0; }
   .walk-status { background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: .82rem; margin-top: 6px; }
@@ -323,7 +329,10 @@
     <h1><span data-i18n="title"></span> <span>Unireso</span></h1>
     <div class="right">
       <span data-i18n="prototype"></span>
-      <button id="lang" class="lang" type="button"></button>
+      <select id="lang" class="lang" aria-label="Language / Langue / Sprache / Lingua">
+        <option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option>
+        <option value="it">Italiano</option><option value="rm">Rumantsch</option>
+      </select>
       <button id="settingsBtn" class="lang" type="button" data-i18n-title="settingsTitle" data-i18n-aria="settingsTitle">⚙</button>
     </div>
   </header>
@@ -623,7 +632,14 @@
       tripNowRide: 'On board: {line} — get off at {stop} at {t}', tripNowWait: 'Next: {line} at {t} from {stop}{plat}', tripNowWalk: 'Walking to {to}',
       tripDone: 'Journey finished', wasPlat: 'was {p}', arrivalLost: 'connection missed: choose an alternative', notLive: 'not in the live data (cancelled?)', platChanged: 'now {p}',
       missedTitle: '⚠ Connection missed at {stop}', missedBody: 'You arrive at {arr}, the {line} leaves at {dep}.',
-      tightTitle: '⚠ Tight connection at {stop}', tightBody: '{n} min to change ({arr} → {dep}).',
+      tightTitle: '⚠ Tight connection at {stop}',
+      tightBodyWalk: '{walk} min walk in the {gap} min between your arrival ({arrRide}) and the departure ({dep}): {spare}.',
+      tightBodyNoWalk: '{gap} min between your arrival ({arrRide}) and the departure ({dep}): {spare}.',
+      spareNone: 'no time to spare — the slightest delay and you miss it', spareN: 'only {n} min to spare',
+      comfortTitle: 'With more margin:', altEarlier: 'Earlier {line} at {dep}', altEarlierDetail: '{m} min margin at the change · leave {leave}',
+      altMarginDetail: '{m} min margin · arrive {t}',
+      waitAfterWalk: 'Change: {walk} min walk, then {wait} min wait', waitOnly: 'Change: {wait} min wait',
+      waitNoneWalk: 'Change: {walk} min walk, no time to spare', waitNone: 'Change: no time to spare', waitMissed: 'Change: missed at the current times',
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
       altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
       altApplied: 'Journey updated: {what}.', platformNotify: 'Platform change', platformBody: '{line} now leaves from {p} at {stop}.',
@@ -659,7 +675,7 @@
       keyUnchecked: 'Saved, but could not be checked now ({why}).', keyRemoved: 'Key removed — back to transport.opendata.ch.', keyEmpty: 'Paste a key first.',
       keyNote: 'The key stays on this device (browser storage) and is only sent to api.opentransportdata.swiss. Free plan: 50 requests per minute. Without a key, the prototype uses transport.opendata.ch.',
       alarmsTitle: 'Alarms',
-      mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Boat', funicular: 'Funicular', cableway: 'Cable car', other: 'Other' }
+      mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Boat', funicular: 'Funicular', cableway: 'Cable car', metro: 'Metro', other: 'Other' }
     },
     fr: {
       title: 'Départs', prototype: 'Prototype · Sprint 9', switchTo: 'EN', switchToLabel: 'Show in English',
@@ -721,7 +737,14 @@
       tripNowRide: 'À bord : {line} — descendez à {stop} à {t}', tripNowWait: 'Prochain : {line} à {t} depuis {stop}{plat}', tripNowWalk: 'À pied jusqu\u2019à {to}',
       tripDone: 'Trajet terminé', wasPlat: 'avant : {p}', arrivalLost: 'correspondance manquée : choisissez une alternative', notLive: 'absent des données en direct (supprimé ?)', platChanged: 'maintenant {p}',
       missedTitle: '⚠ Correspondance manquée à {stop}', missedBody: 'Vous arrivez à {arr}, le {line} part à {dep}.',
-      tightTitle: '⚠ Correspondance serrée à {stop}', tightBody: '{n} min pour changer ({arr} → {dep}).',
+      tightTitle: '⚠ Correspondance serrée à {stop}',
+      tightBodyWalk: '{walk} min de marche pour les {gap} min entre votre arrivée ({arrRide}) et le départ ({dep}) : {spare}.',
+      tightBodyNoWalk: '{gap} min entre votre arrivée ({arrRide}) et le départ ({dep}) : {spare}.',
+      spareNone: 'aucune marge — le moindre retard vous la fait manquer', spareN: 'seulement {n} min de marge',
+      comfortTitle: 'Avec plus de marge :', altEarlier: '{line} plus tôt à {dep}', altEarlierDetail: '{m} min de marge à la correspondance · partir à {leave}',
+      altMarginDetail: '{m} min de marge · arrivée {t}',
+      waitAfterWalk: 'Correspondance : {walk} min de marche, puis {wait} min d\u2019attente', waitOnly: 'Correspondance : {wait} min d\u2019attente',
+      waitNoneWalk: 'Correspondance : {walk} min de marche, aucune marge', waitNone: 'Correspondance : aucune marge', waitMissed: 'Correspondance : manquée aux horaires actuels',
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
       altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
       altApplied: 'Trajet mis à jour : {what}.', platformNotify: 'Changement de quai', platformBody: '{line} part maintenant du {p} à {stop}.',
@@ -757,10 +780,14 @@
       keyUnchecked: 'Enregistrée, mais pas vérifiable maintenant ({why}).', keyRemoved: 'Clé supprimée — retour à transport.opendata.ch.', keyEmpty: 'Collez d’abord une clé.',
       keyNote: 'La clé reste sur cet appareil (stockage du navigateur) et n’est envoyée qu’à api.opentransportdata.swiss. Offre gratuite : 50 requêtes par minute. Sans clé, le prototype utilise transport.opendata.ch.',
       alarmsTitle: 'Alarmes',
-      mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Bateau', funicular: 'Funiculaire', cableway: 'Téléphérique', other: 'Autre' }
+      mode: { tram: 'Tram', bus: 'Bus', train: 'Train', ship: 'Bateau', funicular: 'Funiculaire', cableway: 'Téléphérique', metro: 'Métro', other: 'Autre' }
     }
   };
-  const LOCALE = { en: 'en-GB', fr: 'fr-CH' };   // en-GB keeps the 24-hour clock
+  // US-40: German, Italian and Romansh (i18n.js), same keys as English
+  Object.assign(STRINGS, window.EXTRA_STRINGS || {});
+  const LANGS = ['en', 'fr', 'de', 'it', 'rm'];
+  const LOCALE = { en: 'en-GB', fr: 'fr-CH', de: 'de-CH', it: 'it-CH', rm: 'rm-CH' };   // en-GB keeps the 24-hour clock
+  const apiLang = () => lang === 'rm' ? 'de' : lang;   // OJP answers in de / fr / it / en
 
   // ---------- Local storage (user preferences, on this device) ----------
   const store = {
@@ -772,7 +799,12 @@
     const saved = store.get('lang', null);
     if (saved && STRINGS[saved]) return saved;
     const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
-    return prefs.some(l => /^fr\b/i.test(l)) ? 'fr' : 'en';
+    for (const l of prefs) {
+      const code = String(l).toLowerCase().split('-')[0];
+      if (code === 'gsw') return 'de';                 // Swiss German
+      if (LANGS.includes(code)) return code;
+    }
+    return 'en';
   }
   let lang = detectLang();
   function t(key, vars) {
@@ -853,11 +885,11 @@
     // the app keeps only the stops of the Unireso area (as with transport.opendata.ch).
     async locations(q, signal) {
       if (!useOjp()) return (await getJSON(`${API}/locations?type=station&query=${enc(q)}`, signal)).stations || [];
-      return OJP.toLocations(await ojpPost(OJP.locationsByName(q, { lang, limit: 40 }), signal)).stations;
+      return OJP.toLocations(await ojpPost(OJP.locationsByName(q, { lang: apiLang(), limit: 40 }), signal)).stations;
     },
     // Stops, addresses and places of interest by name: [{ type: 'stop'|'address'|'poi', id, name, coordinate, icon }]
     async places(q, signal) {
-      if (useOjp()) return OJP.toPlaces(await ojpPost(OJP.locationsByName(q, { lang, limit: 30, types: ['stop', 'address', 'poi'] }), signal)).places;
+      if (useOjp()) return OJP.toPlaces(await ojpPost(OJP.locationsByName(q, { lang: apiLang(), limit: 30, types: ['stop', 'address', 'poi'] }), signal)).places;
       const r = await getJSON(`${API}/locations?query=${enc(q)}&type=all`, signal);
       return [...(r.stations || []), ...(r.addresses || []), ...(r.poi || [])].filter(x => x.coordinate && x.coordinate.x != null).map(x => ({
         type: x.id && /^\d{7}$/.test(String(x.id)) ? 'stop' : (x.type === 'poi' || x.icon === 'poi' ? 'poi' : 'address'),
@@ -868,7 +900,7 @@
       if (!useOjp()) return ((await getJSON(`${API}/locations?x=${pos[0]}&y=${pos[1]}`, signal)).stations || []).filter(s => s.id);
       const dLat = MAX_ACCESS_M / 111320, dLon = MAX_ACCESS_M / (111320 * Math.cos(pos[0] * Math.PI / 180));
       const zone = { latMin: pos[0] - dLat, latMax: pos[0] + dLat, lonMin: pos[1] - dLon, lonMax: pos[1] + dLon };
-      return OJP.toLocations(await ojpPost(OJP.locationsInZone(zone, { lang, limit: 40 }), signal)).stations
+      return OJP.toLocations(await ojpPost(OJP.locationsInZone(zone, { lang: apiLang(), limit: 40 }), signal)).stations
         .map(s => Object.assign(s, { distance: s.coordinate ? Math.round(distanceM(pos, [s.coordinate.x, s.coordinate.y])) : null }));
     },
     // Departures from `from` on. With OJP, the next stops of each run (needed for directions) are heavy:
@@ -878,10 +910,10 @@
       const pat = loadPatterns(stopId);
       const needFull = pat.fullAt == null || Date.now() - pat.fullAt > PATTERNS_MAX_AGE
         || (pat.unknown > 0 && Date.now() - pat.fullAt > PATTERNS_RETRY_MS);
-      const light = ojpPost(OJP.stopEvents(stopId, { lang, from, limit: BOARD_LIMIT, onward: false }), signal);
+      const light = ojpPost(OJP.stopEvents(stopId, { lang: apiLang(), from, limit: BOARD_LIMIT, onward: false }), signal);
       light.catch(() => {});   // awaited below; avoids an unhandled rejection if the full request fails first
       if (needFull) {
-        const full = await ojpPost(OJP.stopEvents(stopId, { lang, from: new Date(Date.now() - 2 * 60000), limit: PATTERNS_RESULTS }), signal);
+        const full = await ojpPost(OJP.stopEvents(stopId, { lang: apiLang(), from: new Date(Date.now() - 2 * 60000), limit: PATTERNS_RESULTS }), signal);
         OJP.toStationboard(full, stopId, pat.map);
         pat.fullAt = Date.now();
       }
@@ -898,7 +930,7 @@
         if (arrive) qs.set('isArrivalTime', '1');
         return getJSON(`${API}/connections?${qs}`, signal);
       }
-      return OJP.toConnections(await ojpPost(OJP.trip(a, b, { lang, at: ref, arrive, limit: 4 }), signal));
+      return OJP.toConnections(await ojpPost(OJP.trip(a, b, { lang: apiLang(), at: ref, arrive, limit: 4 }), signal));
     }
   };
 
@@ -2524,10 +2556,12 @@
       const k = idx[n + 1], cur = plan[i], next = plan[k];
       const ready = arrOf(cur) + walkBetween(plan, i, k) * 60000;
       const slack = Math.floor((depOf(next) - ready) / 60000);
-      return { i, k, cur, next, ready, slack, state: slack < 0 ? 'missed' : slack < 2 ? 'tight' : 'ok' };
+      const walk = walkBetween(plan, i, k), gap = Math.floor(depOf(next) / 60000) - Math.floor(arrOf(cur) / 60000);
+      return { i, k, cur, next, ready, slack, walk, gap, state: slack < 0 ? 'missed' : slack < 2 ? 'tight' : 'ok' };
     });
   }
 
+  const COMFORT_MIN = 3;   // a change with at least 3 min to spare is comfortable
   async function refreshTrip(a, boardOf, schedOf) {
     const now = Date.now();
     let changed = false;
@@ -2588,7 +2622,90 @@
       }
       break;   // the first broken change decides what comes next
     }
+    // US-39: a tight change (no missed one): look for options with a comfortable margin
+    const missedOne = tripConnections(a.plan).some(c => (c.state === 'missed' || c.next.missing) && depOf(c.next) > now - 10 * 60000);
+    const tight = !missedOne && tripConnections(a.plan).find(c => c.state === 'tight' && depOf(c.cur) > now - 60000);
+    if (tight && (!a.alts || a.alts.for !== 'tight' + tight.next.dep || now - a.alts.at > 2 * 60000)) {
+      a.alts = { for: 'tight' + tight.next.dep, at: now, list: null };
+      a.alts.list = await findComfortable(a, tight, boardOf, schedOf);
+      changed = true;
+    }
     return changed;
+  }
+
+  // Options for a tight change, each with at least COMFORT_MIN to spare: an earlier first ride (before leaving),
+  // a later run of the next line, another route from where the tight ride starts.
+  async function findComfortable(a, c, boardOf, schedOf) {
+    const out = [], now = Date.now(), plan = a.plan;
+    const rides = plan.filter(l => l.type === 'ride');
+    const isFirst = rides[0] === c.cur;
+    const leadMin = isFirst ? (alarmTimes(a).walk + getSettings().marginMin) : 0;   // time to reach the first stop
+    const same = (j, r) => String(j.category) === String(r.category) && String(j.number) === String(r.number);
+    const arrivalAt = (j, id) => { const p = (j.passList || []).find(x => x.station && x.station.id === id); return p && (parseTime(p.prognosis && p.prognosis.arrival) || parseTime(p.arrival)); };
+    // 1. an earlier run of the tight ride (only for the first ride, before boarding)
+    if (isFirst && depOf(c.cur) > now) {
+      try {
+        const board = await boardOf(c.cur.from.id, new Date(now - LOOKBACK_MIN * 60000));
+        const runs = ((board && board.stationboard) || []).filter(j => same(j, c.cur) && (j.passList || []).some(p => p.station && p.station.id === c.cur.toStop.id))
+          .map(j => ({ j, n: normalize(j) })).filter(({ n }) => n.sched && n.sched.getTime() < c.cur.dep - 30000 && (n.real || n.sched).getTime() >= now + leadMin * 60000)
+          .sort((x, y) => (y.n.real || y.n.sched) - (x.n.real || x.n.sched));
+        for (const { j, n } of runs) {
+          const dep = (n.real || n.sched).getTime(), arr = arrivalAt(j, c.cur.toStop.id);
+          const arrMs = arr ? arr.getTime() : dep + (arrOf(c.cur) - depOf(c.cur));
+          const margin = Math.floor((depOf(c.next) - arrMs) / 60000) - c.walk;
+          if (margin < COMFORT_MIN) continue;
+          out.push({ kind: 'earlier', dep, sched: n.sched.getTime(), real: n.real ? n.real.getTime() : null, arrCur: arrMs, margin,
+                     leave: dep - leadMin * 60000, arrive: tripArrival(plan), line: `${modeName(c.cur.mode)} ${c.cur.label}`, stop: c.cur.toStop.name });
+          break;
+        }
+      } catch { /* no board */ }
+    }
+    // 2. a later run of the next line, caught with a comfortable margin
+    try {
+      const board = await boardOf(c.next.from.id, new Date(c.ready - 5 * 60000));
+      const runs = ((board && board.stationboard) || []).filter(j => same(j, c.next) && (j.passList || []).some(p => p.station && p.station.id === c.next.toStop.id))
+        .map(j => ({ j, n: normalize(j) })).filter(({ n }) => n.sched && n.sched.getTime() > c.next.dep + 30000 && (n.real || n.sched).getTime() >= c.ready + COMFORT_MIN * 60000)
+        .sort((x, y) => (x.n.real || x.n.sched) - (y.n.real || y.n.sched));
+      if (runs.length) {
+        const { j, n } = runs[0], dep = (n.real || n.sched).getTime(), arr = arrivalAt(j, c.next.toStop.id);
+        const arrNext = arr ? arr.getTime() : dep + (arrOf(c.next) - depOf(c.next));
+        out.push({ kind: 'next', dep, sched: n.sched.getTime(), real: n.real ? n.real.getTime() : null, arrNext,
+                   margin: Math.floor((dep - c.ready) / 60000), arrive: tripArrival(plan) + (arrNext - arrOf(c.next)), line: `${modeName(c.next.mode)} ${c.next.label}`, stop: c.cur.toStop.name });
+      }
+    } catch { /* no board */ }
+    // 3. another route from where the tight ride starts, every change comfortable
+    try {
+      if (a.dest && c.cur.from.id && (!isFirst || depOf(c.cur) > now)) {
+        const from = c.cur.from, ctx = { from: { kind: 'stop', id: from.id, name: from.name, coord: from.coord }, to: a.dest };
+        const toC = await candidates(a.dest, 2);
+        const start = new Date(Math.max(now + leadMin * 60000, depOf(c.cur) - 15 * 60000));
+        const lists = await Promise.all(toC.filter(b => b.id !== from.id).map(b => fetchConnections({ id: from.id, name: from.name, coord: from.coord, meters: 0 }, b,
+          { mode: 'depart', at: start }, null, ctx).catch(() => [])));
+        const minSlack = jj => { const cs = tripConnections(planOf(jj)); return cs.length ? Math.min(...cs.map(x => x.slack)) : 99; };
+        const sameRides = jj => jj.rides.map(r => r.label + '@' + r.dep.getTime()).join() === rides.slice(rides.indexOf(c.cur)).map(r => r.label + '@' + r.dep).join();
+        lists.flat().filter(jj => !sameRides(jj) && minSlack(jj) >= COMFORT_MIN && (jj.rides[0].real || jj.rides[0].dep).getTime() >= now + leadMin * 60000)
+          .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 2)
+          .forEach(jj => out.push({ kind: 'replan', dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), arrive: jj.arriveAt.getTime(), margin: Math.min(minSlack(jj), 99),
+            lines: jj.rides.map(r => `${modeName(r.mode)} ${r.label}`).join(' › '), plan: planOf(jj), fromIdx: plan.indexOf(c.cur) }));
+      }
+    } catch { /* no route */ }
+    const seen = new Set();
+    return out.filter(o => { const k = o.kind + o.dep + (o.lines || ''); if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((x, y) => x.arrive - y.arrive || y.margin - x.margin).slice(0, 3);
+  }
+
+  // The first ride changed (earlier bus, other route): departure alarms follow it
+  function syncFirst(a) {
+    const r = a.plan.find(l => l.type === 'ride'); if (!r) return;
+    Object.assign(a.first, { stopId: r.from.id, stopName: r.from.name, stopCoord: r.from.coord, category: r.category, number: r.number,
+      mode: r.mode, label: r.label, style: r.style, to: r.to, sched: r.dep, platform: r.platform });
+    a.live = r.real ? { dep: r.real, at: Date.now() } : null;
+    a.created0 = depOf(r);
+    const k = a.plan.indexOf(r);
+    a.apiWalkBefore = a.plan.slice(0, k).filter(l => l.type === 'walk' && l.edge !== 'access').reduce((x, l) => x + l.min, 0);
+    const tm = alarmTimes(a), now = Date.now();
+    if (tm.ready > now) delete a.fired.ready;
+    if (tm.leave > now) delete a.fired.leave;
   }
 
   async function findAlternatives(a, c, boardOf, schedOf) {
@@ -2644,10 +2761,19 @@
     const list = getAlarms(), a = list.find(x => x.id === id);
     if (!a || !a.alts || !a.alts.list || !a.alts.list[n]) return;
     const o = a.alts.list[n];
-    const c = tripConnections(a.plan).find(x => x.next.dep === a.alts.for);
+    const forDep = String(a.alts.for).replace(/^tight/, '');
+    const c = tripConnections(a.plan).find(x => String(x.next.dep) === forDep);
     if (!c) return;
-    let what;
-    if (o.kind === 'next') {
+    let what, firstChanged = false;
+    if (o.kind === 'earlier') {
+      const r = a.plan[c.i], shift = o.sched - r.dep;
+      Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrCur, platformLive: null, missing: false });
+      r.via.forEach(v => { v.time += shift; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
+      what = `${o.line} ${hhmm(new Date(o.dep))}`; firstChanged = true;
+    } else if (o.kind === 'replan' && o.fromIdx != null) {
+      a.plan = [...a.plan.slice(0, o.fromIdx), ...o.plan];
+      what = o.lines; firstChanged = o.fromIdx <= a.plan.findIndex(l => l.type === 'ride');
+    } else if (o.kind === 'next') {
       const r = a.plan[c.k], shift = o.sched - r.dep;
       Object.assign(r, { dep: o.sched, real: o.real, arr: r.arr + shift, arrReal: o.arrNext, platformLive: null, missing: false });
       r.via.forEach(v => { v.time += shift; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
@@ -2660,8 +2786,10 @@
       a.plan = [...a.plan.slice(0, c.i + 1), { type: 'walk', min: o.min, meters: o.meters, start: o.start, end: o.end, edge: 'egress', to: '' }];
       what = t('altFoot', { stop: o.stop }).replace(/^🚶\s*/, '');
     }
+    if (firstChanged) syncFirst(a);
     // get-off reminders: rides already done keep theirs, the new ones are planned afresh
-    const nDone = a.plan.slice(0, c.i + 1).filter(l => l.type === 'ride').length;
+    const keepUpTo = o.kind === 'earlier' ? c.i : o.kind === 'replan' && o.fromIdx != null ? o.fromIdx : c.i + 1;
+    const nDone = a.plan.slice(0, keepUpTo).filter(l => l.type === 'ride').length;
     const fresh = alightPlan(hydrate(a.plan)).map((x, k) => k < nDone ? Object.assign(a.alights[k] || x, {}) : Object.assign(x, { noShift: true }));
     Object.keys(a.fired).filter(k => /^alight\d+$/.test(k) && +k.slice(6) >= nDone).forEach(k => delete a.fired[k]);
     if (a.gpsSeen) Object.keys(a.gpsSeen).filter(k => +k >= nDone).forEach(k => delete a.gpsSeen[k]);
@@ -2703,6 +2831,14 @@
     const timeHtml = (planned, real) => real && Math.floor(real / 60000) !== Math.floor(planned / 60000)
       ? `<span class="was">${tm(planned)}</span><time class="late">${tm(real)}</time>` : `<time>${tm(planned)}</time>`;
     const curIdx = plan.findIndex(l => l.type === 'ride' ? arrOf(l) > now : false);
+    // live waiting time at each change, shown on the ride taken after it
+    const changes = new Map(tripConnections(plan).map(c => [c.k, c]));
+    const waitHtml = k => {
+      const c = changes.get(k); if (!c || arrOf(c.cur) < now - 60000 && depOf(c.next) < now) return '';
+      const vars = { walk: c.walk, wait: Math.max(0, c.slack) };
+      const txt = c.slack < 0 ? t('waitMissed') : c.slack === 0 ? t(c.walk ? 'waitNoneWalk' : 'waitNone', vars) : t(c.walk ? 'waitAfterWalk' : 'waitOnly', vars);
+      return `<div class="wait${c.slack < COMFORT_MIN ? ' changed' : ''}">⏱ ${esc(txt)}</div>`;
+    };
     const rows = plan.map((l, k) => {
       if (l.type === 'walk') {
         const map = l.start && l.end && (l.start.coord || l.start.stopId) && (l.end.coord || l.end.stopId)
@@ -2718,7 +2854,7 @@
         : l.platform ? ` · ${esc(t(l.mode === 'train' ? 'track' : 'platform', { p: l.platform }))}` : '';
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       return `<li class="tl ride${cls}"${colour}><div class="tl-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span>→ ${esc(l.to)}</span>` +
-        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` +
+        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) +
         `<div>${timeHtml(l.dep, l.real)} ${esc(l.from.name)}${plat}</div>` +
         (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') +
         `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}</div></li>`;
@@ -2728,8 +2864,22 @@
     const broken = tripConnections(plan).find(c => (c.state !== 'ok' || c.next.missing) && depOf(c.next) > now - 10 * 60000);
     if (broken) {
       const missed = broken.state === 'missed' || broken.next.missing;
-      const vars = { stop: broken.cur.toStop.name, line: `${modeName(broken.next.mode)} ${broken.next.label}`, arr: tm(broken.ready), dep: tm(depOf(broken.next)), n: broken.slack };
+      const vars = { stop: broken.cur.toStop.name, line: `${modeName(broken.next.mode)} ${broken.next.label}`, arr: tm(broken.ready), dep: tm(depOf(broken.next)), n: broken.slack,
+                     walk: broken.walk, gap: broken.gap, arrRide: tm(arrOf(broken.cur)),
+                     spare: broken.slack <= 0 ? t('spareNone') : t('spareN', { n: broken.slack }) };
       let alts = '';
+      if (!missed) {
+        const list = a.alts && a.alts.for === 'tight' + broken.next.dep ? a.alts.list : null;
+        alts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? '' :
+          `<small>${esc(t('comfortTitle'))}</small>` + list.map((o, n) => {
+            const title = o.kind === 'earlier' ? t('altEarlier', { line: o.line, dep: tm(o.dep) })
+              : o.kind === 'next' ? t('altNext', { line: o.line, dep: tm(o.dep) })
+              : t('altReplan', { lines: o.lines, dep: tm(o.dep) });
+            const detail = o.kind === 'earlier' ? t('altEarlierDetail', { m: o.margin, leave: tm(o.leave) })
+              : t('altMarginDetail', { m: Math.min(o.margin, 60), t: tm(o.arrive) });
+            return `<button class="trip-alt" data-act="alt" data-n="${n}"><span>${esc(title)}</span><small>${esc(detail)}</small></button>`;
+          }).join('');
+      }
       if (missed) {
         const list = a.alts && a.alts.for === broken.next.dep ? a.alts.list : null;
         alts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? `<small>${esc(t('altNone'))}</small>` :
@@ -2742,7 +2892,7 @@
           }).join('');
       }
       warn = `<div class="trip-warn${missed ? '' : ' tight'}"><b>${esc(t(missed ? 'missedTitle' : 'tightTitle', vars))}</b>` +
-        `<span>${esc(t(missed ? 'missedBody' : 'tightBody', vars))}</span>${alts}</div>`;
+        `<span>${esc(missed ? t('missedBody', vars) : t(broken.walk ? 'tightBodyWalk' : 'tightBodyNoWalk', vars))}</span>${alts}</div>`;
     }
     // with a missed connection, the planned arrival no longer holds
     const lost = broken && (broken.state === 'missed' || broken.next.missing);
@@ -2921,7 +3071,7 @@
     if (!key) { keyStatus('keyEmpty', 'bad'); return; }
     keyStatus('keyChecking');
     let ok = true, why = '';
-    try { await ojpPost(OJP.locationsByName('Cornavin', { lang, limit: 1 }), null, key); }
+    try { await ojpPost(OJP.locationsByName('Cornavin', { lang: apiLang(), limit: 1 }), null, key); }
     catch (e) {
       if (e.kind === 'auth') { setApiStatus(null); keyStatus('keyBad', 'bad', { status: e.status }); return; }
       ok = false; why = e.kind || e.message;
@@ -2983,13 +3133,12 @@
   // ---------- Language (US-10) ----------
   function applyLanguage() {
     document.documentElement.lang = lang;
-    document.title = lang === 'fr' ? 'Départs Unireso — Prototype Sprint 9' : 'Unireso departures — Sprint 9 prototype';
+    document.title = `${t('title')} Unireso — ${t('prototype')}`;
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
     document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
-    $('lang').textContent = t('switchTo');
-    $('lang').setAttribute('aria-label', t('switchToLabel'));
+    $('lang').value = lang;
     $('dirToggle').textContent = $('dirs').hidden ? t('chooseDirections') : t('hideDirections');
     if (lastResults && !$('results').hidden) renderResults(lastResults.stations, lastResults.noteKey);
     if (current && lastLoad) { renderLines(); renderDepartures(); renderStatus(); }
@@ -3016,7 +3165,7 @@
   });
   $('allCH').addEventListener('change', () => { const q = $('q').value.trim(); if (q.length >= 2) search(q); });
   $('near').addEventListener('click', nearMe);
-  $('lang').addEventListener('click', () => { lang = lang === 'fr' ? 'en' : 'fr'; store.set('lang', lang); applyLanguage(); });
+  $('lang').addEventListener('change', e => { lang = LANGS.includes(e.target.value) ? e.target.value : 'en'; store.set('lang', lang); applyLanguage(); });
 
   const pick = (e) => {
     const b = e.target.closest('button[data-id]');

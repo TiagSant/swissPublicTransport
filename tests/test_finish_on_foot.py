@@ -175,10 +175,10 @@ with sync_playwright() as p:
     FAST_TRAM["on"] = False
     # French
     pg.evaluate("localStorage.removeItem('tpp:foot')"); search()
-    pg.click("#lang")
+    pg.select_option("#lang", "fr")
     assert "Finir à pied depuis Genève, Plainpalais" in item().locator(".foot-toggle[data-side=end]").inner_text()
     assert "Partir à pied jusqu’à Genève, Plainpalais" in item().locator(".foot-toggle[data-side=start]").inner_text()
-    pg.click("#lang")
+    pg.select_option("#lang", "en")
     b.close()
 
 print("errors:", errors); assert not errors

@@ -80,7 +80,8 @@ python tests/test_sprint08.py            # journey details, line colours, interm
 python tests/test_sprint09.py            # my places, address search, next stop after removal, alarms set late
 python tests/test_alight_gps.py          # get-off reminders: live time of each ride, position, tunnel fallback
 python tests/test_finish_on_foot.py      # finish / start on foot: offer, switch both ways, learning, limits
-python tests/test_followed_journey.py    # followed journey: live steps, platform change, missed connection, alternatives
+python tests/test_followed_journey.py    # followed journey: live steps, platform change, missed / tight connection, alternatives
+python tests/test_languages.py           # English, French, German, Italian, Romansh
 ```
 
 ## Workflow
