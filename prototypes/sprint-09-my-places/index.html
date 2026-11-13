@@ -262,6 +262,10 @@
   .stay-row input { width: 4.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
   .place.via { border-left: 3px solid var(--accent); padding-left: 8px; }
   .jw.stay { font-weight: 700; }
+  .stay-on { font-size: .82rem; color: #1a7f37; margin: 4px 0 2px; }
+  .stay-on .stay-on-toggle { font-size: .8rem; padding: 2px 8px; margin-left: 4px; }
+  .stay-on.offer .stay-on-toggle { color: #1a7f37; border-color: #1a7f37; margin-left: 0; }
+  @media (prefers-color-scheme: dark) { .stay-on, .stay-on.offer .stay-on-toggle { color: #6fdc8c; border-color: #6fdc8c; } }
   .wait-total.changed { color: #b26a00; font-weight: 600; }
   .leg .wait { font-size: .8rem; color: var(--muted); margin: 2px 0; }
   .leg .wait.changed { color: #b26a00; font-weight: 600; }
@@ -577,6 +581,8 @@
     <label class="set-row"><span data-i18n="margin"></span><span><input id="setMargin" type="number" min="0" max="15" step="1" inputmode="numeric"> min</span></label>
     <label class="set-row"><span data-i18n="alightSetting"></span><input id="setAlight" type="checkbox"></label>
     <label class="set-row"><span data-i18n="footSetting"></span><span><input id="setFootMax" type="number" min="0" max="30" step="1" inputmode="numeric"> min</span></label>
+    <label class="set-row"><span data-i18n="realWalkSetting"></span><input id="setRealWalk" type="checkbox"></label>
+    <p class="note" data-i18n="realWalkNote"></p>
     <div class="set-row"><span data-i18n="notifications"></span><span><button id="enableNotif" class="ghost" data-i18n="enableNotif"></button> <span id="notifState" class="status"></span></span></div>
     <h4 data-i18n="simTitle"></h4>
     <div class="set-row"><span data-i18n="simWalk"></span><span><input id="simSpeed" type="number" min="1" max="10" step="0.1" value="5.5"> km/h <button id="simWalk" class="ghost">▶</button></span></div>
@@ -621,7 +627,10 @@
       yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
       removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
       lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
-      dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators and © OpenStreetMap contributors (ODbL)',
+      dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators and © OpenStreetMap contributors (ODbL) · Walking routes: OSRM, FOSSGIS',
+      stayOnNote: '↷ Staying on to {stop}: {saved} min less walking', stayOnUndo: 'Get off at {stop} instead', stayOnOffer: '↷ Stay on to {stop}: {saved} min less walking',
+      footOfferStayOn: '🚶 Stay on the {line} to {from}, then walk', walkDistRoute: 'About {d} on foot along the streets.',
+      realWalkSetting: 'Walking routes along the streets', realWalkNote: 'Walking routes come from the OpenStreetMap server of FOSSGIS (OSRM): the start and end of each walk are sent to it. Off: straight line × 1.3.',
       noStop: 'No stop found.', searchFailed: 'Search failed (network?).', geoUnavailable: 'Geolocation not available.',
       locating: 'locating…', noNearby: 'No stop nearby.', nearbyFailed: 'Could not load nearby stops.',
       geoDenied: 'Location denied or unavailable.', nextStop: 'next stop: {name}',
@@ -735,7 +744,10 @@
       yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
       removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
       lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
-      dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants et © contributeurs OpenStreetMap (ODbL)',
+      dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants et © contributeurs OpenStreetMap (ODbL) · Itinéraires à pied : OSRM, FOSSGIS',
+      stayOnNote: '↷ Rester jusqu\u2019à {stop} : {saved} min de marche en moins', stayOnUndo: 'Descendre plutôt à {stop}', stayOnOffer: '↷ Rester jusqu\u2019à {stop} : {saved} min de marche en moins',
+      footOfferStayOn: '🚶 Rester dans le {line} jusqu\u2019à {from}, puis à pied', walkDistRoute: 'Environ {d} à pied par les rues.',
+      realWalkSetting: 'Marche par les rues (itinéraire réel)', realWalkNote: 'Les itinéraires à pied viennent du serveur OpenStreetMap de FOSSGIS (OSRM) : le début et la fin de chaque marche lui sont envoyés. Désactivé : ligne droite × 1,3.',
       noStop: 'Aucun arrêt trouvé.', searchFailed: 'Recherche impossible (réseau ?).', geoUnavailable: 'Géolocalisation non disponible.',
       locating: 'localisation…', noNearby: 'Aucun arrêt à proximité.', nearbyFailed: 'Impossible de charger les arrêts proches.',
       geoDenied: 'Position refusée ou indisponible.', nextStop: 'prochain arrêt : {name}',
@@ -1786,7 +1798,7 @@
   // ---------- Settings (US-18) ----------
   // Walking time = straight-line distance × DETOUR / walking speed (streets are rarely straight).
   const DETOUR = 1.3;
-  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true, footMaxMin: 15 };
+  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true, footMaxMin: 15, realWalk: true };
   const getSettings = () => Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {}));
   const saveSettings = s => store.set('settings', s);
   const speedMPerMin = () => getSettings().speedKmh * 1000 / 60;
@@ -2085,6 +2097,167 @@
     return list.slice().sort(prio === 'walk' ? (x, y) => byWalk(x, y) || byTime(x, y) : (x, y) => byTime(x, y) || byWalk(x, y));
   }
 
+  // ---------- US-50 / US-51: where to get off ----------
+  // A vehicle's next stops after the one where the journey gets off, from that stop's departure board (the run is
+  // found by line, time and terminus). Boards are shared by all journeys (one per stop and 5 minutes).
+  const ONWARD_MAX = 5;
+  const onwardBoards = new Map();
+  function boardNear(stopId, at) {
+    const key = stopId + '|' + Math.floor(at / 300000);
+    if (!onwardBoards.has(key)) onwardBoards.set(key, data.board(stopId, new Date(at - 3 * 60000)).catch(() => null));
+    return onwardBoards.get(key);
+  }
+  async function onwardStops(r) {
+    const arr = r.arrReal || r.arr;
+    if (!arr || !r.toStop || !r.toStop.id) return [];
+    const b = await boardNear(r.toStop.id, +arr);
+    const schedOf = j => { const x = tsOr(j.stop.departureTimestamp, j.stop.departure); return x ? x.getTime() : 0; };
+    const run = b && findRun(b.stationboard || [], { category: r.category, number: r.number, to: r.to }, +r.arr, schedOf, 150000).run;
+    if (!run) return [];
+    const delay = r.arrReal ? +r.arrReal - +r.arr : 0, out = [];
+    for (const p of (run.passList || []).slice(1, 1 + ONWARD_MAX)) {
+      const st = p.station || {}, planned = tsOr(p.arrivalTimestamp, p.arrival) || tsOr(p.departureTimestamp, p.departure);
+      const pr = p.prognosis || {}, live = parseTime(pr.arrival), coord = coordOf(st);
+      if (!planned || !coord || !st.name) break;   // a time and a position are needed
+      out.push({ id: st.id ? String(st.id) : null, name: st.name, coord, planned: +planned, at: live ? +live : +planned + delay,
+                 live: !!live || !!r.arrReal, platform: pr.platform || p.platform || '' });
+    }
+    return out;
+  }
+  // Where a stop's platform is (else the stop)
+  function platformPos(quays, id, coord, plat) {
+    const pts = id ? platformPoints(quays[id] || {}) : [];
+    const p = plat && pts.find(q => q.names.includes(plat) || q.names.includes(String(plat).toUpperCase()));
+    return p ? p.pos : coord;
+  }
+  // The same ride, staying on to its onward stop n (the stops passed become intermediate stops)
+  function extendRide(r, n) {
+    const from = r.onwardIdx == null ? -1 : r.onwardIdx, s = r.onward[n];
+    const passed = [{ name: r.toStop.name, id: r.toStop.id, coord: r.toStop.coord, time: r.arrReal || r.arr, live: !!r.arrReal, depAt: r.arrReal || r.arr },
+      ...r.onward.slice(from + 1, n).map(b => ({ name: b.name, id: b.id, coord: b.coord, time: new Date(b.at), live: b.live, depAt: new Date(b.at) }))];
+    return Object.assign({}, r, { toStop: { id: s.id, name: s.name, coord: s.coord }, arr: new Date(s.planned), arrReal: s.live ? new Date(s.at) : null,
+      arrPlatform: s.platform || '', stops: r.stops + passed.length, via: [...(r.via || []), ...passed], onwardIdx: n, stayedFrom: r.stayedFrom || r.toStop.name });
+  }
+  // US-50: at a change, staying on to the connection's stop (or closer to it) when the change still works with
+  // its margin (a comfortable change stays comfortable) and it saves walking
+  function bestStayOn(j, c, quays) {
+    const cur = j.legs[c.i], next = j.legs[c.k];
+    if (!cur.onward || !cur.onward.length || c.walk < 2) return null;
+    const target = platformPos(quays, next.from.id, next.from.coord, next.platform);
+    if (!target) return null;
+    const need = Math.max(1, Math.min(c.slack, COMFORT_MIN));
+    let best = null;
+    cur.onward.forEach((s, n) => {
+      const same = (s.id && s.id === next.from.id) || fold(s.name) === fold(next.from.name);
+      const from = platformPos(quays, s.id, s.coord, s.platform);
+      const min = Math.max(same ? 1 : 0.5, walkMinutes(distanceM(from, target)));
+      const slack = Math.floor((+depOf(next) - (s.at + min * 60000)) / 60000);
+      if (slack < need || min > c.walk - 1) return;
+      if (!best || min < best.min) best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name };
+    });
+    return best;
+  }
+  // The journey with those changes applied (or offered, when the rider prefers the planned stop)
+  const stayOnOff = new Set();   // "get off where planned" choices, by journey and ride
+  function withStayOn(j) {
+    if (!j.stayOns || !j.stayOns.length) return j;
+    let legs = j.legs.slice();
+    for (const a of j.stayOns.slice().sort((x, y) => y.i - x.i)) {
+      const cur = legs[a.i], next = legs[a.k], key = j.key + '#' + a.i;
+      if (stayOnOff.has(key)) { legs[a.i] = Object.assign({}, cur, { stayOffer: Object.assign({ key }, a) }); continue; }
+      const ext = Object.assign(extendRide(cur, a.n), { stayedOn: Object.assign({ key }, a) });
+      const s = cur.onward[a.n];
+      const walk = { type: 'walk', min: a.min, edge: 'transfer', to: next.from.name,
+        start: { name: s.name, stopId: s.id, coord: s.coord, platform: s.platform, mode: cur.mode },
+        end: { name: next.from.name, stopId: next.from.id, coord: next.from.coord, platform: next.platform, mode: next.mode } };
+      legs = [...legs.slice(0, a.i), ext, walk, ...legs.slice(a.k)];
+    }
+    markSamePlatform(legs);
+    const rides = legs.filter(l => l.type === 'ride');
+    return Object.assign({}, j, { legs, rides, walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0), _waits: null });
+  }
+
+  // US-52: walking routes along the streets (OSRM, foot profile, FOSSGIS server), cached on the device; without
+  // them (setting off, offline, server busy) the straight line × 1.3 stays
+  const ROUTE_API = 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/';
+  const ROUTES_MAX = 200, ROUTE_TTL = 30 * 86400000;
+  const routeMem = new Map();
+  const realWalkOn = () => getSettings().realWalk !== false;
+  const routeKey = (a, b) => `${(+a[0]).toFixed(5)},${(+a[1]).toFixed(5)};${(+b[0]).toFixed(5)},${(+b[1]).toFixed(5)}`;
+  const routeMin = meters => meters / speedMPerMin();
+  function routeCached(a, b) {
+    if (!realWalkOn() || !a || !b) return null;
+    const k = routeKey(a, b), m = routeMem.get(k);
+    if (m && !m.then) return m;
+    const st = store.get('routes', {})[k];
+    if (st && Date.now() - st.t < ROUTE_TTL) { routeMem.set(k, st); return st; }
+    return null;
+  }
+  let routeBusy = 0; const routeQueue = [];
+  function walkRoute(a, b) {
+    if (!realWalkOn() || !a || !b || distanceM(a, b) < 25) return Promise.resolve(null);
+    const k = routeKey(a, b), c = routeCached(a, b);
+    if (c) return Promise.resolve(c);
+    if (routeMem.has(k)) return routeMem.get(k);
+    const p = (async () => {
+      while (routeBusy >= 2) await new Promise(r => routeQueue.push(r));   // two requests at a time, at most
+      routeBusy++;
+      try {
+        const res = await fetch(`${ROUTE_API}${(+a[1]).toFixed(6)},${(+a[0]).toFixed(6)};${(+b[1]).toFixed(6)},${(+b[0]).toFixed(6)}?overview=full&geometries=geojson`);
+        if (!res.ok) throw new Error('route ' + res.status);
+        const r0 = ((await res.json()).routes || [])[0];
+        if (!r0 || !r0.geometry) throw new Error('no route');
+        const path = r0.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+        const step = Math.max(1, Math.ceil(path.length / 150));
+        const out = { meters: Math.round(r0.distance), path: path.filter((x, n) => n % step === 0 || n === path.length - 1), t: Date.now() };
+        routeMem.set(k, out);
+        const all = store.get('routes', {}); all[k] = out;
+        const keys = Object.keys(all).sort((x, y) => all[y].t - all[x].t);
+        keys.slice(ROUTES_MAX).forEach(x => delete all[x]);
+        try { store.set('routes', all); } catch { /* storage full: memory only */ }
+        return out;
+      } catch { routeMem.delete(k); return null; }
+      finally { routeBusy--; const w = routeQueue.shift(); if (w) w(); }
+    })();
+    routeMem.set(k, p);
+    return p;
+  }
+  // The walks the app computes itself (to and from a place, on foot instead of a ride) follow the streets
+  async function routeWalks(j) {
+    const quays = await loadQuays().catch(() => ({}));
+    for (const [k, l] of j.legs.entries()) {
+      if (l.type !== 'walk' || l.edge === 'transfer' || l.routed || !l.meters) continue;
+      const { start, end } = walkEnds(j.legs, k);
+      const a = start && platformPos(quays, start.stopId, start.coord, start.platform), b = end && platformPos(quays, end.stopId, end.coord, end.platform);
+      const r = await walkRoute(a, b);
+      if (!r) continue;
+      const apiPart = Math.max(0, l.min - walkMinutes(l.meters));   // minutes the API itself added (a footpath to the stop)
+      const min = apiPart + routeMin(r.meters), delta = min - l.min;
+      Object.assign(l, { min, meters: r.meters, routed: true });
+      const firstIdx = j.legs.findIndex(x => x.type === 'ride');
+      if (k < firstIdx) { j.walkBefore += delta; j.leaveAt = new Date(j.leaveAt.getTime() - delta * 60000); }
+      else if (k > j.legs.map(x => x.type).lastIndexOf('ride')) j.arriveAt = new Date(j.arriveAt.getTime() + delta * 60000);
+      j.walkMin += delta; j.durationMin = (j.arriveAt - j.leaveAt) / 60000; j._waits = null;
+    }
+  }
+  // After a search: next stops of each ride, better stops to get off, street routes — for the journeys shown first
+  async function enrichJourneys(list) {
+    const quays = await loadQuays().catch(() => ({}));
+    for (const j of list) {
+      if (j._enriched) continue;
+      j._enriched = true;
+      try {
+        for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
+        j.stayOns = tripConnections(planOf(j)).map(c => bestStayOn(j, c, quays)).filter(Boolean);
+        if (!(j.segments > 1)) await routeWalks(j);   // a trip in parts keeps its planned stays
+        // the walk at the end, from the best stop: its street route in the cache for footAlternative
+        const alt = footAlternative(withStayOn(j));
+        if (alt && places.to && places.to.coord) await walkRoute(platformPos(quays, alt.start.stopId, alt.start.coord, alt.start.platform), places.to.coord);
+      } catch { /* keep the journey as found */ }
+      if (journeyBase.includes(j)) renderJourneys();
+    }
+  }
+
   // Journeys between two places (one part of the trip): 2 × 2 stops at most, each pair one /connections call
   // (the free API allows about 1000 per day); the same vehicles from another stop keep the shorter walk
   async function journeysBetween(from, to, when, signal) {
@@ -2154,6 +2327,7 @@
       for (const k of new Set(journeyBase.filter(j => !(j.segments > 1)).flatMap(j => [footAlternative(j), startAlternative(j)]).filter(Boolean).map(x => x.key))) recordFoot(k, 'shown');
       status.textContent = journeyBase.length ? '' : t('noJourney');
       renderJourneys();
+      enrichJourneys(rankJourneys(journeyBase, getPrio(), readWhen().mode).slice(0, 6));
     } catch (e) {
       if (e.name === 'AbortError') return;
       if (e.noStop) { status.textContent = t('noStopNear', { name: placeLabel(e.noStop) }); $('journeyResults').hidden = true; return; }
@@ -2179,23 +2353,37 @@
       ? { name: prev.toStop.name, stopId: prev.toStop.id, coord: prev.toStop.coord, platform: prev.arrPlatform, mode: prev.mode }
       : { name: ['saved', 'addr', 'stop'].includes(places.from && places.from.kind) ? placeLabel(places.from) : t('yourStart'), coord: places.from && places.from.coord };
     if (!start.coord) return null;
-    const straight = distanceM(start.coord, dest), min = walkMinutes(straight);
+    // the walk: along the streets when known (US-52), else the straight line × 1.3
+    const walkOf = from => { const r = routeCached(from, dest), straight = distanceM(from, dest);
+      return r ? { min: routeMin(r.meters), meters: r.meters } : { min: walkMinutes(straight), meters: straight * DETOUR }; };
+    const startAt0 = prev ? (prev.arrReal || prev.arr) : j.leaveAt;
+    if (!startAt0) return null;
+    let best = Object.assign({ start, startAt: startAt0, ext: null }, walkOf(start.coord));
+    // US-51: or stay on the previous ride a few stops more, to get off closer (its next stops are known)
+    if (prev && prev.onward) prev.onward.forEach((s, n) => {
+      if (n <= (prev.onwardIdx == null ? -1 : prev.onwardIdx)) return;
+      const w = walkOf(s.coord), at = s.at + w.min * 60000, bestAt = best.startAt.getTime() + best.min * 60000;
+      if (at < bestAt - 30000 || (Math.abs(at - bestAt) <= 30000 && w.min < best.min))
+        best = Object.assign({ start: { name: s.name, stopId: s.id, coord: s.coord, platform: s.platform, mode: prev.mode }, startAt: new Date(s.at), ext: n }, w);
+    });
+    const { min, meters, startAt } = best;
     if (min > maxMin) return null;
-    const startAt = prev ? (prev.arrReal || prev.arr) : j.leaveAt;
-    if (!startAt) return null;
     const arriveAt = new Date(startAt.getTime() + min * 60000);
     const delta = shownMinDiff(arriveAt, j.arriveAt);   // > 0: on foot arrives later
     if (delta > FOOT_MAX_LATER) return null;
-    return { start, startAt, min, meters: straight * DETOUR, arriveAt, delta, line: `${modeName(last.mode)} ${last.label}`,
-             key: (prev ? prev.toStop.id : 'from:' + placeKey(places.from)) + '>' + placeKey(places.to) };
+    return { start: best.start, startAt, min, meters, arriveAt, delta, line: `${modeName(last.mode)} ${last.label}`, ext: best.ext,
+             prevLine: prev ? `${modeName(prev.mode)} ${prev.label}` : '',
+             key: (best.ext != null ? best.start.stopId : prev ? prev.toStop.id : 'from:' + placeKey(places.from)) + '>' + placeKey(places.to) };
   }
   // The same journey, the last ride replaced by the walk
   function onFootVariant(j, alt) {
     const prev = j.rides.length > 1 ? j.rides[j.rides.length - 2] : null;
     const end = { name: ['saved', 'addr', 'stop'].includes(places.to.kind) ? placeLabel(places.to) : t('yourDestination'), coord: places.to.coord };
-    const legs = [...j.legs.slice(0, prev ? j.legs.indexOf(prev) + 1 : 0),
-                  { type: 'walk', min: alt.min, meters: alt.meters, edge: 'egress', start: alt.start, end, to: '', foot: true }];
-    const rides = j.rides.slice(0, -1);
+    const pi = prev ? j.legs.indexOf(prev) : -1;
+    const legs = [...j.legs.slice(0, pi + 1),
+                  { type: 'walk', min: alt.min, meters: alt.meters, edge: 'egress', start: alt.start, end, to: '', foot: true, routed: !!routeCached(alt.start.coord, places.to.coord) }];
+    if (prev && alt.ext != null) legs[pi] = extendRide(prev, alt.ext);   // US-51: stay on to a closer stop
+    const rides = legs.filter(l => l.type === 'ride');
     const leaveAt = rides.length ? j.leaveAt : alt.startAt;
     return Object.assign({}, j, { legs, rides, leaveAt, arriveAt: alt.arriveAt, durationMin: (alt.arriveAt - leaveAt) / 60000,
       transfers: Math.max(0, rides.length - 1), walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0),
@@ -2246,7 +2434,8 @@
     all[key] = r; store.set('foot', all);
   }
   // What the list shows for each journey found: the bus, or the walk when chosen or learned
-  function displayJourney(j) {
+  function displayJourney(j0) {
+    const j = withStayOn(j0);
     if (j.segments > 1) return j;   // a trip in parts: no walk / bus switch at its ends
     const end = footAlternative(j), start = startAlternative(j);
     const state = (alt, side) => {
@@ -2292,7 +2481,7 @@
     }
     const a = j.footOffer;
     if (!a) return '';
-    const title = a.start.stopId ? t('footOffer', { from: a.start.name }) : t('footAll');
+    const title = a.ext != null ? t('footOfferStayOn', { line: a.prevLine, from: a.start.name }) : a.start.stopId ? t('footOffer', { from: a.start.name }) : t('footAll');
     const better = a.delta < 0;
     return `<li class="foot-alt"><button class="foot-toggle${better ? ' better' : ''}" data-i="${i}" data-side="end" data-foot="1"><span>${esc(title)}</span>` +
       `<small>${esc(t('footDetail', { min: fmtMin(a.min), dist: fmtDistance(a.meters), arr: hhmm(a.arriveAt) }))} · ` +
@@ -2387,11 +2576,14 @@
       }
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       const W = journeyWaits(j), change = W.byRide.get(k);
+      const so = l.stayedOn ? `<div class="stay-on">${esc(t('stayOnNote', { stop: l.stayedOn.stop, saved: l.stayedOn.saved }))} ` +
+          `<button class="ghost stay-on-toggle" data-key="${esc(l.stayedOn.key)}">${esc(t('stayOnUndo', { stop: l.stayedFrom }))}</button></div>`
+        : l.stayOffer ? `<div class="stay-on offer"><button class="ghost stay-on-toggle" data-key="${esc(l.stayOffer.key)}">${esc(t('stayOnOffer', { stop: l.stayOffer.stop, saved: l.stayOffer.saved }))}</button></div>` : '';
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
         ${change ? changeWaitHtml(W.plan, change) : ''}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
-        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div></li>`;
+        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div>${so}</li>`;
     }
     const route = j.segments > 1 ? tripPoints().pts.map(placeLabel).join(' → ') : `${placeLabel(places.from)} → ${placeLabel(places.to)}`;
     return `<div class="jr-detail"><div class="jr-meta">${esc(route)}</div>
@@ -2431,6 +2623,7 @@
   // US-32: one walk on the map, from its start to its end. A stop end is its platform (BUG-05): the platform of the
   // ride taken there, live, with the stop's other platforms around it so the right one is easy to spot.
   // While following a journey, the rider's position and the distance to that platform are shown too.
+  let walkMapToken = 0;
   async function openWalkMap(legs, k, opts = {}) {
     const l = legs[k];
     const { start, end } = walkEnds(legs, k);
@@ -2473,9 +2666,18 @@
     if (A.pos) marker(A, start, 'a', 'A');
     if (B.pos) marker(B, end, 'b', 'B');
     if (A.pos && B.pos) {
-      L.polyline([A.pos, B.pos], { color: '#1c7ed6', weight: 4, dashArray: '2 8', lineCap: 'round' }).addTo(mapLayer);
+      const straight = L.polyline([A.pos, B.pos], { color: '#1c7ed6', weight: 4, dashArray: '2 8', lineCap: 'round' }).addTo(mapLayer);
+      // US-52: the walk along the streets, when the routing server answers (the dashed straight line meanwhile)
+      const token = ++walkMapToken;
+      walkRoute(A.pos, B.pos).then(r => {
+        if (!r || token !== walkMapToken || $('mapSheet').hidden) return;
+        mapLayer.removeLayer(straight);
+        L.polyline(r.path, { color: '#1c7ed6', weight: 5, opacity: .9, lineCap: 'round', className: 'walk-route' }).addTo(mapLayer);
+        if (!opts.follow) $('mapInfo').textContent = [t('walkDistRoute', { d: fmtDistance(r.meters) }), ...notes.filter(x => x !== distNote)].join(' ');
+      });
       map.fitBounds([A.pos, B.pos], { padding: [50, 50], maxZoom: 19, animate: false });
-      if (!opts.follow) notes.push(t('walkDist', { d: fmtDistance(distanceM(A.pos, B.pos) * DETOUR) }));   // following: the live distance instead
+      const distNote = t('walkDist', { d: fmtDistance(distanceM(A.pos, B.pos) * DETOUR) });
+      if (!opts.follow) notes.push(distNote);   // following: the live distance instead
       $('walkThere').href = `https://www.google.com/maps/dir/?api=1&origin=${A.pos[0]},${A.pos[1]}&destination=${B.pos[0]},${B.pos[1]}&travelmode=walking`;
       $('walkThere').textContent = t('walkDirections');
       $('walkThere').hidden = false;
@@ -3594,6 +3796,7 @@
     const s = getSettings();
     $('setPrep').value = s.prepMin; $('setSpeed').value = s.speedKmh.toFixed(1); $('setMargin').value = s.marginMin;
     $('setAlight').checked = s.alightReminder !== false;
+    $('setRealWalk').checked = s.realWalk !== false;
     $('setFootMax').value = s.footMaxMin;
     const last = s.samples && s.samples.length ? s.samples[s.samples.length - 1].kmh.toFixed(1) : null;
     $('speedInfo').textContent = s.learned ? t('learnedFrom', { n: s.learned, last }) : t('notLearned');
@@ -3611,6 +3814,7 @@
     s.speedKmh = Math.round(num('setSpeed', 2, 8, s.speedKmh) * 10) / 10;
     s.marginMin = Math.round(num('setMargin', 0, 15, s.marginMin));
     s.alightReminder = $('setAlight').checked;
+    s.realWalk = $('setRealWalk').checked;
     s.footMaxMin = Math.round(num('setFootMax', 0, 30, s.footMaxMin));
     saveSettings(s); renderAlarms(); tickAlarms();
   }
@@ -3810,6 +4014,8 @@
     if (w) { const j = journeys[+w.dataset.i]; if (j && j.legs[+w.dataset.leg]) openWalkMap(j.legs, +w.dataset.leg); return; }
     const v = e.target.closest('.via-toggle');
     if (v) { const open = v.getAttribute('aria-expanded') !== 'true'; v.setAttribute('aria-expanded', String(open)); v.nextElementSibling.hidden = !open; return; }
+    const so = e.target.closest('.stay-on-toggle');
+    if (so) { if (stayOnOff.has(so.dataset.key)) stayOnOff.delete(so.dataset.key); else stayOnOff.add(so.dataset.key); renderJourneys(); return; }
     const ft = e.target.closest('.foot-toggle');
     if (ft) {
       const j = journeys[+ft.dataset.i]; if (!j) return;
@@ -3826,6 +4032,8 @@
     if (!b) return;
     const j = journeys[+b.dataset.i], k = (j.base || j).key;
     openJourney = openJourney === k ? null : k;
+    const raw = journeyBase.find(x => x.key === k);
+    if (openJourney && raw && !raw._enriched) enrichJourneys([raw]);
     renderJourneys();
     const opened = document.querySelector('#journeyList .jr[aria-expanded="true"]');
     if (opened && opened.scrollIntoView) opened.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3858,7 +4066,7 @@
   $('walkStop').addEventListener('click', () => { finishWalkTracking(); $('walkStatus').hidden = true; });
   $('settingsBtn').addEventListener('click', () => { unlockAudio(); renderSettings(); $('settingsSheet').hidden = false; });
   $('settingsClose').addEventListener('click', () => { $('settingsSheet').hidden = true; });
-  ['setPrep', 'setSpeed', 'setMargin', 'setAlight', 'setFootMax'].forEach(id => $(id).addEventListener('change', readSettingsForm));
+  ['setPrep', 'setSpeed', 'setMargin', 'setAlight', 'setFootMax', 'setRealWalk'].forEach(id => $(id).addEventListener('change', readSettingsForm));
   $('resetLearning').addEventListener('click', () => {
     const s = getSettings(); s.speedKmh = DEFAULT_SETTINGS.speedKmh; s.learned = 0; s.samples = [];
     saveSettings(s); renderSettings(); renderAlarms();
