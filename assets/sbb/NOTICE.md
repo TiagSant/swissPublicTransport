@@ -7,6 +7,10 @@ The SVG files in this folder are copied **unmodified** from SBB's public design-
 | `pictograms/` | [sbb-design-systems/picto-library](https://github.com/sbb-design-systems/picto-library) (`pictos/svg-digital`) | `0b59e5c` (2026-09-10) | Apache-2.0 (`LICENSE-picto-library`) |
 | `timetable/` | [sbb-design-systems/sbb-icons](https://github.com/sbb-design-systems/sbb-icons) (`icons`) | `00c3380` (2026-10-15) | Apache-2.0 (`LICENSE-sbb-icons`) |
 
+`pictograms/Metro_r_fr.svg` (the metro "M", for Lausanne's m1 and m2) was added on 2026-11-13 from the same repository's `main` branch, also unmodified.
+
+Line **colours** are not SBB material: they come from OpenStreetMap (see `assets/line-colors-ch.js` and the README).
+
 ## Brand terms of use (in addition to the file licence)
 
 SBB's rights of use (https://digital.sbb.ch/en/foundation/brand/copyrights) reserve **public transport pictograms and timetable icons** for licensed Swiss transport companies and **projects related to public transport in Switzerland**, under these conditions:

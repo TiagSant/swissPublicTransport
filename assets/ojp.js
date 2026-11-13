@@ -95,7 +95,7 @@
   const MODE_CATEGORY = { tram: 'T', bus: 'B', trolleyBus: 'B', coach: 'B', water: 'BAT', ferry: 'BAT',
                           funicular: 'FUN', telecabin: 'GB', cableway: 'PB', metro: 'M' };
   const MODE_ICON = { rail: 'train', tram: 'tram', bus: 'bus', trolleyBus: 'bus', coach: 'bus', water: 'ship',
-                      ferry: 'ship', funicular: 'funicular', telecabin: 'cableway', cableway: 'cableway' };
+                      ferry: 'ship', funicular: 'funicular', telecabin: 'cableway', cableway: 'cableway', metro: 'metro' };
 
   // "IR57" → IR / 57, "RL4" (Léman Express) → R / L4, "RE33" → RE / 33, "TGV" → TGV
   function splitTrainName(name) {
@@ -198,7 +198,7 @@
     const op = (txt(service, 'OperatorRef').match(/(\d+)$/) || [])[1];
     return {
       category: split.category, number: split.number, name,
-      operator: (op && OPERATORS[op]) || '',
+      operator: (op && OPERATORS[op]) || '', operatorRef: op || null,   // company number, e.g. 881 = TPG
       to: txt(service, 'DestinationText'),
       // a run pattern: same line, direction and terminus stop (whatever its platform) → same next stops
       pattern: [txt(service, 'LineRef'), txt(service, 'DirectionRef'), stopId7(txt(service, 'DestinationStopPointRef'))].join('|')
@@ -247,7 +247,7 @@
           arrival: p.offMin == null ? null : new Date(base + p.offMin * 60000).toISOString() }));
       }
       board.push({
-        category: info.category, number: info.number, name: info.name, operator: info.operator, to: info.to,
+        category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
         stop: { station: { id: hereId, name: here.name }, departure: dep.planned,
                 prognosis: { departure: dep.estimated, platform: txt(call, 'EstimatedQuay') || null },
                 platform: txt(call, 'PlannedQuay') || null, delay: null },
@@ -283,7 +283,7 @@
           const st = c => station(txt(c, 'StopPointRef'), txt(c, 'StopPointName'), places);
           const inter = kids(timed, 'LegIntermediate');
           sections.push({
-            journey: { category: info.category, number: info.number, name: info.name, operator: info.operator, to: info.to,
+            journey: { category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
                        // every stop of the ride with its times (planned, and live in prognosis), as in transport.opendata.ch
                        passList: [board, ...inter, alight].map(c => {
                          const ca = callTimes(c, 'ServiceArrival'), cd = callTimes(c, 'ServiceDeparture');

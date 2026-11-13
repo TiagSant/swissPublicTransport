@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swiss line colours — check page</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #1a1a1a; --muted: #666; --line: #ddd; --card: #f6f6f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121212; --fg: #eee; --muted: #aaa; --line: #333; --card: #1e1e1e; } }
+  body { margin: 0; font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+  header { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 12px 16px; z-index: 1; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  input[type=search] { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 10px 12px; font-size: 16px;
+                       border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); }
+  main { padding: 8px 16px 40px; }
+  section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+  h2 { font-size: 15px; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  h2 small { color: var(--muted); font-weight: normal; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { min-width: 30px; padding: 3px 8px; border-radius: 999px; font-weight: 700; font-size: 14px; text-align: center; box-sizing: border-box; }
+  .badge.neutral { background: transparent; border: 1.5px solid var(--muted); color: var(--fg); }
+  .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .row img { width: 28px; height: 28px; }
+  .note { background: var(--card); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .warn { color: #b25e00; }
+  footer { color: var(--muted); font-size: 12px; padding: 0 16px 24px; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Swiss line colours</h1>
+  <div class="meta" id="meta">Loading…</div>
+  <input type="search" id="q" placeholder="Operator (TL, VBZ, PostAuto…) or line (m1, 31…)" autocomplete="off">
+</header>
+<main>
+  <section id="lausanne">
+    <h2>Lausanne metro <small>pictogram + m1 / m2 as the app shows them</small></h2>
+    <div class="row" id="metro"></div>
+    <p class="note warn">To check: OpenStreetMap gives the same colour to m1 and m2. If the tl network map differs, the OSM route relations should be corrected (the monthly rebuild then picks it up).</p>
+  </section>
+  <div id="list"></div>
+</main>
+<footer>
+  Colours: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL 1.0.
+  Operators: ATLAS business organisations, opentransportdata.swiss.
+  Metro pictogram: SBB pictogram library, unmodified.
+  Geneva lines (tpg, Léman Express, Mouettes) come from <code>assets/line-colors.js</code> first in the app.
+</footer>
+<script src="../assets/line-colors-ch.js"></script>
+<script>
+  const ch = window.LINE_COLORS_CH || { operators: {}, numbers: {} };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const byNum = {};
+  for (const [num, abbr] of Object.entries(ch.numbers || {})) (byNum[abbr] = byNum[abbr] || []).push(num);
+  const label = ref => /^m\d+$/.test(ref) ? ref : ref.toUpperCase();
+  const badge = (ref, c) => c ? `<span class="badge" style="background:${c[0]};color:${c[1]}">${esc(label(ref))}</span>`
+                              : `<span class="badge neutral">${esc(label(ref))}</span>`;
+  const sortRefs = (a, b) => (parseInt(a.replace(/\D/g, ''), 10) || 1e9) - (parseInt(b.replace(/\D/g, ''), 10) || 1e9) || a.localeCompare(b);
+  const ops = Object.entries(ch.operators).sort((a, b) => a[0].localeCompare(b[0]));
+  const lineCount = ops.reduce((n, [, o]) => n + Object.keys(o.lines).length, 0);
+  document.getElementById('meta').textContent = `${ops.length} operators · ${lineCount} lines · generated ${ch.generated || '?'}`;
+
+  const tl = (ch.operators.TL || { lines: {} }).lines;
+  document.getElementById('metro').innerHTML = `<img src="../assets/sbb/pictograms/Metro_r_fr.svg" alt="Metro"> ${badge('m1', tl.m1)} ${badge('m2', tl.m2)}`;
+
+  function render(q) {
+    q = q.trim().toLowerCase();
+    const html = [];
+    for (const [abbr, o] of ops) {
+      const hitOp = !q || abbr.toLowerCase().includes(q) || (o.name || '').toLowerCase().includes(q) ||
+                    (q.startsWith('post') || q.startsWith('car') || q.startsWith('auto')) && /^PA/.test(abbr);
+      const refs = Object.keys(o.lines).sort(sortRefs).filter(r => hitOp || r === q);
+      if (!refs.length) continue;
+      const nums = byNum[abbr] ? ` · no. ${byNum[abbr].join(', ')}` : '';
+      html.push(`<section><h2>${esc(abbr)} <small>${esc(o.name || '')}${nums} · ${refs.length} lines</small></h2>` +
+                `<div class="badges">${refs.map(r => badge(r, o.lines[r])).join('')}</div></section>`);
+    }
+    document.getElementById('list').innerHTML = html.join('') || '<p class="note">Nothing found.</p>';
+  }
+  document.getElementById('q').addEventListener('input', e => render(e.target.value));
+  render('');
+</script>
+</body>
+</html>
