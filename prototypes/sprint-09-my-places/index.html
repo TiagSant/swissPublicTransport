@@ -1576,7 +1576,7 @@
       return;
     }
     ul.innerHTML = list.map(d => {
-      const plat = d.platform ? platformChip(d.platform, d.mode) : '';
+      const plat = placeChip(d.platform, d.mode, current);   // US-48: no platform → the stop's position
       const late = d.delay > 0 ? `<span class="late">+${d.delay} min</span>` : '';
       const meta = [plat, late].filter(Boolean).join(' · ');
       const id = depId(d), open = id === expanded;
@@ -1627,7 +1627,8 @@
   }
 
   function openStop(st, opts = {}) {
-    current = { id: st.id, name: st.name };
+    const c0 = st.coordinate;   // known from the search: the board will confirm it
+    current = { id: st.id, name: st.name, coord: c0 && c0.x != null && c0.y != null ? [c0.x, c0.y] : null };
     if (opts.record !== false) recordVisit(st);
     renderRecent();
     $('results').hidden = true; lastResults = null;
@@ -3753,7 +3754,7 @@
   $('departures').addEventListener('click', e => {
     if (e.target.id === 'peekEmpty') { peekAll = true; renderLines(); renderDepartures(); return; }
     const q = e.target.closest('.plat');
-    if (q) { openMap(q.dataset.quay, q.dataset.mode); return; }   // the platform link does not expand the row
+    if (q) { openMap(q.dataset.quay, q.dataset.mode, current, { stopOnly: !!q.dataset.stopOnly }); return; }   // the platform link does not expand the row
     const li = e.target.closest('.dep'); if (!li) return;
     const opening = expanded !== li.dataset.dep;
     expanded = opening ? li.dataset.dep : null;
