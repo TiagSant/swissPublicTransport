@@ -2031,6 +2031,33 @@
       if (samePlace(start, end)) Object.assign(l, { samePlatform: true, apiMin: l.min, min: 0 });
     });
   }
+  // BUG-08: changing platform means walking, even when the API gives no walk between two rides (or a 0-min one,
+  // e.g. tram 17 at Lancy-Pont-Rouge platform A → bus 42 from platform C). No walk only at the same stop AND the
+  // same platform (BUG-06); a platform unknown at the same stop: nothing to tell. The walk comes from the
+  // platforms' positions (ATLAS), at least 1 min.
+  function addChangeWalks(legs) {
+    const quays = (window.QUAYS && window.QUAYS.stops) || {}, up = v => String(v || '').trim().toUpperCase(), out = [];
+    legs.forEach((l, n) => {
+      out.push(l);
+      if (l.type !== 'ride' || !l.toStop) return;
+      const k = legs.slice(n + 1).findIndex(x => x.type === 'ride' || x.type === 'stay');
+      if (k < 0 || legs[n + 1 + k].type !== 'ride') return;
+      const next = legs[n + 1 + k], between = legs.slice(n + 1, n + 1 + k);
+      if (between.some(x => x.type === 'walk' && x.min >= 0.5)) return;   // the API's own walk
+      const A = { name: l.toStop.name, stopId: l.toStop.id, coord: l.toStop.coord, platform: l.arrPlatformLive || l.arrPlatform || '', mode: l.mode };
+      const B = { name: next.from.name, stopId: next.from.id, coord: next.from.coord, platform: next.platformLive || next.platform || '', mode: next.mode };
+      const sameStop = !!A.stopId && String(A.stopId) === String(B.stopId);
+      if (sameStop && (!A.platform || !B.platform || up(A.platform) === up(B.platform))) return;
+      const pa = platformPos(quays, A.stopId, A.coord, A.platform), pb = platformPos(quays, B.stopId, B.coord, B.platform);
+      if (!pa || !pb) return;
+      const straight = distanceM(pa, pb), min = Math.max(1, walkMinutes(straight));
+      const walk = { type: 'walk', min, meters: straight * DETOUR, edge: 'transfer', to: B.name, start: A, end: B, estimated: true };
+      const zero = between.find(x => x.type === 'walk');
+      if (zero) Object.assign(zero, walk, { samePlatform: false });
+      else out.push(walk);
+    });
+    return out;
+  }
   // BUG-03: a walk followed by another walk is one walk, from the first start to the last end
   function mergeWalks(legs) {
     for (let i = legs.length - 1; i > 0; i--) {
@@ -2072,6 +2099,7 @@
     placeWalks(legs, a, b, ctx);
     mergeWalks(legs);
     markSamePlatform(legs);
+    legs.splice(0, legs.length, ...addChangeWalks(legs));
     const rides = legs.filter(l => l.type === 'ride');
     if (!rides.length || !rides[0].dep) return null;
     const firstIdx = legs.indexOf(rides[0]), lastIdx = legs.lastIndexOf(rides[rides.length - 1]);
@@ -2182,6 +2210,7 @@
       legs = [...legs.slice(0, a.i), ext, walk, ...legs.slice(a.k)];
     }
     markSamePlatform(legs);
+    legs = addChangeWalks(legs);
     const rides = legs.filter(l => l.type === 'ride');
     return Object.assign({}, j, { legs, rides, walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0), _waits: null });
   }
@@ -2259,6 +2288,11 @@
       if (j._enriched) continue;
       j._enriched = true;
       try {
+        // BUG-08: walks between platforms estimated before the platforms' positions were known
+        for (const l of j.legs) if (l.estimated && l.start && l.end) {
+          const pa = platformPos(quays, l.start.stopId, l.start.coord, l.start.platform), pb = platformPos(quays, l.end.stopId, l.end.coord, l.end.platform);
+          if (pa && pb) { const d = distanceM(pa, pb), min = Math.max(1, walkMinutes(d)); j.walkMin += min - l.min; Object.assign(l, { min, meters: d * DETOUR }); j._waits = null; }
+        }
         for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
         const cs = tripConnections(planOf(j));
         j.stayOns = cs.map(c => bestStayOn(j, c, quays)).filter(Boolean);
@@ -3184,6 +3218,12 @@
       for (const r of a.plan) if (r.type === 'ride') Object.assign(r, { real: null, arrReal: null, platformLive: null, arrPlatformLive: null, missing: false });
       a.runCheck = 1; changed = true;
     }
+    // BUG-08: journeys followed before: a change of platform without its walk gets it, once
+    if (!a.changeWalks) {
+      const plan = addChangeWalks(a.plan);
+      if (plan.length !== a.plan.length) { a.plan = plan; a.alts = null; }
+      a.changeWalks = 1; changed = true;
+    }
     for (const r of a.plan) {
       if (r.type !== 'ride' || arrOf(r) < now - 120000 || r.dep - now > 90 * 60000 || !r.from.id) continue;
       const board = await boardOf(r.from.id, new Date(Math.min(r.dep, now) - LOOKBACK_MIN * 60000));
@@ -3861,6 +3901,7 @@
     if (current && lastLoad) { renderLines(); renderDepartures(); renderStatus(); }
     for (const w of ['from', 'to', 'via']) if (places[w]) $(w + 'Q').value = placeLabel(places[w]);
     renderAlarms(); renderJourneys();
+    loadQuays();   // the platforms' positions, for the walks at changes (BUG-08)
     renderRecent();
     if (!$('settingsSheet').hidden) renderSettings();
     renderApiStatus();
