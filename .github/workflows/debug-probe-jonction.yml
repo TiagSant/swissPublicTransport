@@ -1,0 +1,54 @@
+name: Debug probe (Jonction)
+on:
+  push:
+    branches: [debug-probe-jonction]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Real data around Sainte-Clotilde / Jonction
+        env:
+          OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.parse, datetime as dt, re
+          def get(u):
+              with urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "swissPublicTransport-debug"}), timeout=60) as r:
+                  return json.load(r)
+          V1 = "https://transport.opendata.ch/v1"
+          for q in ["Genève, Sainte-Clotilde", "Genève, Jonction", "Genève, Musée d'ethnographie", "Petit-Lancy, Les Esserts"]:
+              st = get(f"{V1}/locations?type=station&query={urllib.parse.quote(q)}").get("stations", [])[:2]
+              print("LOC", q, "->", [(s.get("id"), s.get("name"), (s.get("coordinate") or {}).get("x"), (s.get("coordinate") or {}).get("y")) for s in st])
+          now = dt.datetime.now(dt.timezone(dt.timedelta(hours=1)))
+          when = (now + dt.timedelta(minutes=20)).strftime("%Y-%m-%d %H:%M")
+          c = get(f"{V1}/connections?from={urllib.parse.quote('Genève, Musée d’ethnographie'.replace('’', chr(39)))}&to={urllib.parse.quote('Petit-Lancy, Les Esserts')}&date={when[:10]}&time={when[11:]}&limit=6")
+          for k, con in enumerate(c.get("connections", [])):
+              secs = []
+              for s in con["sections"]:
+                  d, a = s["departure"], s["arrival"]
+                  if s.get("journey"):
+                      j = s["journey"]; secs.append(f"{j['category']}{j['number']}→{j['to']} {d['station']['name']}[{d['station']['id']}] {d['departure'][11:16]} pl={d.get('platform')} → {a['station']['name']}[{a['station']['id']}] {a['arrival'][11:16]} pl={a.get('platform')}")
+                  else:
+                      secs.append(f"walk {(s.get('walk') or {}).get('duration')} {d['station']['name']}→{a['station']['name']}")
+              print("CON", k, " | ".join(secs))
+          # the board where the 19 leaves the journey
+          sc = get(f"{V1}/locations?type=station&query={urllib.parse.quote('Genève, Sainte-Clotilde')}")["stations"][0]
+          b = get(f"{V1}/stationboard?id={sc['id']}&limit=40&datetime={urllib.parse.quote(when)}")
+          for e in b.get("stationboard", []):
+              if e.get("number") != "19": continue
+              pl = e.get("passList") or []
+              print("BOARD19", e["category"], e["number"], "to", e["to"], "dep", e["stop"].get("departure"), "pl", e["stop"].get("platform"), "passList:",
+                    [(p["station"].get("id"), p["station"].get("name"), (p.get("arrival") or "")[11:16], p.get("arrivalTimestamp"), (p["station"].get("coordinate") or {}).get("x"), p.get("platform")) for p in pl[:4]])
+          # OJP: the same board with onward stops
+          tok = os.environ.get("OJP_TOKEN")
+          if tok:
+              ts = (now + dt.timedelta(minutes=20)).astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+              body = f'''<?xml version="1.0" encoding="UTF-8"?><OJP xmlns="http://www.vdv.de/ojp" xmlns:siri="http://www.siri.org.uk/siri" version="2.0"><OJPRequest><siri:ServiceRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><siri:RequestorRef>debug</siri:RequestorRef><OJPStopEventRequest><siri:RequestTimestamp>{ts}</siri:RequestTimestamp><Location><PlaceRef><StopPlaceRef>{sc['id']}</StopPlaceRef></PlaceRef><DepArrTime>{ts}</DepArrTime></Location><Params><NumberOfResults>20</NumberOfResults><StopEventType>departure</StopEventType><IncludePreviousCalls>false</IncludePreviousCalls><IncludeOnwardCalls>true</IncludeOnwardCalls><UseRealtimeData>full</UseRealtimeData></Params></OJPStopEventRequest></siri:ServiceRequest></OJPRequest></OJP>'''
+              req = urllib.request.Request("https://api.opentransportdata.swiss/ojp20", data=body.encode(), headers={"Authorization": "Bearer " + tok, "Content-Type": "application/xml"})
+              x = urllib.request.urlopen(req, timeout=60).read().decode()
+              for ev in re.findall(r"<StopEvent>.*?</StopEvent>", x, re.S):
+                  if "<PublicCode>19</PublicCode>" not in ev: continue
+                  onward = re.findall(r"<OnwardCall>.*?<StopPointName><Text[^>]*>([^<]+)</Text>.*?(?:<ServiceArrival><TimetabledTime>([^<]+)</TimetabledTime>)?", ev, re.S)
+                  dest = re.search(r"<DestinationText><Text[^>]*>([^<]+)", ev)
+                  print("OJP19 to", dest and dest.group(1), "onward:", onward[:3])
+          PY
