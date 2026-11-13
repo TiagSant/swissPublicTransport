@@ -237,13 +237,15 @@
           return { station: station(txt(c, 'StopPointRef'), txt(c, 'StopPointName'), places),
                    arrival: a.estimated || a.planned, departure: d.estimated || d.planned, _planned: a.planned || d.planned };
         });
+        // remembered with each stop's position: a light refresh can then still say where the next stops are (US-50)
         if (patterns) patterns.set(info.pattern, passList.filter(p => p.station.id !== hereId).slice(0, 8)
-          .map(p => ({ id: p.station.id, name: p.station.name, offMin: p._planned ? minutesBetween(dep.planned, p._planned) : null })));
+          .map(p => ({ id: p.station.id, name: p.station.name, offMin: p._planned ? minutesBetween(dep.planned, p._planned) : null,
+                       c: p.station.coordinate && p.station.coordinate.x != null ? [p.station.coordinate.x, p.station.coordinate.y] : null })));
       } else {
         const known = patterns && patterns.get(info.pattern);
         if (!known) unknown++;
         const base = new Date(dep.estimated || dep.planned).getTime();
-        passList = (known || []).map(p => ({ station: { id: p.id, name: p.name },
+        passList = (known || []).map(p => ({ station: { id: p.id, name: p.name, coordinate: p.c ? { type: 'WGS84', x: p.c[0], y: p.c[1] } : null },
           arrival: p.offMin == null ? null : new Date(base + p.offMin * 60000).toISOString() }));
       }
       board.push({
