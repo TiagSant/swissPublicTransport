@@ -38,7 +38,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1220">
-<title>Unireso departures — Sprint 8 prototype</title>
+<title>swissPublicTransport — Sprint 8 prototype</title>
 <script src="../../assets/line-colors.js"></script>
 <script src="../../assets/ojp.js"></script>
 <style>
@@ -269,7 +269,7 @@
 <body>
 <main>
   <header>
-    <h1><span data-i18n="title"></span> <span>Unireso</span></h1>
+    <h1 class="brand">swiss<span>Public</span>Transport</h1>
     <div class="right">
       <span data-i18n="prototype"></span>
       <button id="lang" class="lang" type="button"></button>
@@ -2103,7 +2103,7 @@
   // ---------- Language (US-10) ----------
   function applyLanguage() {
     document.documentElement.lang = lang;
-    document.title = lang === 'fr' ? 'Départs Unireso — Prototype Sprint 8' : 'Unireso departures — Sprint 8 prototype';
+    document.title = lang === 'fr' ? 'swissPublicTransport — Prototype Sprint 8' : 'swissPublicTransport — Sprint 8 prototype';
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });

@@ -43,7 +43,7 @@
   - US-11: official Swiss public transport pictograms (modes) and SBB timetable icons (train products),
            used unmodified from SBB's design-system repositories — see assets/sbb/NOTICE.md.
   - US-12: each line in its operator's colour (TPG, Léman Express, Mouettes) — see assets/line-colors.js.
-  Everything from Sprints 1-3 is kept: stop search in the Unireso area, real-time departures, line and
+  Everything from Sprints 1-3 is kept: stop search (now Switzerland-wide, US-43), real-time departures, line and
   direction filters, frequent stops, and the usage-based preselection of usual lines (US-06).
   Data: https://opentransportdata.swiss (OJP 2.0, personal key) or https://transport.opendata.ch (no key).
 -->
@@ -52,7 +52,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1220">
-<title>Unireso departures — Sprint 9 prototype</title>
+<title>swissPublicTransport — Sprint 9 prototype</title>
 <script src="../../assets/line-colors.js"></script>
 <script src="../../assets/line-colors-ch.js"></script>
 <script src="../../assets/ojp.js"></script>
@@ -353,7 +353,7 @@
 <body>
 <main>
   <header>
-    <h1><span data-i18n="title"></span> <span>Unireso</span></h1>
+    <h1 class="brand">swiss<span>Public</span>Transport</h1>
     <div class="right">
       <span data-i18n="prototype"></span>
       <select id="lang" class="lang" aria-label="Language / Langue / Sprache / Lingua">
@@ -602,7 +602,6 @@
   // ---------- Configuration ----------
   const API = 'https://transport.opendata.ch/v1';
   const ASSETS = '../../assets';
-  // Approximate Unireso + Léman Pass / Léman Express area (Geneva, Nyon district, Ain, Haute-Savoie)
   // The API only returns journeys whose *scheduled* time is at or after `datetime`. A bus scheduled at 17:10
   // running +8 min would vanish at 17:11, so we ask from LOOKBACK_MIN minutes ago and filter on the real time.
   const LOOKBACK_MIN = 30;
@@ -943,8 +942,7 @@
   // ---------- Data layer: one interface, two sources (TECH-05) ----------
   // Every function returns the transport.opendata.ch v1 shape (assets/ojp.js converts the OJP answers).
   const data = {
-    // Stop search by name. OJP ignores the name when an area is given, so the search is Switzerland-wide and
-    // the app keeps only the stops of the Unireso area (as with transport.opendata.ch).
+    // Stop search by name, Switzerland-wide (US-43); the app ranks the rider's own stops and towns first.
     async locations(q, signal) {
       if (!useOjp()) return (await getJSON(`${API}/locations?type=station&query=${enc(q)}`, signal)).stations || [];
       return OJP.toLocations(await ojpPost(OJP.locationsByName(q, { lang: apiLang(), limit: 40 }), signal)).stations;
@@ -3628,7 +3626,7 @@
   // ---------- Language (US-10) ----------
   function applyLanguage() {
     document.documentElement.lang = lang;
-    document.title = `${t('title')} Unireso — ${t('prototype')}`;
+    document.title = `swissPublicTransport — ${t('prototype')}`;
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
