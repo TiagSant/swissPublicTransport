@@ -179,6 +179,8 @@
   .plat-v { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 4px;
     background: var(--text); color: var(--card); font-weight: 800; font-size: .75rem; }
   .plat:active { transform: scale(.96); }
+  .plat.stop .plat-k { font-weight: 600; }
+  .qm.stop-pin svg, .wm[data-stop] svg { width: 18px; height: 18px; fill: #fff; }
   .plat.changed { border-color: var(--late, #c62828); color: var(--late, #c62828); }
   .plat.changed .plat-v { background: var(--late, #c62828); color: #fff; }
   .head-actions { display: flex; gap: 6px; }
@@ -641,7 +643,7 @@
       nearStop: '{d} from {name}', leaveNow: 'Leave now', departAt: 'Depart at', arriveBy: 'Arrive by',
       fastest: 'Fastest', leastWalking: 'Least walking', searchJourney: 'Search', chooseBoth: 'Choose a start and a destination.',
       noStopNear: 'No stop within 1.2 km of {name}.', noJourney: 'No connection found.', journeyFailed: 'Journey search failed (network?).',
-      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', noWalk: 'no walking', waitTotal: '{min} min waiting', noWait: 'no time to spare', onTime: 'on time',
+      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', noWalk: 'no walking', waitTotal: '{min} min waiting', noWait: 'no time to spare', stopChip: 'Stop', stopOnMap: 'Show {name} on the map', stopNoPlatform: 'No platform given: the stop’s position', onTime: 'on time',
       walkMin: 'Walk {min} min', walkTo: 'to {name}', walkToDest: 'to your destination', stopsCount: '{n} stops', back: '‹ Back',
       stops1: '1 stop', nextStopShort: 'next stop', showStops: '{n} — show', hideStops: '{n} — hide', nextOff: 'get off at the next stop',
       walkOnMap: 'Map', walkMapTitle: 'Walk {min} min', walkFromTo: '{a} → {b}', yourStart: 'Your start', yourDestination: 'Your destination',
@@ -755,7 +757,7 @@
       nearStop: 'à {d} de {name}', leaveNow: 'Partir maintenant', departAt: 'Départ à', arriveBy: 'Arrivée avant',
       fastest: 'Le plus rapide', leastWalking: 'Le moins de marche', searchJourney: 'Rechercher', chooseBoth: 'Choisissez un départ et une arrivée.',
       noStopNear: 'Aucun arrêt à moins de 1,2 km : {name}.', noJourney: 'Aucune liaison trouvée.', journeyFailed: 'Recherche d\u2019itinéraire impossible (réseau ?).',
-      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', noWalk: 'pas de marche', waitTotal: '{min} min d\u2019attente', noWait: 'aucune marge', onTime: 'à l\u2019heure',
+      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', noWalk: 'pas de marche', waitTotal: '{min} min d\u2019attente', noWait: 'aucune marge', stopChip: 'Arrêt', stopOnMap: 'Voir {name} sur le plan', stopNoPlatform: 'Pas de quai indiqué : position de l\u2019arrêt', onTime: 'à l\u2019heure',
       walkMin: 'Marche {min} min', walkTo: 'jusqu\u2019à {name}', walkToDest: 'jusqu\u2019à votre destination', stopsCount: '{n} arrêts', back: '‹ Retour',
       stops1: '1 arrêt', nextStopShort: 'prochain arrêt', showStops: '{n} — afficher', hideStops: '{n} — masquer', nextOff: 'descendez au prochain arrêt',
       walkOnMap: 'Plan', walkMapTitle: 'Marche {min} min', walkFromTo: '{a} → {b}', yourStart: 'Votre départ', yourDestination: 'Votre destination',
@@ -1701,13 +1703,21 @@
     return `<button class="plat" data-quay="${esc(p)}" data-mode="${mode}"${at} aria-label="${esc(t('showOnMap', { p: t(kind, { p }) }))}">` +
       `${PIN}<span class="plat-k">${esc(word)}</span><span class="plat-v">${esc(p)}</span></button>`;
   }
+  // US-48: no platform from the API but the stop's position: a generic "Stop" button, on the map like a platform
+  function stopChip(stop, mode) {
+    if (!stop || !stop.coord) return '';
+    return `<button class="plat stop" data-quay="" data-stop-only="1" data-mode="${mode}" data-stop-id="${esc(stop.id || '')}" data-stop-name="${esc(stop.name)}"` +
+      ` data-lat="${stop.coord[0]}" data-lon="${stop.coord[1]}" aria-label="${esc(t('stopOnMap', { name: stop.name }))}">${PIN}<span class="plat-k">${esc(t('stopChip'))}</span></button>`;
+  }
+  const placeChip = (p, mode, stop) => p ? platformChip(p, mode, stop) : stopChip(stop, mode);
   const walkUrl = pos => `https://www.google.com/maps/dir/?api=1&destination=${pos[0]},${pos[1]}&travelmode=walking`;
 
-  async function openMap(platform, mode, stop = current) {
+  async function openMap(platform, mode, stop = current, opts = {}) {
     pickState = null;
-    const label = platform ? t(mode === 'train' ? 'track' : 'platform', { p: platform }) : t('allPlatforms');
+    const stopOnly = !platform && opts.stopOnly && stop.coord;   // US-48: the stop's own position stands for the platform
+    const label = platform ? t(mode === 'train' ? 'track' : 'platform', { p: platform }) : stopOnly ? stop.name : t('allPlatforms');
     $('mapTitle').textContent = label;
-    $('mapSub').textContent = stop.name;
+    $('mapSub').textContent = stopOnly ? t('stopNoPlatform') : stop.name;
     $('mapInfo').textContent = '';
     $('walkThere').hidden = true; $('pickConfirm').hidden = true;
     $('mapSheet').hidden = false;
@@ -1721,7 +1731,7 @@
     if ($('mapSheet').hidden) return;   // closed while loading
     const points = platformPoints(quays[stop.id] || {});
     const target = platform ? points.find(p => p.names.includes(platform) || p.names.includes(platform.toUpperCase())) : null;
-    const dest = target ? target.pos : (stop.coord || (points[0] && points[0].pos));
+    const dest = target ? target.pos : stopOnly ? stop.coord : (stop.coord || (points[0] && points[0].pos));
 
     ensureMap();
     map.invalidateSize();
@@ -1735,13 +1745,17 @@
         zIndexOffset: isTarget ? 1000 : 0, title: p.label, keyboard: false
       }).addTo(mapLayer);
     }
-    if (target) map.setView(target.pos, 19);
-    else if (points.length) map.fitBounds(points.map(p => p.pos), { padding: [40, 40], maxZoom: 19 });
-    else if (dest) map.setView(dest, 17);
+    if (stopOnly) L.marker(stop.coord, { icon: L.divIcon({ className: '', html: `<span class="qm target stop-pin" data-stop="1">${PIN}</span>`, iconSize: [38, 38], iconAnchor: [19, 19] }),
+                                        zIndexOffset: 1000, title: stop.name, keyboard: false }).addTo(mapLayer);
+    // a sheet that just opened: straight to the place, no animation from the previous view
+    if (target) map.setView(target.pos, 19, { animate: false });
+    else if (stopOnly) map.setView(stop.coord, 18, { animate: false });
+    else if (points.length) map.fitBounds(points.map(p => p.pos), { padding: [40, 40], maxZoom: 19, animate: false });
+    else if (dest) map.setView(dest, 17, { animate: false });
 
     const notes = [];
     if (platform && !target) notes.push(t('platformUnknown', { p: label }));
-    else if (!points.length) notes.push(t('noPlatforms'));
+    else if (!points.length && !stopOnly) notes.push(t('noPlatforms'));
     $('mapInfo').textContent = notes.join(' ');
     if (dest) { $('walkThere').href = walkUrl(dest); $('walkThere').textContent = t('walkThere'); $('walkThere').hidden = false; trackUser(dest, notes); }
   }
@@ -1758,7 +1772,7 @@
       L.circleMarker(me, { radius: 8, weight: 3, color: '#fff', fillColor: '#1c7ed6', fillOpacity: 1 }).addTo(userLayer);
       const d = distanceM(me, dest);
       $('mapInfo').textContent = [...notes, t('distance', { d: fmtDistance(d), min: fmtMin(walkMinutes(d)) })].join(' ');
-      if (first && d < 2000) map.fitBounds([me, dest], { padding: [50, 50], maxZoom: 19 });   // show both, once
+      if (first && d < 2000) map.fitBounds([me, dest], { padding: [50, 50], maxZoom: 19, animate: false });   // show both, once
       first = false;
     }, () => { $('mapInfo').textContent = [...notes, t('noLocation')].join(' '); },
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
@@ -2357,7 +2371,7 @@
         return `<li class="leg walk"><span class="leg-ico">🚶</span><div>${esc(t('walkMin', { min: fmtMin(l.min) }))}${esc(dist)} — ${esc(where)}</div>${btn}</li>`;
       }
       const late = l.delay > 0 ? ` <span class="late">+${l.delay} min</span>` : '';
-      const plat = l.platform ? platformChip(l.platform, l.mode, l.from) : '';
+      const plat = placeChip(l.platform, l.mode, l.from);
       const arr = l.arrReal || l.arr;
       const key = `${j.key}#${k}`, unfolded = openVia && openVia.has(key);
       // number of stops and time spent on board (live times when known)
@@ -2378,7 +2392,7 @@
         ${change ? changeWaitHtml(W.plan, change) : ''}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
-        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${l.arrPlatform ? platformChip(l.arrPlatform, l.mode, l.toStop) : ''}</div></li>`;
+        <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div></li>`;
     }
     const route = j.segments > 1 ? tripPoints().pts.map(placeLabel).join(' → ') : `${placeLabel(places.from)} → ${placeLabel(places.to)}`;
     return `<div class="jr-detail"><div class="jr-meta">${esc(route)}</div>
@@ -2449,23 +2463,24 @@
     ensureMap(); map.invalidateSize();
     mapLayer.clearLayers(); userLayer.clearLayers();
     // the other platforms of both stops, small and grey
-    for (const x of [A, B]) for (const p of x.points) if (p !== x.target && !(A.target && p.pos.join() === A.target.pos.join()) && !(B.target && p.pos.join() === B.target.pos.join()))
+    const drawn = new Set();   // both ends at the same stop: its platforms once
+    for (const x of [A, B]) for (const p of x.points) if (!drawn.has(p.pos.join()) && drawn.add(p.pos.join()) && p !== x.target && !(A.target && p.pos.join() === A.target.pos.join()) && !(B.target && p.pos.join() === B.target.pos.join()))
       L.marker(p.pos, { icon: L.divIcon({ className: '', html: `<span class="qm other" data-quay="${esc(p.label)}">${esc(p.label)}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
                         title: p.label, keyboard: false }).addTo(mapLayer);
     // the two ends: the platform's own letter or number, else A / B
     const marker = (x, e, cls, fallback) => L.marker(x.pos, {
-      icon: L.divIcon({ className: '', html: `<span class="wm ${cls}" data-end="${cls}"${x.target ? ` data-quay="${esc(e.platform)}"` : ''}>${esc(x.target ? e.platform : fallback)}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }),
+      icon: L.divIcon({ className: '', html: `<span class="wm ${cls}" data-end="${cls}"${x.target ? ` data-quay="${esc(e.platform)}"` : e.stopId ? ' data-stop="1"' : ''}>${x.target ? esc(e.platform) : e.stopId ? PIN : esc(fallback)}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }),
       title: label(e), keyboard: false, zIndexOffset: 1000 }).addTo(mapLayer);
     if (A.pos) marker(A, start, 'a', 'A');
     if (B.pos) marker(B, end, 'b', 'B');
     if (A.pos && B.pos) {
       L.polyline([A.pos, B.pos], { color: '#1c7ed6', weight: 4, dashArray: '2 8', lineCap: 'round' }).addTo(mapLayer);
-      map.fitBounds([A.pos, B.pos], { padding: [50, 50], maxZoom: 19 });
+      map.fitBounds([A.pos, B.pos], { padding: [50, 50], maxZoom: 19, animate: false });
       if (!opts.follow) notes.push(t('walkDist', { d: fmtDistance(distanceM(A.pos, B.pos) * DETOUR) }));   // following: the live distance instead
       $('walkThere').href = `https://www.google.com/maps/dir/?api=1&origin=${A.pos[0]},${A.pos[1]}&destination=${B.pos[0]},${B.pos[1]}&travelmode=walking`;
       $('walkThere').textContent = t('walkDirections');
       $('walkThere').hidden = false;
-    } else if (A.pos || B.pos) map.setView(A.pos || B.pos, 18);
+    } else if (A.pos || B.pos) map.setView(A.pos || B.pos, 18, { animate: false });
     $('mapInfo').textContent = notes.join(' ');
     if (opts.follow && B.pos) trackUser(B.pos, notes);   // on the way: where am I, how far to the platform
   }
@@ -3313,9 +3328,9 @@
       // the platform is a button: tap it to see it on the map (the live one when it changed)
       const plat = l.platformLive
         ? ` ${platformChip(l.platformLive, l.mode, l.from).replace('class="plat"', 'class="plat changed"')} <small>(${esc(t('wasPlat', { p: l.platform }))})</small>`
-        : l.platform ? ` ${platformChip(l.platform, l.mode, l.from)}` : '';
+        : ` ${placeChip(l.platform, l.mode, l.from)}`;
       const arrP = l.arrPlatformLive || l.arrPlatform;
-      const arrPlat = arrP ? ` ${platformChip(arrP, l.mode, l.toStop)}` : '';
+      const arrPlat = ` ${placeChip(arrP, l.mode, l.toStop)}`;
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       // number of stops and time on board, intermediate stops with their live times (as when planning)
       const rideMin = Math.max(0, Math.round((arrOf(l) - depOf(l)) / 60000));
@@ -3791,7 +3806,7 @@
   $('searchJourney').addEventListener('click', searchJourneys);
   $('journeyList').addEventListener('click', e => {
     const q = e.target.closest('.plat');
-    if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }); return; }
+    if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }, { stopOnly: !!q.dataset.stopOnly }); return; }
     const w = e.target.closest('.walk-map');
     if (w) { const j = journeys[+w.dataset.i]; if (j && j.legs[+w.dataset.leg]) openWalkMap(j.legs, +w.dataset.leg); return; }
     const v = e.target.closest('.via-toggle');
@@ -3818,7 +3833,7 @@
   });
   $('alarmList').addEventListener('click', e => {
     const q = e.target.closest('.plat');   // a platform of a followed ride: on the map
-    if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }); return; }
+    if (q) { openMap(q.dataset.quay, q.dataset.mode, { id: q.dataset.stopId, name: q.dataset.stopName, coord: q.dataset.lat ? [+q.dataset.lat, +q.dataset.lon] : null }, { stopOnly: !!q.dataset.stopOnly }); return; }
     const b = e.target.closest('button[data-act]'); if (!b) return;
     const id = b.closest('.alarm').dataset.id, a = getAlarms().find(x => x.id === id); if (!a) return;
     unlockAudio();
