@@ -253,6 +253,7 @@
   .jr-detail .btn-primary { margin-top: 4px; }
   .wm { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-weight: 700; font-size: .8rem; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
   .wm.a { background: #1a7f37; } .wm.b { background: #c62828; }
+  .leg.change, .tl.change { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; }
   .wm { min-width: 30px; width: auto; height: 30px; padding: 0 4px; box-sizing: border-box; font-size: .9rem; }
   .qm.other { width: 24px; height: 24px; font-size: 11px; opacity: .75; }
   .leg-line { display: flex; align-items: center; gap: 8px; font-weight: 600; }
@@ -610,7 +611,7 @@
       nearStop: '{d} from {name}', leaveNow: 'Leave now', departAt: 'Depart at', arriveBy: 'Arrive by',
       fastest: 'Fastest', leastWalking: 'Least walking', searchJourney: 'Search', chooseBoth: 'Choose a start and a destination.',
       noStopNear: 'No stop within 1.2 km of {name}.', noJourney: 'No connection found.', journeyFailed: 'Journey search failed (network?).',
-      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', onTime: 'on time',
+      direct: 'Direct', transfer1: '1 change', transfersN: '{n} changes', walkTotal: '{min} min walking', noWalk: 'no walking', onTime: 'on time',
       walkMin: 'Walk {min} min', walkTo: 'to {name}', walkToDest: 'to your destination', stopsCount: '{n} stops', back: '‹ Back',
       stops1: '1 stop', nextStopShort: 'next stop', showStops: '{n} — show', hideStops: '{n} — hide', nextOff: 'get off at the next stop',
       walkOnMap: 'Map', walkMapTitle: 'Walk {min} min', walkFromTo: '{a} → {b}', yourStart: 'Your start', yourDestination: 'Your destination',
@@ -649,6 +650,7 @@
       comfortTitle: 'With more margin:', altEarlier: 'Earlier {line} at {dep}', altEarlierDetail: '{m} min margin at the change · leave {leave}',
       altMarginDetail: '{m} min margin · arrive {t}',
       waitAfterWalk: 'Change: {walk} min walk, then {wait} min wait', waitOnly: 'Change: {wait} min wait',
+      samePlatform: 'Same platform, no walking', sameWait: '{n} min wait', platformMoved: 'Platform changed: go to {name}',
       waitNoneWalk: 'Change: {walk} min walk, no time to spare', waitNone: 'Change: no time to spare', waitMissed: 'Change: missed at the current times',
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
       altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
@@ -715,7 +717,7 @@
       nearStop: 'à {d} de {name}', leaveNow: 'Partir maintenant', departAt: 'Départ à', arriveBy: 'Arrivée avant',
       fastest: 'Le plus rapide', leastWalking: 'Le moins de marche', searchJourney: 'Rechercher', chooseBoth: 'Choisissez un départ et une arrivée.',
       noStopNear: 'Aucun arrêt à moins de 1,2 km : {name}.', noJourney: 'Aucune liaison trouvée.', journeyFailed: 'Recherche d\u2019itinéraire impossible (réseau ?).',
-      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', onTime: 'à l\u2019heure',
+      direct: 'Direct', transfer1: '1 changement', transfersN: '{n} changements', walkTotal: '{min} min de marche', noWalk: 'pas de marche', onTime: 'à l\u2019heure',
       walkMin: 'Marche {min} min', walkTo: 'jusqu\u2019à {name}', walkToDest: 'jusqu\u2019à votre destination', stopsCount: '{n} arrêts', back: '‹ Retour',
       stops1: '1 arrêt', nextStopShort: 'prochain arrêt', showStops: '{n} — afficher', hideStops: '{n} — masquer', nextOff: 'descendez au prochain arrêt',
       walkOnMap: 'Plan', walkMapTitle: 'Marche {min} min', walkFromTo: '{a} → {b}', yourStart: 'Votre départ', yourDestination: 'Votre destination',
@@ -754,6 +756,7 @@
       comfortTitle: 'Avec plus de marge :', altEarlier: '{line} plus tôt à {dep}', altEarlierDetail: '{m} min de marge à la correspondance · partir à {leave}',
       altMarginDetail: '{m} min de marge · arrivée {t}',
       waitAfterWalk: 'Correspondance : {walk} min de marche, puis {wait} min d\u2019attente', waitOnly: 'Correspondance : {wait} min d\u2019attente',
+      samePlatform: 'Même quai, pas de marche', sameWait: '{n} min d\u2019attente', platformMoved: 'Changement de quai : aller à {name}',
       waitNoneWalk: 'Correspondance : {walk} min de marche, aucune marge', waitNone: 'Correspondance : aucune marge', waitMissed: 'Correspondance : manquée aux horaires actuels',
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
       altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
@@ -1924,6 +1927,18 @@
     return { start: prev && l.edge !== 'access' && prev.toStop ? off(prev) : l.start,
              end: next && l.edge !== 'egress' && next.from ? on(next) : l.end };
   }
+  // BUG-06: a change where the next ride leaves from the very platform the previous one arrives at is no walk.
+  // The API still gives a "walk" there (its minimum transfer time): it becomes waiting time. The leg is kept, with
+  // no minutes, so that a live platform change while following can turn it back into a walk.
+  const samePlace = (x, y) => !!(x && y && x.stopId && x.stopId === y.stopId && x.platform && y.platform &&
+                                 String(x.platform).toUpperCase() === String(y.platform).toUpperCase());
+  function markSamePlatform(legs) {
+    legs.forEach((l, k) => {
+      if (l.type !== 'walk' || l.edge !== 'transfer') return;
+      const { start, end } = walkEnds(legs, k);
+      if (samePlace(start, end)) Object.assign(l, { samePlatform: true, apiMin: l.min, min: 0 });
+    });
+  }
   // BUG-03: a walk followed by another walk is one walk, from the first start to the last end
   function mergeWalks(legs) {
     for (let i = legs.length - 1; i > 0; i--) {
@@ -1964,6 +1979,7 @@
     if (b.meters > 30) legs.push({ type: 'walk', min: walkMinutes(b.meters), meters: b.meters, from: b.name, to: '', edge: 'egress' });
     placeWalks(legs, a, b, ctx);
     mergeWalks(legs);
+    markSamePlatform(legs);
     const rides = legs.filter(l => l.type === 'ride');
     if (!rides.length || !rides[0].dep) return null;
     const firstIdx = legs.indexOf(rides[0]), lastIdx = legs.lastIndexOf(rides[rides.length - 1]);
@@ -2163,7 +2179,7 @@
   }
 
   function rideIds(j) {
-    return j.legs.map(l => l.type === 'walk'
+    return j.legs.filter(l => !l.samePlatform).map(l => l.type === 'walk'
       ? `<span class="jw">🚶${fmtMin(l.min)}′</span>`
       : lineIdHtml(l.mode, l.style, l.label, true)).join('<span class="jsep">›</span>');
   }
@@ -2193,7 +2209,7 @@
       return `<li class="jr-item"><button class="jr" data-i="${i}" aria-expanded="${open}">
         <div class="jr-top"><b>${hhmm(j.leaveAt)} → ${hhmm(j.arriveAt)}</b><span class="jr-dur">${fmtDuration(j.durationMin)}</span></div>
         <div class="jr-segs">${rideIds(j)}</div>
-        <div class="jr-meta">${j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(t('walkTotal', { min: fmtMin(j.walkMin) }))}${live}${tags}</div>
+        <div class="jr-meta">${j.rides.length ? esc(transfersText(j.transfers)) + ' · ' : ''}${esc(Math.round(j.walkMin) ? t('walkTotal', { min: fmtMin(j.walkMin) }) : t('noWalk'))}${live}${tags}</div>
       </button>${open ? journeyDetailHtml(j, i, openVia) : ''}</li>`;
     }).join('');
   }
@@ -2206,6 +2222,7 @@
       return legHtml(l, k) + extra;
     }).join('');
     function legHtml(l, k) {
+      if (l.samePlatform) return samePlatformRow(j.legs, k, 'leg change');
       if (l.type === 'walk') {
         const where = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: l.to || (l.end && l.end.name) || '' });
         const dist = l.meters ? ` · ${fmtDistance(l.meters)}` : '';
@@ -2238,6 +2255,17 @@
     return `<div class="jr-detail"><div class="jr-meta">${esc(placeLabel(places.from))} → ${esc(placeLabel(places.to))}</div>
       <ul class="legs">${rows}</ul>
       ${j.rides.length ? `<button class="btn-primary set-alarms" data-i="${i}">${esc(t('followJourney'))}</button>` : ''}</div>`;
+  }
+
+  // A change on the same platform (BUG-06): the platform (tappable) and the wait, no walk
+  function samePlatformRow(legs, k, cls) {
+    const { end } = walkEnds(legs, k);
+    const prev = legs.slice(0, k).reverse().find(x => x.type === 'ride'), next = legs.slice(k + 1).find(x => x.type === 'ride');
+    const time = v => v == null ? null : +v;
+    const arr = prev && time(prev.arrReal || prev.arr), dep = next && time(next.real || next.dep);
+    const wait = arr && dep ? Math.max(0, Math.round((dep - arr) / 60000)) : null;
+    return `<li class="${cls}"><span class="leg-ico">⇄</span><div>${esc(t('samePlatform'))} ${platformChip(end.platform, end.mode, { id: end.stopId, name: end.name, coord: end.coord })}` +
+      `${wait ? ` · ${esc(t('sameWait', { n: wait }))}` : ''}</div></li>`;
   }
 
   // US-32: one walk on the map, from its start to its end. A stop end is its platform (BUG-05): the platform of the
@@ -2592,7 +2620,8 @@
           from: l.from, toStop: l.toStop, dep: ms(l.dep), real: ms(l.real), arr: ms(l.arr), arrReal: ms(l.arrReal),
           platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops,
           via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), depAt: ms(v.depAt), live: !!v.live })) }
-      : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '' });
+      : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '',
+          samePlatform: !!l.samePlatform, apiMin: l.apiMin || null });
   }
   // Back to a journey with Date objects, for the helpers shared with the planner (get-off reminders)
   function hydrate(plan) {
@@ -2905,9 +2934,14 @@
     };
     const rows = plan.map((l, k) => {
       if (l.type === 'walk') {
+        const ends = walkEnds(plan, k), end = ends.end;
+        if (l.samePlatform && samePlace(ends.start, end)) return samePlatformRow(plan, k, 'tl change');
         const map = l.start && l.end && (l.start.coord || l.start.stopId) && (l.end.coord || l.end.stopId)
           ? `<button class="ghost walk-map" data-act="walk-map" data-leg="${k}">${MAP_ICON}${esc(t('walkOnMap'))}</button>` : '';
-        const end = walkEnds(plan, k).end;
+        if (l.samePlatform) {   // the next ride moved to another platform: a walk again
+          const name = end.name + (end.platform ? ` (${t(end.mode === 'train' ? 'track' : 'platform', { p: end.platform })})` : '');
+          return `<li class="tl walk changed"><span>🚶 ${esc(t('platformMoved', { name }))}</span>${map}</li>`;
+        }
         const toName = end && end.name ? end.name + (end.platform ? ` (${t(end.mode === 'train' ? 'track' : 'platform', { p: end.platform })})` : '') : l.to || '';
         const to = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: toName });
         return `<li class="tl walk"><span>🚶 ${esc(t('walkMin', { min: fmtMin(l.min) }))} — ${esc(to)}</span>${map}</li>`;
