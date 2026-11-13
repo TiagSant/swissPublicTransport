@@ -54,6 +54,7 @@
 <meta name="theme-color" content="#0b1220">
 <title>Unireso departures — Sprint 9 prototype</title>
 <script src="../../assets/line-colors.js"></script>
+<script src="../../assets/line-colors-ch.js"></script>
 <script src="../../assets/ojp.js"></script>
 <script src="i18n.js"></script>
 <style>
@@ -583,7 +584,7 @@
       allSwitzerland: 'Include all of Switzerland', yourStops: 'Your stops', clear: 'Clear', clearAll: 'Clear all',
       removeStop: 'Remove {name} from your stops', stopRemoved: '{name} removed from your stops.', stopsCleared: 'Your stops were cleared.', undo: 'Undo', refresh: 'Refresh',
       lines: 'Lines', all: 'All', none: 'None', chooseDirections: 'Choose directions ▾', hideDirections: 'Hide directions ▴',
-      dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators',
+      dataSource: 'Data:', credits: 'Pictograms © SBB CFF FFS · Line colours from the operators and © OpenStreetMap contributors (ODbL)',
       noStopInZone: 'No stop found in the Unireso area. Tick "Include all of Switzerland" to widen the search.',
       noStop: 'No stop found.', searchFailed: 'Search failed (network?).', geoUnavailable: 'Geolocation not available.',
       locating: 'locating…', noNearby: 'No stop nearby.', nearbyFailed: 'Could not load nearby stops.',
@@ -688,7 +689,7 @@
       allSwitzerland: 'Inclure toute la Suisse', yourStops: 'Vos arrêts', clear: 'Effacer', clearAll: 'Tout effacer',
       removeStop: 'Retirer {name} de vos arrêts', stopRemoved: '{name} retiré de vos arrêts.', stopsCleared: 'Vos arrêts ont été effacés.', undo: 'Annuler', refresh: 'Rafraîchir',
       lines: 'Lignes', all: 'Toutes', none: 'Aucune', chooseDirections: 'Choisir les directions ▾', hideDirections: 'Masquer les directions ▴',
-      dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants',
+      dataSource: 'Données :', credits: 'Pictogrammes © SBB CFF FFS · Couleurs des lignes : exploitants et © contributeurs OpenStreetMap (ODbL)',
       noStopInZone: 'Aucun arrêt trouvé dans la zone Unireso. Cochez « Inclure toute la Suisse » pour élargir.',
       noStop: 'Aucun arrêt trouvé.', searchFailed: 'Recherche impossible (réseau ?).', geoUnavailable: 'Géolocalisation non disponible.',
       locating: 'localisation…', noNearby: 'Aucun arrêt à proximité.', nearbyFailed: 'Impossible de charger les arrêts proches.',
@@ -974,6 +975,7 @@
   // API category codes → transport mode (validated against real data, see docs/real-data-validation.md)
   const CATS = {
     tram:      ['T', 'TRAM', 'NFT', 'STR'],
+    metro:     ['M', 'METRO'],
     bus:       ['B', 'BUS', 'NFB', 'BN', 'EV', 'KB', 'EXB', 'BP', 'TX', 'NB', 'RUB', 'CAR'],
     ship:      ['BAT', 'BAV', 'FAE', 'SCH', 'SHIP'],
     funicular: ['FUN'],
@@ -981,10 +983,11 @@
     train:     ['S', 'SN', 'SL', 'L', 'R', 'RE', 'IR', 'IRE', 'IC', 'ICE', 'ICN', 'EC', 'EN', 'NJ', 'TGV',
                 'TER', 'RJ', 'RJX', 'PE', 'EXT', 'RB', 'IN', 'TRN']
   };
-  const MODE_ORDER = { train: 0, tram: 1, bus: 2, ship: 3, funicular: 4, cableway: 5, other: 6 };
+  const MODE_ORDER = { train: 0, metro: 1, tram: 2, bus: 3, ship: 4, funicular: 5, cableway: 6, other: 7 };
   // Swiss public transport pictograms (SBB pictogram library, pictos/svg-digital), used unmodified
+  // Metro: the French "M" pictogram — Switzerland's metro lines (m1, m2) are in Lausanne
   const PICTOGRAMS = { tram: 'Tram_r', bus: 'Bus_r', train: 'Zug_r', ship: 'Schiff_r',
-                       funicular: 'Standseilbahn_r', cableway: 'Luftseilbahn_r' };
+                       funicular: 'Standseilbahn_r', cableway: 'Luftseilbahn_r', metro: 'Metro_r_fr' };
   // SBB timetable icons available in assets/sbb/timetable (each with a -negative variant for dark mode)
   const SBB_TIMETABLE_ICONS = new Set(['ic-1', 'ic-5', 'ir-15', 'ir-57', 'ir-90', 'ir-95', 're-33', 'r-55', 'ter', 'tgv']);
 
@@ -996,11 +999,11 @@
 
   function modeOfCategory(cat) {
     const c = String(cat || '').toUpperCase().trim();
-    for (const m of ['tram', 'bus', 'ship', 'funicular', 'cableway', 'train']) if (CATS[m].includes(c)) return m;
+    for (const m of ['metro', 'tram', 'bus', 'ship', 'funicular', 'cableway', 'train']) if (CATS[m].includes(c)) return m;
     return 'other';
   }
   function modeOfIcon(icon, name) {
-    const m = ({ tram: 'tram', bus: 'bus', train: 'train', ship: 'ship', boat: 'ship', funicular: 'funicular', cableway: 'cableway' })[icon];
+    const m = ({ tram: 'tram', bus: 'bus', train: 'train', ship: 'ship', boat: 'ship', funicular: 'funicular', cableway: 'cableway', metro: 'metro', subway: 'metro' })[icon];
     if (m) return m;
     // Real data: some piers come without an icon (e.g. "Genève-Jardin-Anglais (lac)")
     return /\(lac\)/i.test(name || '') ? 'ship' : 'other';
@@ -1010,6 +1013,7 @@
   function lineLabel(j, mode) {
     const n = String(j.number || '').trim();
     const c = String(j.category || '').trim();
+    if (mode === 'metro') return /^\d+$/.test(n) ? 'm' + n : (n || c || '?').replace(/^M(\d+)$/, 'm$1');   // Lausanne: m1, m2
     if (mode !== 'train') return n || c || '?';
     if (/^[A-Za-z]/.test(n)) return n;                     // e.g. L1…L6, S1
     if (n && n.length <= 3) return (c + ' ' + n).trim();   // e.g. IR 90, RE 33
@@ -1034,9 +1038,27 @@
     }
     const op = String(j.operator || '');
     let c = null;
-    if (/^tpg$/i.test(op)) c = nets.TPG && nets.TPG[label];
+    if (/^tpg$/i.test(op) || j.operatorRef === '881') c = nets.TPG && nets.TPG[label];
     else if (mode === 'ship' && (/^mgsa$|mouettes/i.test(op) || /^M\d$/.test(label))) c = nets.MGN && nets.MGN[label];
-    return c ? { bg: c[0], fg: c[1], shape: c[2] } : { neutral: true };
+    // the rest of Switzerland: colours from OpenStreetMap, by operator abbreviation
+    // (transport.opendata.ch gives it, e.g. "TL"; OJP gives the company number, e.g. "151")
+    const abbr = chOperator(j);
+    if (!c && abbr && mode !== 'train') {
+      const o = window.LINE_COLORS_CH.operators[abbr];
+      c = o && o.lines[String(label).toLowerCase()];
+    }
+    if (c) return { bg: c[0], fg: c[1], shape: c[2] };
+    // PostAuto: its yellow for every line without a colour of its own
+    if (mode === 'bus' && (abbr === 'PAG' || /^(pag|pa|postauto|carpostal|autopostale)\b/i.test(j.operator || ''))) return { bg: '#FFCC00', fg: '#000000', shape: 'pill' };
+    return { neutral: true };
+  }
+  function chOperator(j) {
+    const ch = window.LINE_COLORS_CH;
+    if (!ch) return null;
+    const num = j.operatorRef && String(parseInt(j.operatorRef, 10));
+    if (num && ch.numbers && ch.numbers[num]) return ch.numbers[num];
+    const op = String(j.operator || '').trim().toUpperCase();
+    return op && ch.operators[op] ? op : null;
   }
 
   function badgeHtml(style, label) {
