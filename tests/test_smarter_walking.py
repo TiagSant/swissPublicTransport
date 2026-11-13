@@ -76,12 +76,12 @@ def osrm(route):
 STOP = lambda s: {"kind": "stop", "id": s["id"], "name": s["name"], "coord": [s["coordinate"]["x"], s["coordinate"]["y"]]}
 
 errors = []
-def session(b, case, base, store):
+def session(b, case, base, store, routing=True):
     S.update(case=case, base=base, routes=0)
     ctx = b.new_context(viewport={"width": 390, "height": 900}, locale="fr-CH", timezone_id="Europe/Zurich",
                         permissions=["geolocation"], geolocation={"latitude": 46.20, "longitude": 6.14})
     ctx.route("https://transport.opendata.ch/**", api)
-    ctx.route("https://routing.openstreetmap.de/**", osrm)
+    ctx.route("https://routing.openstreetmap.de/**", osrm if routing else (lambda r: r.abort()))
     if LEAFLET_DIR: ctx.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=str(Path(LEAFLET_DIR) / r.request.url.rsplit("/", 1)[-1])))
     if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
@@ -107,12 +107,8 @@ with sync_playwright() as p:
     assert "2 arrêts" in r19.inner_text(), r19.inner_text()            # Sainte-Clotilde now passed on board
     assert "Marche 1 min — jusqu’à Genève, Jonction" in " ".join(det.locator(".leg.walk").first.inner_text().split()), det.locator(".leg.walk").first.inner_text()
     pg.screenshot(path=str(OUT / "stay-on-plan.png"))
-    # the rider prefers the planned stop
-    r19.locator(".stay-on-toggle").click()
-    r19 = pg.locator("#journeyList .jr-detail .leg.ride").first
-    assert "16:59 Genève, Sainte-Clotilde" in " ".join(r19.inner_text().split()) and r19.locator(".stay-on.offer").count() == 1
-    r19.locator(".stay-on-toggle").click()
-    assert "17:01 Genève, Jonction" in " ".join(pg.locator("#journeyList .jr-detail .leg.ride").first.inner_text().split())
+    # nothing to gain at Sainte-Clotilde: no way back to it is offered (PO)
+    assert det.locator(".stay-on-toggle").count() == 0 and "Sainte-Clotilde" not in det.locator(".leg.ride").first.locator(".stay-on").inner_text()
     # followed as shown
     pg.click("#journeyList .jr-detail .set-alarms"); pg.wait_for_selector("#alarmList .trip")
     while pg.is_visible("#alarmBanner"): pg.click("#abOk")
@@ -120,7 +116,7 @@ with sync_playwright() as p:
     assert pl[0]["toStop"]["name"] == "Genève, Jonction" and pl[1]["type"] == "walk" and round(pl[1]["min"]) == 1, pl[:2]
     assert S["routes"] == 0, "street routes are off in this session"
     ctx.close()
-    print("change      → stay on the 19 to Jonction: 1 min instead of 4; undo / redo; followed as shown; the 19 to Vernier ignored")
+    print("change      → stay on the 19 to Jonction: 1 min instead of 4; the planned stop not offered; followed as shown; the 19 to Vernier ignored")
 
     # ---- B: stay on the 1 to École-de-Médecine, then on foot; streets for the walks
     ctx, pg = session(b, "B", dt.datetime(2026, 11, 13, 10, 0, tzinfo=tz),
@@ -152,8 +148,7 @@ with sync_playwright() as p:
 
     # ---- the straight line without the routing server (offline / off): nothing breaks
     ctx, pg = session(b, "B", dt.datetime(2026, 11, 13, 10, 0, tzinfo=tz),
-                      {"settings": {"footMaxMin": 15}, "journey:from": STOP(PLAIN), "journey:to": {"kind": "point", "coord": list(DEST), "near": None}})
-    ctx.unroute("https://routing.openstreetmap.de/**"); ctx.route("https://routing.openstreetmap.de/**", lambda r: r.abort())
+                      {"settings": {"footMaxMin": 15}, "journey:from": STOP(PLAIN), "journey:to": {"kind": "point", "coord": list(DEST), "near": None}}, routing=False)
     pg.locator("#journeyList .jr").first.click()
     pg.locator("#journeyList .jr-detail .leg.walk .walk-map").last.click(); pg.wait_for_selector("#mapSheet .wm.b")
     pg.wait_for_timeout(500)
