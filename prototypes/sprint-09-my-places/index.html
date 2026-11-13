@@ -2122,6 +2122,18 @@
     }
     return out;
   }
+  // The platform where a run stops at one of its next stops: the board of the stop where the journey gets off gives
+  // the next stops' times and positions but not always their platforms; the board of that next stop does (the run
+  // found by line, time and terminus). One board per stop and 5 minutes, shared.
+  async function platformAt(s, r) {
+    if (!s || s.platform || !s.id) return s && s.platform;
+    const b = await boardNear(s.id, s.at);
+    const schedOf = j => { const x = tsOr(j.stop.departureTimestamp, j.stop.departure); return x ? x.getTime() : 0; };
+    const run = b && findRun(b.stationboard || [], { category: r.category, number: r.number, to: r.to }, s.planned, schedOf, 150000).run;
+    const p = run && ((run.stop.prognosis && run.stop.prognosis.platform) || run.stop.platform);
+    if (p) s.platform = p;
+    return s.platform;
+  }
   // Where a stop's platform is (else the stop)
   function platformPos(quays, id, coord, plat) {
     const pts = id ? platformPoints(quays[id] || {}) : [];
@@ -2238,20 +2250,33 @@
     }
   }
   // After a search: next stops of each ride, better stops to get off, street routes — for the journeys shown first
+  let searchGen = 0;   // a new search: what an older one still works out is no longer drawn
   async function enrichJourneys(list) {
+    const gen = searchGen;
     const quays = await loadQuays().catch(() => ({}));
     for (const j of list) {
+      if (gen !== searchGen) return;
       if (j._enriched) continue;
       j._enriched = true;
       try {
         for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
-        j.stayOns = tripConnections(planOf(j)).map(c => bestStayOn(j, c, quays)).filter(Boolean);
+        const cs = tripConnections(planOf(j));
+        j.stayOns = cs.map(c => bestStayOn(j, c, quays)).filter(Boolean);
+        // the platform where the rider now gets off (shown, and the change walked from it), then the choice again
+        if (j.stayOns.length) {
+          for (const a of j.stayOns) await platformAt(j.legs[a.i].onward[a.n], j.legs[a.i]);
+          j.stayOns = cs.map(c => bestStayOn(j, c, quays)).filter(Boolean);
+        }
         if (!(j.segments > 1)) await routeWalks(j);   // a trip in parts keeps its planned stays
         // the walk at the end, from the best stop: its street route in the cache for footAlternative
-        const alt = footAlternative(withStayOn(j));
+        let alt = footAlternative(withStayOn(j));
+        if (alt && alt.ext != null && !alt.start.platform) {   // finishing on foot from a later stop: its platform too
+          const prev = j.rides[j.rides.length - 2];
+          if (await platformAt(prev.onward[alt.ext], prev)) alt = footAlternative(withStayOn(j));
+        }
         if (alt && places.to && places.to.coord) await walkRoute(platformPos(quays, alt.start.stopId, alt.start.coord, alt.start.platform), places.to.coord);
       } catch { /* keep the journey as found */ }
-      if (journeyBase.includes(j)) renderJourneys();
+      if (gen === searchGen && journeyBase.includes(j)) renderJourneys();
     }
   }
 
@@ -2292,6 +2317,7 @@
   }
 
   async function searchJourneys() {
+    searchGen++;
     const { from, to } = places;
     const status = $('journeyStatus');
     if (!from || !to) { status.textContent = t('chooseBoth'); return; }

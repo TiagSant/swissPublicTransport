@@ -235,18 +235,20 @@
         passList = onward.map(c => {
           const a = callTimes(c, 'ServiceArrival'), d = callTimes(c, 'ServiceDeparture');
           return { station: station(txt(c, 'StopPointRef'), txt(c, 'StopPointName'), places),
-                   arrival: a.estimated || a.planned, departure: d.estimated || d.planned, _planned: a.planned || d.planned };
+                   arrival: a.estimated || a.planned, departure: d.estimated || d.planned, _planned: a.planned || d.planned,
+                   platform: txt(c, 'EstimatedQuay') || txt(c, 'PlannedQuay') || null };
         });
         // remembered with each stop's position: a light refresh can then still say where the next stops are (US-50)
         if (patterns) patterns.set(info.pattern, passList.filter(p => p.station.id !== hereId).slice(0, 8)
           .map(p => ({ id: p.station.id, name: p.station.name, offMin: p._planned ? minutesBetween(dep.planned, p._planned) : null,
-                       c: p.station.coordinate && p.station.coordinate.x != null ? [p.station.coordinate.x, p.station.coordinate.y] : null })));
+                       c: p.station.coordinate && p.station.coordinate.x != null ? [p.station.coordinate.x, p.station.coordinate.y] : null,
+                       q: p.platform || null })));
       } else {
         const known = patterns && patterns.get(info.pattern);
         if (!known) unknown++;
         const base = new Date(dep.estimated || dep.planned).getTime();
         passList = (known || []).map(p => ({ station: { id: p.id, name: p.name, coordinate: p.c ? { type: 'WGS84', x: p.c[0], y: p.c[1] } : null },
-          arrival: p.offMin == null ? null : new Date(base + p.offMin * 60000).toISOString() }));
+          arrival: p.offMin == null ? null : new Date(base + p.offMin * 60000).toISOString(), platform: p.q || null }));
       }
       board.push({
         category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,

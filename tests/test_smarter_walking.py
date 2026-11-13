@@ -37,10 +37,10 @@ def ride(cat, num, to, a, b, t0, t1, p0, p1):
     return {"journey": {"category": cat, "number": num, "to": to, "operator": "TPG", "passList": calls}, "walk": None,
             "departure": end(a, t0, "departure", p0), "arrival": end(b, t1, "arrival", p1)}
 def walk(a, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - t0).total_seconds())}, "departure": end(a, t0, "departure", ""), "arrival": end(a, t1, "arrival", "")}
-def board_entry(cat, num, to, here, t0, nxt, no_coord=False):
+def board_entry(cat, num, to, here, t0, nxt, no_coord=False, plat=""):
     strip = lambda s: {k: v for k, v in s.items() if k != "coordinate"} if no_coord else s
     return {"category": cat, "number": num, "to": to, "operator": "TPG",
-            "stop": {"station": here, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()), "prognosis": {}, "platform": "", "delay": 0},
+            "stop": {"station": here, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()), "prognosis": {}, "platform": plat, "delay": 0},
             "passList": [{"station": here}] + [{"station": strip(s), "arrival": fmt(t), "arrivalTimestamp": int(t.timestamp()), "prognosis": {}} for s, t in nxt]}
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 
@@ -55,6 +55,9 @@ def board(stop_id):
         # as on the real board: Jonction 1 min after Sainte-Clotilde; here without positions (light official-data board)
         return [board_entry("B", "19", "Onex, cité", STECLO, at(9), [(JONCTION, at(10)), (VOIRIE, at(13))], no_coord=True),
                 board_entry("B", "19", "Vernier-Village", STECLO, at(9), [(MUSEE, at(11))])]          # other direction, same minute
+    if S["case"] == "A" and stop_id == JONCTION["id"]:   # the platform of the 19 at Jonction: on Jonction's own board
+        return [board_entry("B", "19", "Onex, cité", JONCTION, at(10), [(VOIRIE, at(13))], plat="C"),
+                board_entry("B", "19", "Vernier, village", JONCTION, at(10), [(STECLO, at(11))], plat="D")]
     if S["case"] == "B" and stop_id == CIRQUE["id"]:
         return [board_entry("B", "1", "Genève, Rond-Point de Plainpalais", CIRQUE, at(10), [(ECOLE, at(11)), (GARE, at(13))])]
     return []
@@ -105,7 +108,7 @@ with sync_playwright() as p:
     assert "1 min de marche" in meta and "4 min d’attente" in meta, meta
     jr.click(); det = pg.locator("#journeyList .jr-detail").first
     r19 = det.locator(".leg.ride").first
-    assert "17:00 Genève, Jonction" in " ".join(r19.inner_text().split()), r19.inner_text()
+    assert "17:00 Genève, Jonction Quai C" in " ".join(r19.inner_text().split()), r19.inner_text()   # not the generic "Arrêt"
     assert "2 arrêts" in r19.inner_text(), r19.inner_text()            # Sainte-Clotilde now passed on board
     assert "Marche 1 min — jusqu’à Genève, Jonction" in " ".join(det.locator(".leg.walk").first.inner_text().split()), det.locator(".leg.walk").first.inner_text()
     pg.screenshot(path=str(OUT / "stay-on-plan.png"))

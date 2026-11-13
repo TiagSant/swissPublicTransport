@@ -14,10 +14,12 @@ with sync_playwright() as p:
       const a = OJP_ADAPTER.toStationboard(full, '8587418', pat), l = OJP_ADAPTER.toStationboard(light, '8587418', pat);
       const next = j => j.passList.slice(1);
       const withPos = b => b.stationboard.filter(j => next(j).length).map(j => next(j).every(x => x.station.coordinate && x.station.coordinate.x && x.arrival));
-      return { full: withPos(a), light: withPos(l), patterns: pat.size };
+      const quays = b => b.stationboard.flatMap(j => next(j)).filter(x => x.platform).length;
+      return { full: withPos(a), light: withPos(l), patterns: pat.size, fullQ: quays(a), lightQ: quays(l) };
     }""", [(FX / "app_ser_esserts_full.xml").read_text(), (FX / "app_ser_esserts_light.xml").read_text()])
     assert r["patterns"] > 0 and r["full"] and all(r["full"]), r
     assert r["light"] and all(r["light"]), r
-    print(f"ojp         → {len(r['light'])} runs on the light board with their next stops' times and positions")
+    assert r["fullQ"] > 0 and r["lightQ"] > 0, (r["fullQ"], r["lightQ"])   # the next stops' platforms too
+    print(f"ojp         → {len(r['light'])} runs on the light board with their next stops' times and positions; {r['lightQ']} next stops with their platform")
     b.close()
 print("OK")
