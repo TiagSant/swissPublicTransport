@@ -1,0 +1,258 @@
+{
+ "generated": "2026-11-13T04:44Z",
+ "ckan_errors": [
+  "business-organisations: HTTP Error 403: Forbidden",
+  "transport-companies: HTTP Error 403: Forbidden",
+  "business-organisation: HTTP Error 403: Forbidden",
+  "transport-company: HTTP Error 403: Forbidden"
+ ],
+ "overpass": "https://overpass-api.de/api/interpreter",
+ "routes": 7967,
+ "used": 0,
+ "without_colour_or_ref": 2675,
+ "operators": 0,
+ "lines": 0,
+ "unmatched_operators": [
+  [
+   "PAG",
+   2156
+  ],
+  [
+   "VBZ",
+   251
+  ],
+  [
+   "PAZ",
+   219
+  ],
+  [
+   "SBB",
+   189
+  ],
+  [
+   "TPG",
+   104
+  ],
+  [
+   "BSGU",
+   97
+  ],
+  [
+   "TL",
+   94
+  ],
+  [
+   "BVB",
+   91
+  ],
+  [
+   "ZVB",
+   84
+  ],
+  [
+   "VBSH",
+   80
+  ],
+  [
+   "Bernmobil",
+   67
+  ],
+  [
+   "RVBW",
+   62
+  ],
+  [
+   "TRAVYS",
+   58
+  ],
+  [
+   "BOGG",
+   57
+  ],
+  [
+   "SBW",
+   53
+  ],
+  [
+   "BOS/wimo",
+   52
+  ],
+  [
+   "AVA-szr",
+   50
+  ],
+  [
+   "MBC Auto",
+   49
+  ],
+  [
+   "AAGS",
+   48
+  ],
+  [
+   "RBL",
+   42
+  ],
+  [
+   "BLS",
+   40
+  ],
+  [
+   "BBA",
+   39
+  ],
+  [
+   "VB",
+   38
+  ],
+  [
+   "VBSG",
+   36
+  ],
+  [
+   "TPG: Globe Limo",
+   36
+  ],
+  [
+   "TPL",
+   35
+  ],
+  [
+   "BOS/rtb",
+   35
+  ],
+  [
+   "AAGL",
+   35
+  ],
+  [
+   "TPF Auto",
+   34
+  ],
+  [
+   "BLT Auto",
+   34
+  ],
+  [
+   "THB",
+   32
+  ],
+  [
+   "AAGU",
+   32
+  ],
+  [
+   "BSF",
+   32
+  ],
+  [
+   "SBF",
+   30
+  ],
+  [
+   "RhB",
+   30
+  ],
+  [
+   "VMCV",
+   29
+  ],
+  [
+   "TRN/tc",
+   28
+  ],
+  [
+   "REGO",
+   28
+  ],
+  [
+   "TN",
+   26
+  ],
+  [
+   "TPG: RATP Dev",
+   22
+  ],
+  [
+   "STI",
+   22
+  ],
+  [
+   "VZO",
+   22
+  ],
+  [
+   "VBD",
+   22
+  ],
+  [
+   "VSK",
+   22
+  ],
+  [
+   "Verkehrsbetrieb LIECHTENSTEINmobil",
+   21
+  ],
+  [
+   "SZU Auto",
+   20
+  ],
+  [
+   "TPN",
+   18
+  ],
+  [
+   "Treni Regionali Ticino Lombardia",
+   17
+  ],
+  [
+   "TSD-asdt",
+   17
+  ],
+  [
+   "SOB",
+   16
+  ],
+  [
+   "THURBO",
+   16
+  ],
+  [
+   "Lemanis",
+   15
+  ],
+  [
+   "BLT",
+   14
+  ],
+  [
+   "RBS",
+   14
+  ],
+  [
+   "TPF",
+   14
+  ],
+  [
+   "BuS/eb",
+   14
+  ],
+  [
+   "SNCF Voyageurs",
+   13
+  ],
+  [
+   "ZB",
+   12
+  ],
+  [
+   "SZU",
+   12
+  ],
+  [
+   "TRN/Autovr",
+   12
+  ]
+ ],
+ "per_operator": {}
+}
