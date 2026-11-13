@@ -3208,7 +3208,9 @@
     return { legs, rides: legs.filter(l => l.type === 'ride') };
   }
   const depOf = r => r.real || r.dep, arrOf = r => r.arrReal || r.arr;
-  const walkBetween = (plan, i, k) => plan.slice(i + 1, k).filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0);
+  // Walking at a change, in whole minutes as shown (at least 1 when there is any): walks estimated from distances
+  // are fractions (1.33 min), and the waiting is worked out from the same figure the rider reads
+  const walkBetween = (plan, i, k) => { const m = plan.slice(i + 1, k).filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0); return m > 0.05 ? Math.max(1, Math.round(m)) : 0; };
   // Arrival at the destination: last ride + the walks after it (or a walk-only end)
   function tripArrival(plan) {
     let last = -1; plan.forEach((l, k) => { if (l.type === 'ride') last = k; });

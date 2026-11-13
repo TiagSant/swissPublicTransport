@@ -50,6 +50,8 @@ with sync_playwright() as p:
     w = det.locator(".leg.walk")
     assert w.count() == 1 and "jusqu’à Lancy-Pont-Rouge, gare" in " ".join(w.inner_text().split()) and w.locator(".walk-map").count() == 1, det.inner_text()
     wait = det.locator(".leg.ride .wait").inner_text()
+    import re as _re
+    assert not _re.search(r"\d[.,]\d+ min", det.inner_text() + jr.inner_text()), det.inner_text()   # whole minutes only
     assert "1 min de marche, puis 4 min d’attente" in wait, wait
     pg.screenshot(path=str(OUT / "change-walk.png"))
     print("A → C       → walk added: '1 min de marche, puis 4 min d’attente', with its map")
