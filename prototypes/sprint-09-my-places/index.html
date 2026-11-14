@@ -701,6 +701,7 @@
       earlyLeft: 'You left early: “Get ready” and “Leave” are cancelled.', earlyAtStop: 'You are at {stop}, {n} min before the {line}.',
       earlyOnWay: 'On your way: at {stop} around {t}, {n} min before the {line}.', earlyOptions: 'Earlier options:', altEarly: '{lines} at {dep}', altEarlyDetail: 'arrive {t} ({n} min sooner)',
       waitNoneWalk: 'Change: {walk} min walk, no time to spare', waitNone: 'Change: no time to spare', waitMissed: 'Change: missed at the current times',
+      allMissed: 'With the current delays, the changes of the journeys found are missed. Try a later departure.',
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
       altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
       altApplied: 'Journey updated: {what}.', platformNotify: 'Platform change', platformBody: '{line} now leaves from {p} at {stop}.',
@@ -821,6 +822,7 @@
       earlyLeft: 'Vous êtes parti plus tôt : « Préparez-vous » et « Partir » sont annulées.', earlyAtStop: 'Vous êtes à {stop}, {n} min avant le {line}.',
       earlyOnWay: 'En route : à {stop} vers {t}, {n} min avant le {line}.', earlyOptions: 'Options plus tôt :', altEarly: '{lines} à {dep}', altEarlyDetail: 'arrivée {t} ({n} min plus tôt)',
       waitNoneWalk: 'Correspondance : {walk} min de marche, aucune marge', waitNone: 'Correspondance : aucune marge', waitMissed: 'Correspondance : manquée aux horaires actuels',
+      allMissed: 'Avec les retards actuels, les correspondances des itinéraires trouvés sont manquées. Essayez un départ plus tard.',
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
       altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
       altApplied: 'Trajet mis à jour : {what}.', platformNotify: 'Changement de quai', platformBody: '{line} part maintenant du {p} à {stop}.',
@@ -2571,6 +2573,14 @@
       const when = readWhen();
       const { pts, stays } = tripPoints();
       journeyBase = await journeysBetween(pts[0], pts[1], when, signal);
+      // US-57: when every journey found has a change missed at the current times, look once from just after them
+      const feasible = list => list.some(j => !journeyWaits(j).missed);
+      if (journeyBase.length && !feasible(journeyBase) && when.mode !== 'arrive') {
+        const after = Math.min(...journeyBase.map(j => j.leaveAt.getTime())) + 60000;
+        const more = await journeysBetween(pts[0], pts[1], { mode: 'depart', at: new Date(after) }, signal).catch(() => []);
+        const keys = new Set(journeyBase.map(j => j.key));
+        journeyBase = journeyBase.concat(more.filter(j => !keys.has(j.key)));
+      }
       // US-45 / US-46: each next part leaves once the time at the place is over; each journey of the first part
       // gets the best next part it can catch (one search per part, from the earliest possible time)
       if (pts.length > 2) {
@@ -2589,7 +2599,7 @@
       for (const k of new Set(journeyBase.filter(j => !(j.segments > 1)).flatMap(j => [footAlternative(j), startAlternative(j)]).filter(Boolean).map(x => x.key))) recordFoot(k, 'shown');
       status.textContent = journeyBase.length ? '' : t('noJourney');
       renderJourneys();
-      enrichJourneys(rankJourneys(journeyBase, getPrio(), readWhen().mode).slice(0, 8));   // every journey shown
+      enrichJourneys(rankJourneys(journeyBase.filter(j => !journeyWaits(j).missed), getPrio(), readWhen().mode).slice(0, 8));   // every journey shown
     } catch (e) {
       if (e.name === 'AbortError') return;
       if (e.noStop) { status.textContent = t('noStopNear', { name: placeLabel(e.noStop) }); $('journeyResults').hidden = true; return; }
@@ -2780,7 +2790,10 @@
   function renderJourneys() {
     const box = $('journeyResults');
     if (!journeyBase.length) { box.hidden = true; return; }
-    journeys = journeyBase.map(displayJourney);
+    // US-57: a journey whose change is missed at the current times (delays) is not suggested
+    journeys = journeyBase.map(displayJourney).filter(j => !journeyWaits(j).missed);
+    if (!journeys.length) { box.hidden = true; $('journeyStatus').textContent = t('allMissed'); return; }
+    if ($('journeyStatus').textContent === t('allMissed')) $('journeyStatus').textContent = '';
     const mode = readWhen().mode;
     const keyOf = j => (j.base || j).key;
     if (!journeyOrder) journeyOrder = rankJourneys(journeys, getPrio(), mode).map(keyOf);
@@ -2870,7 +2883,8 @@
   function journeyWaits(j) {
     if (!j._waits || j._waits.legs !== j.legs) {   // a walk/bus variant has its own legs
       const plan = planOf(j), cs = tripConnections(plan);
-      j._waits = { legs: j.legs, plan, byRide: new Map(cs.map(c => [c.k, c])), total: cs.reduce((x, c) => x + Math.max(0, c.slack), 0), tight: cs.some(c => c.slack < COMFORT_MIN), n: cs.length };
+      j._waits = { legs: j.legs, plan, byRide: new Map(cs.map(c => [c.k, c])), total: cs.reduce((x, c) => x + Math.max(0, c.slack), 0), tight: cs.some(c => c.slack < COMFORT_MIN), n: cs.length,
+                   missed: cs.some(c => c.slack < 0) };   // US-57: a change missed at the current times
     }
     return j._waits;
   }
