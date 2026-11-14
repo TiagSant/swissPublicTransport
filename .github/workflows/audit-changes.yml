@@ -1,0 +1,32 @@
+name: Audit of changes on real data
+
+# Runs the prototype on real journeys across Switzerland (both data sources) and checks every change against the
+# best place the same two vehicles allow (tools/audit/audit_changes.py). Manual: Actions → this workflow → Run.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full, quick (2 journeys) or debug (the cases left over on 14.11.2026, with the reasons)"
+        default: full
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright==1.48.0 && python -m playwright install --with-deps chromium
+      - name: Audit
+        env:
+          OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
+          OUT: audit-out
+          QUICK: ${{ inputs.mode == 'quick' && '1' || '' }}
+          DEBUG: ${{ inputs.mode == 'debug' && '1' || '' }}
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &
+          sleep 2
+          python tools/audit/audit_changes.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: audit-out, path: audit-out }

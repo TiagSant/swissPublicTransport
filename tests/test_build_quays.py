@@ -17,11 +17,12 @@ rows = [
 rows += [f"ch:1:sloid:9{i:04d}:0:1;859{i:04d};B;;BOARDING_PLATFORM;6.1{i:03d};46.2{i:03d}" for i in range(60)]
 csv_text = header + "\n" + "\n".join(rows) + "\n"
 
-stops, kept, types = bq.build(csv_text)
+stops, kept, types, everywhere = bq.build(csv_text)
 assert stops["8587387"] == {"F": [46.2047, 6.1431], "A": [46.2049, 6.1429]}, stops["8587387"]
 assert "8507000" not in stops                       # outside the area
 assert stops["8501008"] == {"4": [46.2101, 6.1424], "4AB": [46.2101, 6.1424]}, stops["8501008"]  # id rebuilt from SLOID
 assert types == {"BOARDING_PLATFORM": 64, "BOARDING_AREA": 1}, types
+assert everywhere["8507000"] == {"3": [46.9488, 7.4391]} and everywhere["8587387"] == stops["8587387"]   # all of Switzerland
 print("plain CSV OK:", len(stops), "stops,", kept, "platforms")
 
 with tempfile.TemporaryDirectory() as d:
@@ -34,4 +35,8 @@ with tempfile.TemporaryDirectory() as d:
     js = out.read_text(encoding="utf-8")
     data = json.loads(js.split("window.QUAYS = ", 1)[1].rstrip().rstrip(";"))
     assert data["stops"]["8587387"]["F"] == [46.2047, 6.1431] and "licence" in data
+    # the parts for the whole of Switzerland: one per block of stop numbers
+    part = (Path(d) / "quays-ch" / "8507.js").read_text(encoding="utf-8")
+    assert json.loads(part.split("] = ", 1)[1].rstrip().rstrip(";")) == {"8507000": {"3": [46.9488, 7.4391]}}, part
+    assert (Path(d) / "quays-ch" / "8587.js").exists() and (Path(d) / "quays-ch" / "8501.js").exists()
 print("zipped CSV + output file OK")
