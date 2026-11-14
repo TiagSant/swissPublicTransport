@@ -1,0 +1,12 @@
+name: Probe split trains (temporary)
+on:
+  push:
+    branches: [debug-probe-split]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/probe/probe_split_trains.py
+        env:
+          OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
