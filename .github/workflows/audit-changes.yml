@@ -15,7 +15,6 @@ jobs:
         env:
           OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
           OUT: audit-out
-          QUICK: "1"
         run: |
           python -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &
           sleep 2

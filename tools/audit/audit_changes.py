@@ -249,17 +249,24 @@ def audit(dumps):
                 if not run1 or not run2:
                     row.setdefault("verdict", "UNVERIFIABLE"); row["why"] = "run not found" + (" (1st)" if not run1 else "") + (" (2nd)" if not run2 else ""); rows.append(row); continue
                 need = max(1, min(r["slack"], COMFORT))
-                best = best_possible(run1, run2, cur, nxt, need)
-                if not best:
-                    row.setdefault("verdict", "UNVERIFIABLE"); row["why"] = "stops of the run not matched"; rows.append(row); continue
-                row["best"] = best
-                def est(ride_a, ride_b):
+                def est(ride_a, ride_b, info=None):
                     X = next((c for c in run1["calls"][[c["this"] for c in run1["calls"]].index(True) + 1:] if c["id"] == str(ride_a["toStop"]["id"])), None)
                     Y = next((c for c in run2["calls"] if c["id"] == str(ride_b["from"]["id"])), None)
+                    if info is not None: info.update(X=bool(X), Y=bool(Y), Xc=bool(X and X["coord"]), Yc=bool(Y and Y["coord"]),
+                                                     Xq=bool(X and str(X["id"]) in QS), Yq=bool(Y and str(Y["id"]) in QS))
                     if not X or not Y: return None
                     w = walk_exact(dict(X, quay=ride_a.get("arrPlatform") or X["quay"]), dict(Y, quay=ride_b.get("platform") or Y["quay"]))
                     return None if w is None else shown(w)
-                row["api_est"], row["app_est"] = est(cur, nxt), est(f["cur"], f["next"])
+                info = {}
+                row["api_est"], row["app_est"] = est(cur, nxt, info), est(f["cur"], f["next"])
+                unchanged = str(f["cur"]["toStop"]["id"]) == str(cur["toStop"]["id"]) and str(f["next"]["from"]["id"]) == str(nxt["from"]["id"])
+                best = best_possible(run1, run2, cur, nxt, need)
+                if not best:
+                    if row["api_est"] is None: row.setdefault("verdict", "UNVERIFIABLE"); row["why"] = f"no position {info}"
+                    elif unchanged: row.setdefault("verdict", "TIGHT_UNCHANGED")
+                    else: row.setdefault("verdict", "CHANGED_TIGHT"); row["why"] = "app moved a change the check finds too tight"
+                    rows.append(row); continue
+                row["best"] = best
                 if row["app_est"] is not None and row["api_est"] is not None and row["app_est"] > row["api_est"]: row.setdefault("verdict", "REGRESSION_WORSE_PLACE")
                 if "verdict" not in row:
                     if row["app_est"] is None:
