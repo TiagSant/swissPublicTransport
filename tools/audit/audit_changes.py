@@ -137,14 +137,18 @@ def find_run(ride):
     return best and best[1]
 
 # ---------------- positions and walks, as the app ----------------
-QS = json.loads(re.search(r"window\.QUAYS = (\{.*\});?\s*$", (ROOT / "assets/quays.js").read_text(), re.S).group(1))["stops"]
+QS = {}
+for f in sorted((ROOT / "assets/quays-ch").glob("*.js")):   # all of Switzerland (same data as the app)
+    QS.update(json.loads(f.read_text().split("] = ", 1)[1].rstrip().rstrip(";")))
+QS.update(json.loads(re.search(r"window\.QUAYS = (\{.*\});?\s*$", (ROOT / "assets/quays.js").read_text(), re.S).group(1))["stops"])
 def hav(a, b):
     p1, p2 = math.radians(a[0]), math.radians(b[0]); dl = math.radians(b[1] - a[1])
     return 2 * 6371000 * math.asin(math.sqrt(math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2))
 def pos(sid, coord, quay):
     q = QS.get(str(sid) if sid else "", {})
     if quay:
-        for k in (quay, str(quay).upper(), str(quay).zfill(2)):
+        m = re.match(r"^(\d{1,2})\s*[A-Z]{1,3}(?:\s*-\s*[A-Z])?$", str(quay).upper())
+        for k in (quay, str(quay).upper(), str(quay).zfill(2)) + ((m.group(1),) if m else ()):
             if k in q: return q[k]
     return coord
 def walk_exact(a, b):
@@ -204,7 +208,10 @@ def run_app(pairs):
                         if "openstreetmap" in r.url or "cdnjs" in r.url: return
                         state["inflight"] -= 1; state["last"] = time.time()
                         resp = None if failed else r.response()
-                        if failed or (resp and resp.status >= 400): state["fail"] += 1
+                        if failed or (resp and resp.status >= 400):
+                            state["fail"] += 1
+                            k = f'{r.url.split("/")[2]} {"failed" if failed else resp.status}'
+                            state.setdefault("codes", {})[k] = state.setdefault("codes", {}).get(k, 0) + 1
                     pg.on("request", on_req); pg.on("requestfinished", on_done); pg.on("requestfailed", lambda r: on_done(r, True))
                     pg.clock.install(time=t0.timestamp())
                     pg.goto(PAGE)
@@ -224,11 +231,12 @@ def run_app(pairs):
                         res = res or pg.evaluate("window.__audit()")
                     except Exception as e:
                         print("  app error", a["name"], "→", z["name"], src, e)
+                    if state.get("codes"): print("    failed requests:", state["codes"], flush=True)
                     dumps.append({"src": src, "at": t0.isoformat(), "from": a["name"], "to": z["name"], "journeys": res or [],
                                   "requests": state["req"], "failed_requests": state["fail"], "secs": round(time.time() - t_start)})
                     print(f'  {src:8} {t0:%H:%M} {a["name"]} → {z["name"]}: {len(res or [])} journeys, {state["req"]} requests, {state["fail"]} failed, {round(time.time() - t_start)} s', flush=True)
                     ctx.close()
-                    time.sleep(1)
+                    time.sleep(25 if src == "ojp" else 1)   # the OJP key's per-minute limit
         b.close()
     return dumps
 
@@ -273,11 +281,11 @@ def audit(dumps):
                         row["verdict"], row["why"] = "UNVERIFIABLE", "app's change stops not on the runs"
                     elif row["app_est"] - best["walk"] >= 1:
                         why = []
-                        if r["walk"] < 2: why.append("API walk < 2 min (not looked at)")
+                        if r["walk"] < 1: why.append("no API walk (not looked at)")
                         if best["off_shift"] > 5: why.append(f'off {best["off_shift"]} stops later (window 5)')
                         if best["off_shift"] < -5: why.append(f'off {-best["off_shift"]} stops earlier (window 5)')
                         if best["board_shift"] < -4: why.append(f'board {-best["board_shift"]} stops earlier (window 4)')
-                        if best["board_shift"] > 0: why.append("board later (not looked at)")
+                        if best["board_shift"] > 5: why.append(f'board {best["board_shift"]} stops later (window 5)')
                         if best["off_shift"] and best["board_shift"] < 0 and best["off_shift"] < 0: why.append("off earlier + board earlier together (not looked at)")
                         row["verdict"], row["why"] = "MISSED", "; ".join(why) or "within the windows: data or rule"
                     elif row["app_est"] < row["api_est"]: row["verdict"] = "IMPROVED_OPTIMAL"
@@ -307,7 +315,7 @@ if __name__ == "__main__":
     for r in rows:
         if r["verdict"] not in ("OPTIMAL", "IMPROVED_OPTIMAL"):
             print(f'{r["verdict"]:24} {r["src"]:8} {r["case"]} | {r.get("change", "")} | API {r.get("api_walk")} (est {r.get("api_est")}) app {r.get("app_walk")} (est {r.get("app_est")}) '
-                  f'best {r.get("best", {}).get("walk")} ({r.get("best", {}).get("off", "")} → {r.get("best", {}).get("board", "")}) | {r.get("why", "")}')
+                  f'best {r.get("best", {}).get("walk")} ({r.get("best", {}).get("off", "")} → {r.get("best", {}).get("board", "")}) | app: {r.get("app_change", "")} | {r.get("why", "")}')
     print("\n=== IMPROVED (sample) ===")
     for r in [r for r in rows if r["verdict"] == "IMPROVED_OPTIMAL"][:30]:
         print(f'{r["src"]:8} {r["case"]} | {r["change"]} | API {r["api_walk"]} (est {r["api_est"]}) → app {r["app_walk"]} (est {r["app_est"]}) at {r["app_change"]}')
