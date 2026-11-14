@@ -125,12 +125,12 @@ def build(text):
         names.discard("")
         if not sid or not names:
             continue
-        for n in names:
+        for n in sorted(names):   # a stable order: the same data gives the same files
             everywhere.setdefault(sid, {}).setdefault(n, [round(lat, 6), round(lon, 6)])
         if not (ZONE["lat_min"] <= lat <= ZONE["lat_max"] and ZONE["lon_min"] <= lon <= ZONE["lon_max"]):
             continue
         quays = stops.setdefault(sid, {})
-        for n in names:
+        for n in sorted(names):
             quays.setdefault(n, [round(lat, 6), round(lon, 6)])
         kept += 1
     return stops, kept, seen_types, everywhere
