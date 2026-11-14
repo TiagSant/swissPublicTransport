@@ -1,0 +1,1 @@
+Built from the real case seen on 16.11.2026 (OJP probe): RE 2143 Zürich HB 23:39 → "Winterthur | St. Gallen" with the notice A__FL (train with several destinations), then RE 75 n°31245 to Konstanz from Winterthur track 5, sectors E–H. Shortened (fewer stops); times and platforms as given by the API.
