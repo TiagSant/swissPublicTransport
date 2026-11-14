@@ -41,6 +41,7 @@ PAIRS = [  # (from, to) by name; resolved to the first stop OJP gives
 TIMES = [dt.datetime(2026, 11, 16, 8, 0, tzinfo=TZ), dt.datetime(2026, 11, 16, 17, 30, tzinfo=TZ)]
 SOURCES = ["opendata", "ojp"]
 if os.environ.get("QUICK"): PAIRS, TIMES, SOURCES = PAIRS[:2], TIMES[:1], SOURCES[:1]
+if os.environ.get("DEBUG"): PAIRS, TIMES, SOURCES = [("Carouge GE, Rondeau", "Meyrin, Gravière"), ("Kriens, Zentrum Pilatus", "Luzern, Verkehrshaus")], TIMES[1:], ["opendata"]
 
 # ---------------- OJP from Python (the independent side) ----------------
 def iso(t): return t.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -190,7 +191,15 @@ def add_hook():
     p = ROOT / "prototypes/sprint-09-my-places/index.html"; s = p.read_text()
     anchor = "  // Journeys between two places (one part of the trip)"
     assert s.count(anchor) == 1
-    p.write_text(s.replace(anchor, HOOK + anchor))
+    s = s.replace(anchor, HOOK + anchor)
+    if os.environ.get("DEBUG"):   # served copy only: why each candidate place was kept or left
+        a = "      if (slack < need || min > limit) return;"
+        assert s.count(a) == 1
+        s = s.replace(a, "      (window.__dbg = window.__dbg || []).push({ cur: cur.label, nxt: next.label, x: s.name, xp: s.platform, y: y ? y.name : board ? 'earlier:' + s.name : next.from.name, yp: yPlat, min: +min.toFixed(2), slack, need, limit: +limit.toFixed(2) });\n" + a)
+        b = "    pairs.sort("
+        assert s.count(b) == 1
+        s = s.replace(b, "    (window.__dbg = window.__dbg || []).push({ cur: cur.label, nxt: next.label, d0: Math.round(d0), base: +base.toFixed(2), cwalk: c.walk, early: early.map(e => e.s.name), via: (next.via || []).map(v => v.name), pairs: pairs.map(p => [p.x.s.name, p.y.name, Math.round(distanceM(p.x.s.coord, p.y.coord))]) });\n" + b)
+    p.write_text(s)
 
 def run_app(pairs):
     dumps = []
@@ -229,6 +238,8 @@ def run_app(pairs):
                             if d and all(j["enriched"] for j in d) and state["inflight"] <= 0 and time.time() - state["last"] > 4:
                                 res = d; break
                         res = res or pg.evaluate("window.__audit()")
+                        if os.environ.get("DEBUG"):
+                            for e in pg.evaluate("window.__dbg || []"): print("    DBG", json.dumps(e, ensure_ascii=False))
                     except Exception as e:
                         print("  app error", a["name"], "→", z["name"], src, e)
                     if state.get("codes"): print("    failed requests:", state["codes"], flush=True)
