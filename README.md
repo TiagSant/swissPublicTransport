@@ -86,6 +86,8 @@ python tests/test_followed_journey.py    # followed journey: live steps, platfor
 python tests/test_languages.py           # English, French, German, Italian, Romansh
 ```
 
+**Audit of changes on real data** (manual GitHub Actions workflow, needs the `OJP_TOKEN` secret): the Sprint 9 prototype plans real journeys in about twenty Swiss cities with both data sources, and [`tools/audit/audit_changes.py`](tools/audit/audit_changes.py) checks each change against the best place the same two vehicles allow (full runs of both vehicles from OJP). It reports changes moved to a worse place, missed improvements and why.
+
 ## Workflow
 
 - Backlog and user stories: [GitHub Issues](https://github.com/TiagSant/swissPublicTransport/issues), one milestone per sprint (conventions in [`docs/backlog.md`](docs/backlog.md))
