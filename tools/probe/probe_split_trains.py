@@ -30,44 +30,37 @@ def attrs(node):
     for a in node.iter("Attribute"):
         out.append((txt(a, "Code"), " ".join(t.text.strip() for t in a.iter("Text") if t.text)))
     return out
-fl = []
-for day in (dt.date(2026, 11, 14), dt.date(2026, 11, 16)):
-    for hh, mm in ((6, 0), (8, 0), (10, 0), (12, 0), (14, 0), (16, 0), (17, 30), (19, 0), (20, 30), (22, 0), (23, 15)):
-        t = dt.datetime(day.year, day.month, day.day, hh, mm, tzinfo=TZ)
-        root, raw = ojp('<OJPStopEventRequest><siri:RequestTimestamp>{TS}</siri:RequestTimestamp>'
-                        f'<Location><PlaceRef><StopPlaceRef>8503000</StopPlaceRef><Name><Text>Zürich HB</Text></Name></PlaceRef><DepArrTime>{iso(t)}</DepArrTime></Location>'
-                        '<Params><IncludeAllRestrictedLines>true</IncludeAllRestrictedLines><NumberOfResults>100</NumberOfResults><StopEventType>departure</StopEventType>'
-                        '<IncludePreviousCalls>false</IncludePreviousCalls><IncludeOnwardCalls>true</IncludeOnwardCalls><UseRealtimeData>full</UseRealtimeData></Params></OJPStopEventRequest>', "fr")
-        if root is None: continue
-        evs = []
-        for ev in root.iter("StopEvent"):
-            svc = ev.find("Service"); this = ev.find("ThisCall/CallAtStop")
-            evs.append({"line": txt(svc, "PublishedServiceName/Text"), "num": txt(svc, "TrainNumber"), "dest": txt(svc, "DestinationText/Text"),
-                        "dep": txt(this, "ServiceDeparture/TimetabledTime"), "quay": txt(this, "PlannedQuay/Text"),
-                        "codes": [c for c, _ in attrs(svc)], "texts": [x for c, x in attrs(svc) if c == "A__FL"],
-                        "calls": [txt(c.find("CallAtStop"), "StopPointName/Text") for c in ev.findall("OnwardCall")],
-                        "callfl": [txt(c.find("CallAtStop"), "StopPointName/Text") for c in ev.findall("OnwardCall") if any(a[0] == "A__FL" for a in attrs(c))]})
-        for e in evs:
-            if "A__FL" in e["codes"] or e["callfl"]:
-                partners = [f'{o["line"]} {o["num"]} → {o["dest"]}' for o in evs if o is not e and o["dep"] == e["dep"] and o["quay"] == e["quay"]]
-                key = (e["dep"], e["line"], e["dest"])
-                if key in [f[0] for f in fl]: continue
-                fl.append((key, f'{e["dep"][:16]} {e["line"]} n°{e["num"]} → {e["dest"]} voie {e["quay"]} | stops: {" · ".join(e["calls"][:12])} | notice at stops: {e["callfl"][:5]} | same time+platform: {partners}'))
-        print(day, f"{hh:02}:{mm:02}", len(evs), "departures", flush=True)
-print("\n=== TRAINS WITH A__FL ===")
-for _, line in fl: print(line)
-# The same notice in a journey (TripRequest), for the first one found
-if fl:
-    (dep, line, dest), _ = fl[0]
-    t = dt.datetime.fromisoformat(dep.replace("Z", "+00:00"))
-    for lang in ("fr",):
-        root, raw = ojp('<OJPTripRequest><siri:RequestTimestamp>{TS}</siri:RequestTimestamp>'
-                        f'<Origin><PlaceRef><StopPlaceRef>8503000</StopPlaceRef><Name><Text>Zürich HB</Text></Name></PlaceRef><DepArrTime>{iso(t - dt.timedelta(minutes=1))}</DepArrTime></Origin>'
-                        f'<Destination><PlaceRef><Name><Text>{dest}</Text></Name><StopPlaceRef>{dest}</StopPlaceRef></PlaceRef></Destination>'
-                        '<Params><NumberOfResults>3</NumberOfResults><IncludeIntermediateStops>true</IncludeIntermediateStops></Params></OJPTripRequest>', lang)
-        print("\n=== TRIP REQUEST to", dest, "===")
-        if root is not None:
-            for leg in root.iter("TimedLeg"):
-                svc = leg.find("Service")
-                print(txt(svc, "PublishedServiceName/Text"), txt(svc, "DestinationText/Text"), [a for a in attrs(svc)][:12])
-            m = re.findall(rb"A__FL[^<]*", raw); print("A__FL in raw trip answer:", len(m))
+def resolve(name):
+    root, _ = ojp('<OJPLocationInformationRequest><siri:RequestTimestamp>{TS}</siri:RequestTimestamp>'
+                  f'<InitialInput><Name>{name}</Name></InitialInput><Restrictions><Type>stop</Type><NumberOfResults>3</NumberOfResults></Restrictions></OJPLocationInformationRequest>', "fr")
+    for pr in root.iter("PlaceResult"):
+        ref = txt(pr, "Place/StopPlace/StopPlaceRef")
+        if ref: return ref, txt(pr, "Place/Name/Text")
+def trip(dest, t, lang="fr"):
+    ref, nm = resolve(dest)
+    root, raw = ojp('<OJPTripRequest><siri:RequestTimestamp>{TS}</siri:RequestTimestamp>'
+                    f'<Origin><PlaceRef><StopPlaceRef>8503000</StopPlaceRef><Name><Text>Zürich HB</Text></Name></PlaceRef><DepArrTime>{iso(t)}</DepArrTime></Origin>'
+                    f'<Destination><PlaceRef><StopPlaceRef>{ref}</StopPlaceRef><Name><Text>{nm}</Text></Name></PlaceRef></Destination>'
+                    '<Params><NumberOfResults>2</NumberOfResults><IncludeIntermediateStops>true</IncludeIntermediateStops><UseRealtimeData>full</UseRealtimeData></Params></OJPTripRequest>', lang)
+    print(f"\n=== TRIP Zürich HB → {nm} ({ref}) {t:%H:%M} {lang} ===")
+    if root is None: print("no answer"); return
+    for k, tr in enumerate(root.iter("Trip")):
+        print(f"-- trip {k}: {txt(tr, 'StartTime')[11:16]} → {txt(tr, 'EndTime')[11:16]}, transfers {txt(tr, 'Transfers')}")
+        for leg in tr.findall("Leg"):
+            for kind in leg:
+                if kind.tag == "TimedLeg":
+                    svc = kind.find("Service")
+                    b = kind.find("LegBoard"); a = kind.find("LegAlight")
+                    extra = [c.tag for c in kind if c.tag not in ("LegBoard", "LegAlight", "LegIntermediate", "Service", "LegTrack", "Extension")]
+                    print(f"   ride {txt(svc, 'PublishedServiceName/Text')} n°{txt(svc, 'TrainNumber')} → {txt(svc, 'DestinationText/Text')} | {txt(b, 'StopPointName/Text')} {txt(b, 'PlannedQuay/Text')} {txt(b, 'ServiceDeparture/TimetabledTime')[11:16]}"
+                          f" → {txt(a, 'StopPointName/Text')} {txt(a, 'PlannedQuay/Text')} {txt(a, 'ServiceArrival/TimetabledTime')[11:16]} | notices {[c for c, _ in attrs(svc)]} | other: {extra}")
+                    for c in [b, a] + kind.findall("LegIntermediate"):
+                        fl = [x for x in attrs(c) if x[0] == "A__FL" or "multipl" in x[1]]
+                        if fl: print("     at", txt(c, "StopPointName/Text"), fl)
+                elif kind.tag in ("TransferLeg", "ContinuousLeg"):
+                    print(f"   {kind.tag}: {[c.tag for c in kind]} {txt(kind, 'TransferType')} {txt(kind, 'Duration')}")
+    print("A__FL in raw answer:", len(re.findall(rb"A__FL", raw)), "| words:", sorted(set(re.findall(rb"(?i)staySeated|InterchangeStatus|Guaranteed|Continu\w*", raw)))[:8])
+day = dt.date(2026, 11, 16)
+for dest in ("St. Gallen", "Konstanz", "Weinfelden", "Winterthur"):
+    trip(dest, dt.datetime(day.year, day.month, day.day, 22, 37, tzinfo=TZ))
+trip("St. Gallen", dt.datetime(day.year, day.month, day.day, 22, 37, tzinfo=TZ), "de")
