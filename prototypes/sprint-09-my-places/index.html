@@ -2798,7 +2798,12 @@
     const keyOf = j => (j.base || j).key;
     if (!journeyOrder) journeyOrder = rankJourneys(journeys, getPrio(), mode).map(keyOf);
     const pos = j => { const n = journeyOrder.indexOf(keyOf(j)); return n < 0 ? journeyOrder.length : n; };
-    const ranked = journeys.slice().sort((x, y) => pos(x) - pos(y));
+    // US-58: duplicates out — two journeys the rider sees as the same (same route and times, same walks, same
+    // alternative offered: bus or on foot) are one; the first in the list stays. Different start places that
+    // become the same once the start is on foot are the usual case.
+    const seen = new Set();
+    const ranked = journeys.slice().sort((x, y) => pos(x) - pos(y)).filter(j => { const s = journeySignature(j); return !seen.has(s) && seen.add(s); });
+    journeys = ranked;
     const fastest = rankJourneys(journeys, 'fast', mode)[0], leastWalk = rankJourneys(journeys, 'walk', mode)[0];
     journeys = ranked;
     box.hidden = false;
@@ -2822,6 +2827,14 @@
     }).join('');
   }
 
+  // US-58: what the rider sees of a journey: its summary and its whole detail, alternatives included (attributes
+  // that only identify the card left out)
+  function journeySignature(j) {
+    try {
+      const detail = journeyDetailHtml(j, 0, new Set()).replace(/\s(?:data-[\w-]+|aria-[\w-]+|id)="[^"]*"/g, '');
+      return [hhmm(j.leaveAt), hhmm(j.arriveAt), Math.round(j.walkMin), j.transfers, rideIds(j), detail].join('|');
+    } catch { return (j.base || j).key + '|' + (j.onFoot || ''); }
+  }
   const MAP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5.1 9 3 3 5v16l6-2.1 6 2.1 6-2V3l-6 2.1zM14 18.6l-4-1.4V5.4l4 1.4v11.8z"/></svg>';
   function journeyDetailHtml(j, i, openVia) {
     const footAt = j.legs.length - 1;   // the alternative (walk or bus) comes after the whole plan
