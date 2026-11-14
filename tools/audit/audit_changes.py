@@ -127,6 +127,8 @@ def find_run(ride):
     for ev in stop_events(ride["from"]["id"], ride["dep"]):
         this = next((c for c in ev["calls"] if c["this"]), None)
         if not this or this["id"] != str(ride["from"]["id"]) or this["dep"] is None or abs(this["dep"] - ride["dep"]) > 60000: continue
+        after = [c["id"] for c in ev["calls"][ev["calls"].index(this) + 1:]]
+        if str(ride["toStop"]["id"]) not in after: continue   # the other direction, same minute
         names = {norm(ride.get("number")), norm(ride.get("label")), norm(str(ride.get("category") or "") + str(ride.get("number") or ""))} - {""}
         ln = norm(ev["line"])
         num = norm(ride.get("number"))
@@ -251,8 +253,18 @@ def audit(dumps):
                 if not best:
                     row.setdefault("verdict", "UNVERIFIABLE"); row["why"] = "stops of the run not matched"; rows.append(row); continue
                 row["best"] = best
+                def est(ride_a, ride_b):
+                    X = next((c for c in run1["calls"][[c["this"] for c in run1["calls"]].index(True) + 1:] if c["id"] == str(ride_a["toStop"]["id"])), None)
+                    Y = next((c for c in run2["calls"] if c["id"] == str(ride_b["from"]["id"])), None)
+                    if not X or not Y: return None
+                    w = walk_exact(dict(X, quay=ride_a.get("arrPlatform") or X["quay"]), dict(Y, quay=ride_b.get("platform") or Y["quay"]))
+                    return None if w is None else shown(w)
+                row["api_est"], row["app_est"] = est(cur, nxt), est(f["cur"], f["next"])
+                if row["app_est"] is not None and row["api_est"] is not None and row["app_est"] > row["api_est"]: row.setdefault("verdict", "REGRESSION_WORSE_PLACE")
                 if "verdict" not in row:
-                    if f["walk"] - best["walk"] >= 1:
+                    if row["app_est"] is None:
+                        row["verdict"], row["why"] = "UNVERIFIABLE", "app's change stops not on the runs"
+                    elif row["app_est"] - best["walk"] >= 1:
                         why = []
                         if r["walk"] < 2: why.append("API walk < 2 min (not looked at)")
                         if best["off_shift"] > 5: why.append(f'off {best["off_shift"]} stops later (window 5)')
@@ -261,7 +273,7 @@ def audit(dumps):
                         if best["board_shift"] > 0: why.append("board later (not looked at)")
                         if best["off_shift"] and best["board_shift"] < 0 and best["off_shift"] < 0: why.append("off earlier + board earlier together (not looked at)")
                         row["verdict"], row["why"] = "MISSED", "; ".join(why) or "within the windows: data or rule"
-                    elif f["walk"] < r["walk"]: row["verdict"] = "IMPROVED_OPTIMAL"
+                    elif row["app_est"] < row["api_est"]: row["verdict"] = "IMPROVED_OPTIMAL"
                     else: row["verdict"] = "OPTIMAL"
                 rows.append(row)
     return rows
@@ -287,8 +299,11 @@ if __name__ == "__main__":
           "| app requests failed:", sum(d["failed_requests"] for d in dumps), "| audit OJP calls:", STATS)
     for r in rows:
         if r["verdict"] not in ("OPTIMAL", "IMPROVED_OPTIMAL"):
-            print(f'{r["verdict"]:24} {r["src"]:8} {r["case"]} | {r.get("change", "")} | API {r.get("api_walk")} app {r.get("app_walk")} '
+            print(f'{r["verdict"]:24} {r["src"]:8} {r["case"]} | {r.get("change", "")} | API {r.get("api_walk")} (est {r.get("api_est")}) app {r.get("app_walk")} (est {r.get("app_est")}) '
                   f'best {r.get("best", {}).get("walk")} ({r.get("best", {}).get("off", "")} → {r.get("best", {}).get("board", "")}) | {r.get("why", "")}')
     print("\n=== IMPROVED (sample) ===")
     for r in [r for r in rows if r["verdict"] == "IMPROVED_OPTIMAL"][:30]:
-        print(f'{r["src"]:8} {r["case"]} | {r["change"]} | API {r["api_walk"]} → app {r["app_walk"]} at {r["app_change"]}')
+        print(f'{r["src"]:8} {r["case"]} | {r["change"]} | API {r["api_walk"]} (est {r["api_est"]}) → app {r["app_walk"]} (est {r["app_est"]}) at {r["app_change"]}')
+    big = [r for r in rows if r.get("api_walk") is not None and r.get("api_est") is not None and r["api_walk"] - r["api_est"] >= 3]
+    print(f"\n=== API change times much longer than the distance ({len(big)} changes, sample) ===")
+    for r in big[:15]: print(f'{r["src"]:8} {r["change"]} | API {r["api_walk"]} min, distance estimate {r["api_est"]} min')
