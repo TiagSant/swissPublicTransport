@@ -2729,11 +2729,14 @@
   const arriveWords = d => d === 0 ? t('footSame') : t(d < 0 ? 'minSooner' : 'minLater', { n: Math.abs(d) });
   const leaveWords = d => d === 0 ? t('startSame') : t(d < 0 ? 'leaveEarlierBy' : 'leaveLaterBy', { n: Math.abs(d) });
   function startRowHtml(j, i) {
-    if (j.onFoot === 'start') {
-      const d = shownMinDiff(j.base.leaveAt, j.leaveAt);   // < 0: with the bus, leave earlier
-      const learned = footPref(j.alt.key) === 'foot' && !footChoice.has(j.base.key + '|start') ? `<small>${esc(t('startLearned'))}</small>` : '';
-      return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-side="start" data-foot="0"><span>${esc(t('busStartAlt', { line: j.alt.line }))}</span>` +
-        `<small>${esc(t('busStartDetail', { leave: hhmm(j.base.leaveAt), d: leaveWords(d) }))}</small>${learned}</button></li>`;
+    if (j.onFoot === 'start') {   // US-59: each bus that leads to this same walk, by time
+      const all = (j.altGroup || [j]).map((m, g) => ({ m, g })).sort((x, y) => x.m.base.leaveAt - y.m.base.leaveAt);
+      return all.map(({ m, g }, n) => {
+        const d = shownMinDiff(m.base.leaveAt, m.leaveAt);   // < 0: with the bus, leave earlier
+        const learned = !n && footPref(m.alt.key) === 'foot' && !footChoice.has(m.base.key + '|start') ? `<small>${esc(t('startLearned'))}</small>` : '';
+        return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-g="${g}" data-side="start" data-foot="0"><span>${esc(t('busStartAlt', { line: m.alt.line }))}</span>` +
+          `<small>${esc(t('busStartDetail', { leave: hhmm(m.base.leaveAt), d: leaveWords(d) }))}</small>${learned}</button></li>`;
+      }).join('');
     }
     const a = j.startOffer;
     if (!a) return '';
@@ -2745,11 +2748,14 @@
   }
   function footRowHtml(j, i) {
     if (j.onFoot === 'start') return '';
-    if (j.onFoot) {
-      const d = shownMinDiff(j.base.arriveAt, j.arriveAt);   // < 0: the bus arrives sooner
-      const learned = footPref(j.alt.key) === 'foot' && !footChoice.has(j.base.key + '|end') ? `<small>${esc(t('footLearned'))}</small>` : '';
-      return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-side="end" data-foot="0"><span>${esc(t('busAlt', { line: j.alt.line }))}</span>` +
-        `<small>${esc(t('busAltDetail', { arr: hhmm(j.base.arriveAt), d: arriveWords(d) }))}</small>${learned}</button></li>`;
+    if (j.onFoot) {   // US-59: each ride that leads to this same walk, by arrival
+      const all = (j.altGroup || [j]).map((m, g) => ({ m, g })).sort((x, y) => x.m.base.arriveAt - y.m.base.arriveAt);
+      return all.map(({ m, g }, n) => {
+        const d = shownMinDiff(m.base.arriveAt, m.arriveAt);   // < 0: the bus arrives sooner
+        const learned = !n && footPref(m.alt.key) === 'foot' && !footChoice.has(m.base.key + '|end') ? `<small>${esc(t('footLearned'))}</small>` : '';
+        return `<li class="foot-alt"><button class="foot-toggle" data-i="${i}" data-g="${g}" data-side="end" data-foot="0"><span>${esc(t('busAlt', { line: m.alt.line }))}</span>` +
+          `<small>${esc(t('busAltDetail', { arr: hhmm(m.base.arriveAt), d: arriveWords(d) }))}</small>${learned}</button></li>`;
+      }).join('');
     }
     const a = j.footOffer;
     if (!a) return '';
@@ -2802,7 +2808,16 @@
     // alternative offered: bus or on foot) are one; the first in the list stays. Different start places that
     // become the same once the start is on foot are the usual case.
     const seen = new Set();
-    const ranked = journeys.slice().sort((x, y) => pos(x) - pos(y)).filter(j => { const s = journeySignature(j); return !seen.has(s) && seen.add(s); });
+    const ranked0 = journeys.slice().sort((x, y) => pos(x) - pos(y)).filter(j => { const s = journeySignature(j); return !seen.has(s) && seen.add(s); });
+    // US-59: the same journey on foot, reached from different buses (a bus of the same line 2–3 min apart, another
+    // stop…): one card, the walk first, and each bus offered as the alternative
+    const groups = new Map(), ranked = [];
+    for (const j of ranked0) {
+      if (!j.onFoot) { ranked.push(j); continue; }
+      const g = 'foot|' + j.onFoot + '|' + journeySignature(j, true), first = groups.get(g);
+      if (first) { (first.altGroup || (first.altGroup = [first])).push(j); continue; }
+      groups.set(g, j); delete j.altGroup; ranked.push(j);
+    }
     journeys = ranked;
     const fastest = rankJourneys(journeys, 'fast', mode)[0], leastWalk = rankJourneys(journeys, 'walk', mode)[0];
     journeys = ranked;
@@ -2829,9 +2844,10 @@
 
   // US-58: what the rider sees of a journey: its summary and its whole detail, alternatives included (attributes
   // that only identify the card left out)
-  function journeySignature(j) {
+  function journeySignature(j, routeOnly) {
     try {
-      const detail = journeyDetailHtml(j, 0, new Set()).replace(/\s(?:data-[\w-]+|aria-[\w-]+|id)="[^"]*"/g, '');
+      let detail = journeyDetailHtml(j, 0, new Set()).replace(/\s(?:data-[\w-]+|aria-[\w-]+|id)="[^"]*"/g, '');
+      if (routeOnly) detail = detail.replace(/<li class="foot-alt">[\s\S]*?<\/li>/g, '');   // US-59: the route without its alternatives
       return [hhmm(j.leaveAt), hhmm(j.arriveAt), Math.round(j.walkMin), j.transfers, rideIds(j), detail].join('|');
     } catch { return (j.base || j).key + '|' + (j.onFoot || ''); }
   }
@@ -4343,7 +4359,8 @@
     if (v) { const open = v.getAttribute('aria-expanded') !== 'true'; v.setAttribute('aria-expanded', String(open)); v.nextElementSibling.hidden = !open; return; }
     const ft = e.target.closest('.foot-toggle');
     if (ft) {
-      const j = journeys[+ft.dataset.i]; if (!j) return;
+      const j0 = journeys[+ft.dataset.i]; if (!j0) return;
+      const j = (j0.altGroup || [j0])[+(ft.dataset.g || 0)] || j0;   // US-59: the bus chosen among those grouped
       const base = j.base || j, foot = ft.dataset.foot === '1', side = ft.dataset.side;
       const alt = j.onFoot === side || (j.onFoot === true && side === 'end') ? j.alt : side === 'start' ? j.startOffer : j.footOffer;
       if (!alt) return;
