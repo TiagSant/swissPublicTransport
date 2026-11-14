@@ -2209,7 +2209,7 @@
     const here = { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, at: +arrOf(cur), planned: +cur.arr, platform: cur.arrPlatformLive || cur.arrPlatform || '' };
     const spots = [{ n: -1, s: here }, ...(cur.onward || []).map((s, n) => ({ n, s }))];
     let best = null;
-    const consider = (n, s, board) => {
+    const consider = (n, s, board, early) => {
       const to = board ? platformPos(quays, s.id, s.coord, board.platform) : target;
       const from = platformPos(quays, s.id, s.coord, s.platform);
       if (!from || !to) return;
@@ -2219,9 +2219,21 @@
       const dep = board ? board.depAt : +depOf(next);
       const slack = Math.floor((dep - (s.at + min * 60000)) / 60000);
       if (slack < need || min > c.walk - 1) return;
-      if (!best || min < best.min || (min === best.min && n < best.n)) best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name, board: board || null };
+      if (!best || min < best.min || (min === best.min && n < best.n && early == null))
+        best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name, board: board || null, early: early == null ? null : early };
     };
     spots.forEach(({ n, s }) => { if (n >= 0) consider(n, s, null); });   // staying on (US-50)
+    // BUG-11: getting off earlier, at a stop the first vehicle passes before the planned one, when it is closer to
+    // the next one (the API made riders go one stop past Gare Cornavin and walk back from Lyon). Only stops
+    // clearly closer than the planned one are looked at (their platform: one board each).
+    const hereAt = platformPos(quays, here.id, here.coord, here.platform), d0 = hereAt ? distanceM(hereAt, target) : Infinity;
+    const vias = cur.via || [];
+    for (let e = Math.max(0, vias.length - ONWARD_MAX); e < vias.length; e++) {
+      const s = earlySpot(cur, e);
+      if (!s || distanceM(s.coord, target) > d0 - 50) continue;
+      if (!s.platform) await platformAt(s, cur);
+      consider(-1, s, null, e);
+    }
     // boarding earlier (US-53): where the second vehicle passes before its planned stop; stops near it only
     for (const { n, s } of spots.slice(0, 4)) {
       if (!s.id || String(s.id) === String(next.from.id) || !s.coord || !next.from.coord || distanceM(s.coord, next.from.coord) > 1200) continue;
@@ -2232,6 +2244,26 @@
       }
     }
     return best;
+  }
+  // BUG-11: a stop the ride passes before the planned one, as a place to get off (kept on the ride: its platform,
+  // found once, stays known)
+  function earlySpot(r, e) {
+    const v = (r.via || [])[e];
+    if (!v || !v.id || !v.coord || !v.time) return null;
+    const memo = r._early || Object.defineProperty(r, '_early', { value: {} })._early;   // not saved with the journey
+    return memo[e] || (memo[e] = { id: String(v.id), name: v.name, coord: v.coord, at: +v.time, planned: +(v.planned || v.time), live: !!v.live, platform: '' });
+  }
+  // The same ride, getting off at the stop e it passes before the planned one: the stops after it (the planned one
+  // too) become its next stops
+  function cutRide(r, e) {
+    const s = earlySpot(r, e), later = r.via.slice(e + 1);
+    const memo = r._cutOnward || Object.defineProperty(r, '_cutOnward', { value: {} })._cutOnward;
+    const onward = memo[e] || (memo[e] = [
+      ...later.map(v => ({ id: v.id ? String(v.id) : null, name: v.name, coord: v.coord, planned: +(v.planned || v.time), at: +v.time, live: !!v.live, platform: '' })),
+      { id: r.toStop.id, name: r.toStop.name, coord: r.toStop.coord, planned: +r.arr, at: +(r.arrReal || r.arr), live: !!r.arrReal, platform: r.arrPlatform || '' },
+      ...(r.onward || [])]);
+    return Object.assign({}, r, { toStop: { id: s.id, name: s.name, coord: s.coord }, arr: new Date(s.planned), arrReal: s.live ? new Date(s.at) : null,
+      arrPlatform: s.platform || '', arrPlatformLive: null, stops: Math.max(1, r.stops - later.length - 1), via: r.via.slice(0, e), onward, onwardIdx: null });
   }
   // The second ride boarded earlier, at s: the stops passed before its planned stop become intermediate stops
   function boardEarlier(next, b, s) {
@@ -2249,8 +2281,9 @@
     let legs = j.legs.slice();
     for (const a of j.stayOns.slice().sort((x, y) => y.i - x.i)) {
       const cur = legs[a.i], next = legs[a.k];
-      const ext = a.n >= 0 ? Object.assign(extendRide(cur, a.n), { stayedOn: a }) : cur;
-      const s = a.n >= 0 ? cur.onward[a.n] : { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, platform: cur.arrPlatform };
+      const early = a.early != null && earlySpot(cur, a.early);
+      const ext = early ? Object.assign(cutRide(cur, a.early), { gotOffEarly: a }) : a.n >= 0 ? Object.assign(extendRide(cur, a.n), { stayedOn: a }) : cur;
+      const s = early || (a.n >= 0 ? cur.onward[a.n] : { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, platform: cur.arrPlatform });
       const nx = a.board ? boardEarlier(next, a.board, s) : next;
       const walk = { type: 'walk', min: a.min, edge: 'transfer', to: nx.from.name,
         start: { name: s.name, stopId: s.id, coord: s.coord, platform: s.platform, mode: cur.mode },
@@ -2357,7 +2390,7 @@
         // the walk at the end, from the best stop: its street route in the cache for footAlternative
         let alt = footAlternative(withStayOn(j));
         if (alt && alt.ext != null && !alt.start.platform) {   // finishing on foot from a later stop: its platform too
-          const prev = j.rides[j.rides.length - 2];
+          const w = withStayOn(j), prev = w.rides[w.rides.length - 2];   // the ride as changed (got off earlier: its own next stops)
           if (await platformAt(prev.onward[alt.ext], prev)) alt = footAlternative(withStayOn(j));
         }
         if (alt && places.to && places.to.coord) await walkRoute(platformPos(quays, alt.start.stopId, alt.start.coord, alt.start.platform), places.to.coord);
