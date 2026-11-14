@@ -1672,9 +1672,34 @@
     return leafletPromise;
   }
   // assets/quays.js is a script (not JSON) so it also works when the page is opened as a local file
-  function loadQuays() {
-    if (!quaysPromise) quaysPromise = (window.QUAYS ? Promise.resolve() : loadScript(`${ASSETS}/quays.js`)).catch(() => {});
-    return quaysPromise.then(() => (window.QUAYS && window.QUAYS.stops) || {});
+  // Platform positions: the Unireso file (Geneva area), and for the rest of Switzerland one small part per block of
+  // stop numbers (assets/quays-ch/8587.js…), loaded for the stops asked only. One merged object, completed as parts
+  // arrive; the Unireso data wins for its own stops.
+  const QALL = {}, quayParts = new Map();
+  function loadQuays(ids) {
+    if (!quaysPromise) quaysPromise = (window.QUAYS ? Promise.resolve() : loadScript(`${ASSETS}/quays.js`)).catch(() => {})
+      .then(() => Object.assign(QALL, (window.QUAYS && window.QUAYS.stops) || {}));
+    const keys = [...new Set((ids || []).map(x => String(x || '')).filter(x => /^\d{7}$/.test(x)).map(x => x.slice(0, 4)))];
+    const parts = keys.map(k => {
+      if (!quayParts.has(k)) quayParts.set(k, quaysPromise.then(() => loadScript(`${ASSETS}/quays-ch/${k}.js`)).catch(() => {}).then(() => {
+        const part = (window.QUAYS_CH && window.QUAYS_CH[k]) || {}, own = (window.QUAYS && window.QUAYS.stops) || {};
+        for (const [id, q] of Object.entries(part)) if (!own[id]) QALL[id] = q;
+      }));
+      return quayParts.get(k);
+    });
+    return Promise.all([quaysPromise, ...parts]).then(() => QALL);
+  }
+  // Every stop of a journey (rides, their stops on the way and next stops), for loadQuays
+  const journeyStopIds = j => (j.legs || []).flatMap(l => l.type !== 'ride' ? [] :
+    [l.from && l.from.id, l.toStop && l.toStop.id, ...(l.via || []).map(v => v.id), ...(l.onward || []).map(v => v.id)]).filter(Boolean);
+  // A platform among a stop's points: its exact designation, else a track with sectors ("13D-F", "7AB") as the track
+  function findPlatform(points, plat) {
+    if (!plat) return null;
+    const p = String(plat).trim(), u = p.toUpperCase();
+    const hit = points.find(q => q.names.includes(p) || q.names.includes(u));
+    if (hit) return hit;
+    const m = u.match(/^(\d{1,2})\s*[A-Z]{1,3}(?:\s*-\s*[A-Z])?$/);
+    return m ? points.find(q => q.names.includes(m[1])) || null : null;
   }
 
   // ATLAS gives each platform an official designation and an internal one (e.g. "F" and "05"):
@@ -1728,14 +1753,14 @@
     $('mapSheet').hidden = false;
     let quays;
     try {
-      [quays] = await Promise.all([loadQuays(), loadLeaflet()]);
+      [quays] = await Promise.all([loadQuays([stop && stop.id]), loadLeaflet()]);
     } catch {
       $('mapInfo').textContent = t('mapFailed');
       return;
     }
     if ($('mapSheet').hidden) return;   // closed while loading
     const points = platformPoints(quays[stop.id] || {});
-    const target = platform ? points.find(p => p.names.includes(platform) || p.names.includes(platform.toUpperCase())) : null;
+    const target = findPlatform(points, platform);
     const dest = target ? target.pos : stopOnly ? stop.coord : (stop.coord || (points[0] && points[0].pos));
 
     ensureMap();
@@ -2036,7 +2061,7 @@
   // same platform (BUG-06); a platform unknown at the same stop: nothing to tell. The walk comes from the
   // platforms' positions (ATLAS), at least 1 min.
   function addChangeWalks(legs) {
-    const quays = (window.QUAYS && window.QUAYS.stops) || {}, up = v => String(v || '').trim().toUpperCase(), out = [];
+    const quays = Object.keys(QALL).length ? QALL : (window.QUAYS && window.QUAYS.stops) || {}, up = v => String(v || '').trim().toUpperCase(), out = [];
     legs.forEach((l, n) => {
       out.push(l);
       if (l.type !== 'ride' || !l.toStop) return;
@@ -2139,7 +2164,7 @@
     const delay = r.arrReal ? +r.arrReal - +r.arr : 0, out = [];
     // a stop without its position on the board (light official-data boards remembered before): the middle of its
     // platforms (ATLAS)
-    const quays = await loadQuays().catch(() => ({}));
+    const quays = await loadQuays((run.passList || []).map(p => p.station && p.station.id)).catch(() => ({}));
     const centre = id => { const pts = Object.values((id && quays[id]) || {}); return pts.length ? [pts.reduce((x, q) => x + q[0], 0) / pts.length, pts.reduce((x, q) => x + q[1], 0) / pts.length] : null; };
     for (const p of (run.passList || []).slice(1, 1 + ONWARD_MAX)) {
       const st = p.station || {}, planned = tsOr(p.arrivalTimestamp, p.arrival) || tsOr(p.departureTimestamp, p.departure);
@@ -2165,7 +2190,7 @@
   // Where a stop's platform is (else the stop)
   function platformPos(quays, id, coord, plat) {
     const pts = id ? platformPoints(quays[id] || {}) : [];
-    const p = plat && pts.find(q => q.names.includes(plat) || q.names.includes(String(plat).toUpperCase()));
+    const p = findPlatform(pts, plat);
     return p ? p.pos : coord;
   }
   // The same ride, staying on to its onward stop n (the stops passed become intermediate stops)
@@ -2201,36 +2226,52 @@
   }
   async function bestChange(j, c, quays) {
     const cur = j.legs[c.i], next = j.legs[c.k];
-    if (c.walk < 2) return null;
+    if (c.walk < 1) return null;   // no walk: nothing to save
     const target = platformPos(quays, next.from.id, next.from.coord, next.platform);
     if (!target) return null;
     const need = Math.max(1, Math.min(c.slack, COMFORT_MIN));
+    const up = v => String(v || '').trim().toUpperCase();
     // where the rider can be: the planned stop (n = -1) or one of the first vehicle's next stops
     const here = { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, at: +arrOf(cur), planned: +cur.arr, platform: cur.arrPlatformLive || cur.arrPlatform || '' };
     const spots = [{ n: -1, s: here }, ...(cur.onward || []).map((s, n) => ({ n, s }))];
+    // A walk between two places, estimated the same way for every place (planned one included)
+    const sameStop = (s, id, name) => (s.id && id && String(s.id) === String(id)) || fold(s.name) === fold(name);
+    const estimate = (from, to, same, samePlat) => samePlat ? 0 : Math.max(same ? 1 : 0.5, walkMinutes(distanceM(from, to)));
+    // BUG-12: a place is better only if it is better by that same estimate. The API's change time for the planned
+    // place is often an official minimum, longer than the walk (Neuchâtel: 4 min for a 2-min walk): compared with
+    // it, a place 3 min away looked better than the planned one, 2 min away.
+    const hereAt = platformPos(quays, here.id, here.coord, here.platform);
+    const plannedSame = sameStop(here, next.from.id, next.from.name);
+    const base = hereAt ? estimate(hereAt, target, plannedSame, plannedSame && here.platform && next.platform && up(here.platform) === up(next.platform)) : c.walk;
+    const limit = Math.min(c.walk, base) - 1;   // at least 1 min less than both
     let best = null;
-    const consider = (n, s, board, early) => {
-      const to = board ? platformPos(quays, s.id, s.coord, board.platform) : target;
+    const consider = (n, s, board, early, later) => {
+      const y = later || null;
+      const to = board ? platformPos(quays, s.id, s.coord, board.platform) : y ? platformPos(quays, y.id, y.coord, y.platform) : target;
       const from = platformPos(quays, s.id, s.coord, s.platform);
       if (!from || !to) return;
-      const same = board ? true : (s.id && s.id === next.from.id) || fold(s.name) === fold(next.from.name);
-      const samePlace = board && s.platform && board.platform && String(s.platform).toUpperCase() === String(board.platform).toUpperCase();
-      const min = samePlace ? 0 : Math.max(same ? 1 : 0.5, walkMinutes(distanceM(from, to)));
-      const dep = board ? board.depAt : +depOf(next);
+      const same = board ? true : y ? sameStop(s, y.id, y.name) : sameStop(s, next.from.id, next.from.name);
+      const yPlat = board ? board.platform : y ? y.platform : '';
+      const samePlace = (board || y) && same && s.platform && yPlat && up(s.platform) === up(yPlat);
+      const min = estimate(from, to, same, samePlace);
+      const dep = board ? board.depAt : y ? y.at : +depOf(next);
       const slack = Math.floor((dep - (s.at + min * 60000)) / 60000);
-      if (slack < need || min > c.walk - 1) return;
-      if (!best || min < best.min || (min === best.min && n < best.n && early == null))
-        best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name, board: board || null, early: early == null ? null : early };
+      if (slack < need || min > limit) return;
+      if (!best || min < best.min || (min === best.min && n < best.n && early == null && !y))
+        best = { i: c.i, k: c.k, n, min, saved: Math.round(c.walk - min), stop: s.name, board: board || null,
+                 early: early == null ? null : early, later: y ? { m: y.m, platform: y.platform || '' } : null };
     };
     spots.forEach(({ n, s }) => { if (n >= 0) consider(n, s, null); });   // staying on (US-50)
     // BUG-11: getting off earlier, at a stop the first vehicle passes before the planned one, when it is closer to
     // the next one (the API made riders go one stop past Gare Cornavin and walk back from Lyon). Only stops
     // clearly closer than the planned one are looked at (their platform: one board each).
-    const hereAt = platformPos(quays, here.id, here.coord, here.platform), d0 = hereAt ? distanceM(hereAt, target) : Infinity;
-    const vias = cur.via || [];
+    const d0 = hereAt ? distanceM(hereAt, target) : Infinity;
+    const vias = cur.via || [], early = [];
     for (let e = Math.max(0, vias.length - ONWARD_MAX); e < vias.length; e++) {
       const s = earlySpot(cur, e);
-      if (!s || distanceM(s.coord, target) > d0 - 50) continue;
+      if (!s) continue;
+      early.push({ e, s });
+      if (distanceM(s.coord, target) > d0 - 50) continue;
       if (!s.platform) await platformAt(s, cur);
       consider(-1, s, null, e);
     }
@@ -2243,7 +2284,41 @@
         consider(n, n >= 0 ? cur.onward[n] : here, board);
       }
     }
+    // BUG-12: boarding later — the two vehicles go on together (Lucerne: bus 1 and bus 6 from Kantonalbank to the
+    // station): stay on and change where both stop, ideally on the same platform. The second vehicle's next stops are
+    // known (its stops on the way); pairs clearly closer than the planned change only (their platforms: one board each).
+    const pairs = [];
+    for (let m = 0; m < Math.min((next.via || []).length, ONWARD_MAX); m++) {
+      const y = laterSpot(next, m);
+      if (!y) continue;
+      for (const x of [{ n: -1, s: here }, ...spots.slice(1), ...early.map(({ e, s }) => ({ n: -1, s, e }))]) {
+        if (!x.s.coord || !(x.s.at < y.at)) continue;
+        if (!sameStop(x.s, y.id, y.name) && distanceM(x.s.coord, y.coord) > d0 - 50) continue;
+        pairs.push({ x, y });
+      }
+    }
+    pairs.sort((p, q) => distanceM(p.x.s.coord, p.y.coord) - distanceM(q.x.s.coord, q.y.coord));
+    for (const { x, y } of pairs.slice(0, 6)) {
+      if (!y.platform) await platformAt(y, next);
+      if (!x.s.platform && x.s !== here) await platformAt(x.s, cur);
+      consider(x.n, x.s, null, x.e == null ? null : x.e, y);
+    }
     return best;
+  }
+  // BUG-12: a stop the second ride passes after its planned one, as a place to board it (kept on the ride)
+  function laterSpot(r, m) {
+    const v = (r.via || [])[m];
+    if (!v || !v.id || !v.coord || !(v.depAt || v.time)) return null;
+    const memo = r._later || Object.defineProperty(r, '_later', { value: {} })._later;
+    return memo[m] || (memo[m] = { m, id: String(v.id), name: v.name, coord: v.coord, at: +(v.depAt || v.time), planned: +(v.planned || v.time), live: !!v.live, platform: '' });
+  }
+  // The second ride boarded later, at its stop m: the stops before it are no longer on the way
+  function boardLater(next, y) {
+    const v = next.via[y.m];
+    const dep = +(v.depAt || v.time), planned = +(v.planned || v.time);
+    return Object.assign({}, next, { from: { id: v.id ? String(v.id) : null, name: v.name, coord: v.coord }, dep: new Date(v.live ? planned : dep),
+      real: v.live ? new Date(dep) : null, platform: y.platform || '', platformLive: null, stops: Math.max(1, next.stops - y.m - 1),
+      via: next.via.slice(y.m + 1), boardedFrom: next.from.name });
   }
   // BUG-11: a stop the ride passes before the planned one, as a place to get off (kept on the ride: its platform,
   // found once, stays known)
@@ -2284,7 +2359,7 @@
       const early = a.early != null && earlySpot(cur, a.early);
       const ext = early ? Object.assign(cutRide(cur, a.early), { gotOffEarly: a }) : a.n >= 0 ? Object.assign(extendRide(cur, a.n), { stayedOn: a }) : cur;
       const s = early || (a.n >= 0 ? cur.onward[a.n] : { id: cur.toStop.id, name: cur.toStop.name, coord: cur.toStop.coord, platform: cur.arrPlatform });
-      const nx = a.board ? boardEarlier(next, a.board, s) : next;
+      const nx = a.board ? boardEarlier(next, a.board, s) : a.later ? boardLater(next, a.later) : next;
       const walk = { type: 'walk', min: a.min, edge: 'transfer', to: nx.from.name,
         start: { name: s.name, stopId: s.id, coord: s.coord, platform: s.platform, mode: cur.mode },
         end: { name: nx.from.name, stopId: nx.from.id, coord: nx.from.coord, platform: nx.platform, mode: nx.mode } };
@@ -2343,7 +2418,7 @@
   }
   // The walks the app computes itself (to and from a place, on foot instead of a ride) follow the streets
   async function routeWalks(j) {
-    const quays = await loadQuays().catch(() => ({}));
+    const quays = await loadQuays(journeyStopIds(j)).catch(() => ({}));
     for (const [k, l] of j.legs.entries()) {
       if (l.type !== 'walk' || l.edge === 'transfer' || l.routed || !l.meters) continue;
       const { start, end } = walkEnds(j.legs, k);
@@ -2369,12 +2444,14 @@
       if (j._enriched) continue;
       j._enriched = true;
       try {
+        await loadQuays(journeyStopIds(j));   // the platforms of its stops, anywhere in Switzerland
         // BUG-08: walks between platforms estimated before the platforms' positions were known
         for (const l of j.legs) if (l.estimated && l.start && l.end) {
           const pa = platformPos(quays, l.start.stopId, l.start.coord, l.start.platform), pb = platformPos(quays, l.end.stopId, l.end.coord, l.end.platform);
           if (pa && pb) { const d = distanceM(pa, pb), min = Math.max(1, walkMinutes(d)); j.walkMin += min - l.min; Object.assign(l, { min, meters: d * DETOUR }); j._waits = null; }
         }
         for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
+        await loadQuays(journeyStopIds(j));   // and of the next stops just found
         const cs = tripConnections(planOf(j));
         const found = [];
         for (const c of cs) found.push(await bestChange(j, c, quays));
@@ -2782,7 +2859,7 @@
     $('walkThere').hidden = true; $('pickConfirm').hidden = true;
     $('mapSheet').hidden = false;
     let quays;
-    try { [quays] = await Promise.all([loadQuays(), loadLeaflet()]); }
+    try { [quays] = await Promise.all([loadQuays([start && start.stopId, end && end.stopId]), loadLeaflet()]); }
     catch { $('mapInfo').textContent = t('mapFailed'); return; }
     if ($('mapSheet').hidden) return;
     const notes = [];
@@ -2791,7 +2868,7 @@
       if (!e) return { pos: null, points: [] };
       const points = e.stopId ? platformPoints(quays[e.stopId] || {}) : [];
       if (e.platform && e.stopId) {
-        const p = points.find(q => q.names.includes(e.platform) || q.names.includes(String(e.platform).toUpperCase()));
+        const p = findPlatform(points, e.platform);
         if (p) return { pos: p.pos, points, target: p };
         if (points.length) notes.push(t('platformUnknown', { p: `${kind(e)} (${e.name})` }));
       }
