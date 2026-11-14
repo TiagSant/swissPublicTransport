@@ -265,6 +265,7 @@
   .wait-total.changed { color: #b26a00; font-weight: 600; }
   .leg .wait { font-size: .8rem; color: var(--muted); margin: 2px 0; }
   .leg .wait.changed { color: #b26a00; font-weight: 600; }
+  .split-note { font-size: .8rem; color: #b26a00; font-weight: 600; margin: 2px 0; }
   .leg.stay, .tl.stay { list-style: none; margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px dashed var(--line); }
   .leg.stay b, .tl.stay b { display: block; }
   .stay-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
@@ -685,7 +686,11 @@
       comfortTitle: 'With more margin:', altEarlier: 'Earlier {line} at {dep}', altEarlierDetail: '{m} min margin at the change · leave {leave}',
       altMarginDetail: '{m} min margin · arrive {t}',
       waitAfterWalk: 'Change: {walk} min walk, then {wait} min wait', waitOnly: 'Change: {wait} min wait',
-      samePlatform: 'Same platform, no walking', sameWait: '{n} min wait', platformMoved: 'Platform changed: go to {name}',
+      samePlatform: 'Same platform, no walking', sameWait: '{n} min wait',
+      splitTrain: 'Train with several destinations: check the signs on the coaches to be in the right part.',
+      splitTrainAt: 'This train splits at {stop}. The part for {dest} goes on from track {track}{sectors}: board the coaches showing “{dest}” and stay on.',
+      splitSectors: ', sectors {s}', splitStay: 'Same train: stay in the part for {dest}',
+      splitTitle: 'Next stop: the train splits', splitBody: 'At {stop}, only the part for {dest} goes on (track {track}{sectors}). Check the sign on your coach; if it shows another destination, move to the part for {dest} during the stop.', platformMoved: 'Platform changed: go to {name}',
       stopover: 'Stopover', addStopover: '+ Add a stopover', removeStopover: 'Remove the stopover', stayFor: 'Stay', minutesShort: 'min',
       roundTrip: 'Round trip', stayThere: 'Time there', chooseVia: 'Choose the stopover, or remove it.',
       stayTitle: 'Stopover at {place} · {min} min', stayUntil: 'Arrive {from} · leave {until}', stayReturn: 'Time at {place} · {min} min, then back',
@@ -801,7 +806,11 @@
       comfortTitle: 'Avec plus de marge :', altEarlier: '{line} plus tôt à {dep}', altEarlierDetail: '{m} min de marge à la correspondance · partir à {leave}',
       altMarginDetail: '{m} min de marge · arrivée {t}',
       waitAfterWalk: 'Correspondance : {walk} min de marche, puis {wait} min d\u2019attente', waitOnly: 'Correspondance : {wait} min d\u2019attente',
-      samePlatform: 'Même quai, pas de marche', sameWait: '{n} min d\u2019attente', platformMoved: 'Changement de quai : aller à {name}',
+      samePlatform: 'Même quai, pas de marche', sameWait: '{n} min d\u2019attente',
+      splitTrain: 'Train à plusieurs destinations : vérifiez l\u2019affichage sur les voitures pour être dans la bonne partie.',
+      splitTrainAt: 'Ce train se sépare à {stop}. La partie pour {dest} continue depuis la voie {track}{sectors} : montez dans les voitures indiquant « {dest} » et restez à bord.',
+      splitSectors: ', secteurs {s}', splitStay: 'Même train : restez dans la partie pour {dest}',
+      splitTitle: 'Prochain arrêt : le train se sépare', splitBody: 'À {stop}, seule la partie pour {dest} continue (voie {track}{sectors}). Vérifiez l\u2019affichage sur votre voiture ; s\u2019il indique une autre destination, rejoignez la partie pour {dest} pendant l\u2019arrêt.', platformMoved: 'Changement de quai : aller à {name}',
       stopover: 'Escale', addStopover: '+ Ajouter une escale', removeStopover: 'Enlever l\u2019escale', stayFor: 'Durée', minutesShort: 'min',
       roundTrip: 'Aller-retour', stayThere: 'Temps sur place', chooseVia: 'Choisissez l\u2019escale, ou enlevez-la.',
       stayTitle: 'Escale à {place} · {min} min', stayUntil: 'Arrivée {from} · départ {until}', stayReturn: 'Sur place à {place} · {min} min, puis retour',
@@ -876,7 +885,7 @@
   let lang = detectLang();
   function t(key, vars) {
     let s = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
-    if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace('{' + k + '}', v);
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.split('{' + k + '}').join(v);   // every occurrence
     return s;
   }
   const modeName = m => STRINGS[lang].mode[m] || STRINGS[lang].mode.other;
@@ -2049,9 +2058,42 @@
   // no minutes, so that a live platform change while following can turn it back into a walk.
   const samePlace = (x, y) => !!(x && y && x.stopId && x.stopId === y.stopId && x.platform && y.platform &&
                                  String(x.platform).toUpperCase() === String(y.platform).toUpperCase());
+  // US-54: a track and its sectors ("5E-H" → track 5, sectors E–H)
+  function trackOf(p) {
+    const m = String(p || '').trim().toUpperCase().match(/^(\d{1,2})\s*([A-Z]{1,3}(?:\s*-\s*[A-Z])?)?$/);
+    return m ? { track: m[1], sectors: (m[2] || '').replace(/\s*-\s*/, '–') } : null;
+  }
+  // US-54: a train with several destinations (coupled trains that split) whose part for the rider goes on as the
+  // next ride: same stop, same track (the part's sectors), within 10 min. OJP shows the split as a change
+  // (RE Zürich HB 23:39 → Winterthur 5, then RE 75 to Konstanz from Winterthur 5E-H, 3 min later).
+  function splitContinuation(legs, k) {
+    const l = legs[k];
+    if (!l || l.type !== 'ride' || !l.multiDest || !l.toStop) return null;
+    const n = legs.slice(k + 1).findIndex(x => x.type !== 'walk');
+    const next = n < 0 ? null : legs[k + 1 + n];
+    if (!next || next.type !== 'ride' || !next.from) return null;
+    const sameStop = (l.toStop.id && String(l.toStop.id) === String(next.from.id)) || fold(l.toStop.name) === fold(next.from.name);
+    const a = trackOf(l.arrPlatformLive || l.arrPlatform), b = trackOf(next.platformLive || next.platform);
+    const gap = (+(next.real || next.dep) - +(l.arrReal || l.arr)) / 60000;
+    if (!sameStop || !a || !b || a.track !== b.track || !(gap >= 0 && gap <= 10)) return null;
+    return { stop: l.toStop.name, dest: next.to, track: b.track, sectors: b.sectors };
+  }
+  // US-54: the notice on the train's ride, when planning and when following
+  function splitNoteHtml(legs, k) {
+    const l = legs[k];
+    if (!l || l.type !== 'ride' || !l.multiDest) return '';
+    const c = splitContinuation(legs, k);
+    const text = c ? t('splitTrainAt', { stop: c.stop, dest: c.dest, track: c.track, sectors: c.sectors ? t('splitSectors', { s: c.sectors }) : '' }) : t('splitTrain');
+    return `<div class="split-note">🚆 ${esc(text)}</div>`;
+  }
   function markSamePlatform(legs) {
     legs.forEach((l, k) => {
       if (l.type !== 'walk' || l.edge !== 'transfer') return;
+      const p = legs.slice(0, k).map(x => x.type).lastIndexOf('ride');
+      if (p >= 0 && legs.slice(p + 1, k).every(x => x.type === 'walk') && splitContinuation(legs, p)) {   // US-54: same train, its part goes on
+        Object.assign(l, { samePlatform: true, splitStay: true, apiMin: l.min, min: 0 });
+        return;
+      }
       const { start, end } = walkEnds(legs, k);
       if (samePlace(start, end)) Object.assign(l, { samePlatform: true, apiMin: l.min, min: 0 });
     });
@@ -2069,6 +2111,7 @@
       if (k < 0 || legs[n + 1 + k].type !== 'ride') return;
       const next = legs[n + 1 + k], between = legs.slice(n + 1, n + 1 + k);
       if (between.some(x => x.type === 'walk' && x.min >= 0.5)) return;   // the API's own walk
+      if (between.some(x => x.splitStay) || splitContinuation(legs, n)) return;   // US-54: the same train goes on
       const A = { name: l.toStop.name, stopId: l.toStop.id, coord: l.toStop.coord, platform: l.arrPlatformLive || l.arrPlatform || '', mode: l.mode };
       const B = { name: next.from.name, stopId: next.from.id, coord: next.from.coord, platform: next.platformLive || next.platform || '', mode: next.mode };
       const sameStop = !!A.stopId && String(A.stopId) === String(B.stopId);
@@ -2110,7 +2153,7 @@
         const arrReal = parseTime(arr.prognosis && arr.prognosis.arrival);
         const pass = j.passList || [];
         const style = lineStyle(j, mode, label);
-        legs.push({ type: 'ride', mode, label, style, color: lineColor(style), to: j.to || '', category: j.category, number: j.number,
+        legs.push({ type: 'ride', mode, label, style, color: lineColor(style), to: j.to || '', category: j.category, number: j.number, multiDest: !!j.multiDest,
           dep: depT, real, live: !!real, delay: delay || 0, arr: arrT, arrReal,
           from: stopRef(dep.station), toStop: stopRef(arr.station),
           platform: (dep.prognosis && dep.prognosis.platform) || dep.platform || '',
@@ -2803,7 +2846,7 @@
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       const W = journeyWaits(j), change = W.byRide.get(k);
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
-        ${change ? changeWaitHtml(W.plan, change) : ''}
+        ${change ? changeWaitHtml(W.plan, change) : ''}${splitNoteHtml(j.legs, k)}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
         <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div></li>`;
@@ -2817,7 +2860,7 @@
   // Walk and wait at a change, on the ride taken after it: when planning (US-47) as when following (US-39).
   // A change on the same platform already says its wait on its own row.
   function changeWaitHtml(plan, c) {
-    const onSpot = plan.slice(c.i + 1, c.k).some((l, n) => l.samePlatform && (({ start, end }) => samePlace(start, end))(walkEnds(plan, c.i + 1 + n)));
+    const onSpot = plan.slice(c.i + 1, c.k).some((l, n) => l.samePlatform && (l.splitStay || (({ start, end }) => samePlace(start, end))(walkEnds(plan, c.i + 1 + n))));
     if (onSpot && c.slack >= COMFORT_MIN) return '';
     const vars = { walk: c.walk, wait: Math.max(0, c.slack) };
     const txt = c.slack < 0 ? t('waitMissed') : c.slack === 0 ? t(c.walk ? 'waitNoneWalk' : 'waitNone', vars) : t(c.walk ? 'waitAfterWalk' : 'waitOnly', vars);
@@ -2839,7 +2882,8 @@
     const time = v => v == null ? null : +v;
     const arr = prev && time(prev.arrReal || prev.arr), dep = next && time(next.real || next.dep);
     const wait = arr && dep ? Math.max(0, Math.round((dep - arr) / 60000)) : null;
-    return `<li class="${cls}"><span class="leg-ico">⇄</span><div>${esc(t('samePlatform'))}` +
+    const label = legs[k].splitStay ? t('splitStay', { dest: next ? next.to : '' }) : t('samePlatform');
+    return `<li class="${cls}"><span class="leg-ico">⇄</span><div>${esc(label)}` +
       `${wait ? ` · ${esc(t('sameWait', { n: wait }))}` : ''}</div></li>`;
   }
 
@@ -2979,6 +3023,7 @@
                prevId: prevStop.id || null, prevName: prevStop.name, prevCoord: prevStop.coord || null,
                category: r.category, number: r.number, to: r.to, mode: r.mode, label: r.label,
                next: next ? { mode: next.mode, label: next.label, platform: next.platform, dep: (next.real || next.dep).getTime() } : null,
+               split: splitContinuation(j.legs, j.legs.indexOf(r)),   // US-54: the train splits there, the rider's part goes on
                walkEnd };
     }).filter(x => x.at);
   }
@@ -3301,13 +3346,13 @@
   const ms = d => d ? new Date(d).getTime() : null;
   function planOf(j) {
     return j.legs.map(l => l.type === 'ride'
-      ? { type: 'ride', mode: l.mode, label: l.label, style: l.style, color: l.color, category: l.category, number: l.number, to: l.to,
+      ? { type: 'ride', mode: l.mode, label: l.label, style: l.style, color: l.color, category: l.category, number: l.number, to: l.to, multiDest: !!l.multiDest,
           from: l.from, toStop: l.toStop, dep: ms(l.dep), real: ms(l.real), arr: ms(l.arr), arrReal: ms(l.arrReal),
           platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops,
           via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), planned: ms(v.planned || v.time), depAt: ms(v.depAt), live: !!v.live })) }
       : l.type === 'stay' ? { type: 'stay', min: l.min, from: ms(l.from), until: ms(l.until), back: !!l.back, place: l.place }
       : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '',
-          samePlatform: !!l.samePlatform, apiMin: l.apiMin || null });
+          samePlatform: !!l.samePlatform, splitStay: !!l.splitStay, apiMin: l.apiMin || null });
   }
   // Back to a journey with Date objects, for the helpers shared with the planner (get-off reminders)
   function hydrate(plan) {
@@ -3760,7 +3805,7 @@
       if (l.type === 'stay') return stayRowHtml(a, l, k, now);
       if (l.type === 'walk') {
         const ends = walkEnds(plan, k), end = ends.end;
-        if (l.samePlatform && samePlace(ends.start, end)) return samePlatformRow(plan, k, 'tl change');
+        if (l.samePlatform && (l.splitStay || samePlace(ends.start, end))) return samePlatformRow(plan, k, 'tl change');
         const map = l.start && l.end && (l.start.coord || l.start.stopId) && (l.end.coord || l.end.stopId)
           ? `<button class="ghost walk-map" data-act="walk-map" data-leg="${k}">${MAP_ICON}${esc(t('walkOnMap'))}</button>` : '';
         if (l.samePlatform) {   // the next ride moved to another platform: a walk again
@@ -3801,7 +3846,7 @@
           }).join('')}</ul>`
         : `<div class="ride-meta">${esc(count)}</div>`;
       return `<li class="tl ride${cls}"${colour}><div class="tl-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span>→ ${esc(l.to)}</span>` +
-        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) +
+        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) + splitNoteHtml(plan, k) +
         `<div>${timeHtml(l.dep, l.real)} ${esc(l.from.name)}${plat}</div>` +
         (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') + via +
         `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}${arrPlat}</div></li>`;
@@ -3888,11 +3933,13 @@
   function fireAlight(a, n) {
     const x = a.alights[n];
     let body;
-    if (x.next) {
+    if (x.split) {
+      body = t('splitBody', { stop: x.split.stop, dest: x.split.dest, track: x.split.track, sectors: x.split.sectors ? t('splitSectors', { s: x.split.sectors }) : '' });
+    } else if (x.next) {
       const plat = x.next.platform ? ` (${t(x.next.mode === 'train' ? 'track' : 'platform', { p: x.next.platform })})` : '';
       body = t('alightBodyChange', { stop: x.stop, line: `${modeName(x.next.mode)} ${x.next.label}`, plat, dep: hhmm(new Date(x.next.dep + alightShift(a))) });
     } else body = x.walkEnd >= 1 ? t('alightBodyEnd', { stop: x.stop, walk: t('alightWalkEnd', { min: fmtMin(x.walkEnd) }) }) : t('alightBodyLast', { stop: x.stop });
-    const title = t('alightTitle');
+    const title = t(x.split ? 'splitTitle' : 'alightTitle');
     $('abTitle').textContent = '🔔 ' + title;
     $('abBody').textContent = body;
     $('abTrack').hidden = true;

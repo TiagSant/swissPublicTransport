@@ -200,6 +200,8 @@
       category: split.category, number: split.number, name,
       operator: (op && OPERATORS[op]) || '', operatorRef: op || null,   // company number, e.g. 881 = TPG
       to: txt(service, 'DestinationText'),
+      // US-54: "train with several destinations" (HRDF attribute A__FL): coupled trains that split on the way
+      multiDest: kids(service, 'Attribute').some(a => txt(a, 'Code') === 'A__FL'),
       // a run pattern: same line, direction and terminus stop (whatever its platform) → same next stops
       pattern: [txt(service, 'LineRef'), txt(service, 'DirectionRef'), stopId7(txt(service, 'DestinationStopPointRef'))].join('|')
     };
@@ -252,6 +254,7 @@
       }
       board.push({
         category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
+        multiDest: info.multiDest,
         stop: { station: { id: hereId, name: here.name }, departure: dep.planned,
                 prognosis: { departure: dep.estimated, platform: txt(call, 'EstimatedQuay') || null },
                 platform: txt(call, 'PlannedQuay') || null, delay: null },
@@ -288,6 +291,7 @@
           const inter = kids(timed, 'LegIntermediate');
           sections.push({
             journey: { category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
+                       multiDest: info.multiDest,
                        // every stop of the ride with its times (planned, and live in prognosis), as in transport.opendata.ch
                        passList: [board, ...inter, alight].map(c => {
                          const ca = callTimes(c, 'ServiceArrival'), cd = callTimes(c, 'ServiceDeparture');
