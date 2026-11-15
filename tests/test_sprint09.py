@@ -53,8 +53,9 @@ def api(route):
         asked = dt.datetime.strptime(q["date"][0] + " " + q["time"][0], "%Y-%m-%d %H:%M").replace(tzinfo=tz)
         off = (asked - NOW).total_seconds() / 60
         body = {"connections": [{"sections": [ride(stops[a], stops[b], off + 16, off + 34)]}]} if a in stops and b in stops else {"connections": []}
-    else:
-        body = {"station": BELAIR, "stationboard": []}
+    else:   # the stop asked (it always answered Bel-Air: the name shown changed with the timing of the answer)
+        sid = (q.get("id") or q.get("station") or [""])[0]
+        body = {"station": next((s for s in (COMMUNES, ESSERTS, CORNAVIN, BELAIR) if s["id"] == sid), BELAIR), "stationboard": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 
 def new_page(b, when):
