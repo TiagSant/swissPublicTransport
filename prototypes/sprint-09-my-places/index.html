@@ -2536,7 +2536,20 @@
       const prev = best.get(j.key);
       if (!prev || j.walkMin < prev.walkMin) best.set(j.key, j);
     }
-    return [...best.values()];
+    // BUG-13: the same vehicles reached from another nearby stop (the same bus 25 boarded at Monthoux 07:58 or at the
+    // stop before, 07:56) are one journey, not two: the searches from each nearby stop each return it. Kept: the one
+    // arriving first, then with the least walking, then leaving latest.
+    const stopOf = s => s ? String(s.id || fold(s.name)) : '';
+    const sameRun = (a, b) => a.label === b.label && fold(a.to) === fold(b.to) &&
+      ((stopOf(a.from) === stopOf(b.from) && +a.dep === +b.dep) || (stopOf(a.toStop) === stopOf(b.toStop) && +a.arr === +b.arr));
+    const sameVehicles = (x, y) => x.rides.length > 0 && x.rides.length === y.rides.length && x.rides.every((r, n) => sameRun(r, y.rides[n]));
+    const better = (x, y) => +x.arriveAt !== +y.arriveAt ? x.arriveAt < y.arriveAt : x.walkMin !== y.walkMin ? x.walkMin < y.walkMin : x.leaveAt > y.leaveAt;
+    const out = [];
+    for (const j of best.values()) {
+      const k = out.findIndex(o => sameVehicles(o, j));
+      if (k < 0) out.push(j); else if (better(j, out[k])) out[k] = j;
+    }
+    return out;
   }
   // Parts of a trip put together, with the time at each place in between (a "stay" leg)
   function combineJourney(parts, pts, stays) {
