@@ -244,7 +244,7 @@ def run_app(pairs):
                         res = res or pg.evaluate("window.__audit()")
                         if os.environ.get("DEBUG"):
                             for e in pg.evaluate("window.__dbg || []"): print("    DBG", json.dumps(e, ensure_ascii=False))
-                        for e in pg.evaluate("window.__probe()"): print("    PROBE", json.dumps(e, ensure_ascii=False))
+                        for e in pg.evaluate("window.__probe()"): print("    PROBE", json.dumps(e, ensure_ascii=False, default=str))
                     except Exception as e:
                         print("  app error", a["name"], "→", z["name"], src, e)
                     if state.get("codes"): print("    failed requests:", state["codes"], flush=True)
