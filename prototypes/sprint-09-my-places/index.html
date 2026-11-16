@@ -13,6 +13,7 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - US-67: traffic messages (OJP, SIRI SX situations) on departures, journeys and followed rides; a new one told once.
   - US-66: walking or riding, from the phone's own motion sensors (no Google service, nothing sent): still walking a
            minute after the first vehicle left → other ways from there; the reading shown on the followed journey.
   - BUG-14: the journey followed has the better change place: "Follow" waits for the check; changes still ahead are
@@ -274,6 +275,11 @@
   .leg .wait { font-size: .8rem; color: var(--muted); margin: 2px 0; }
   .leg .wait.changed { color: #b26a00; font-weight: 600; }
   .split-note { font-size: .8rem; color: #b26a00; font-weight: 600; margin: 2px 0; }
+  .sit { font-size: .8rem; color: #b26a00; margin: 2px 0; }
+  .sit summary { cursor: pointer; font-weight: 600; }
+  .sit p { margin: 4px 0 0; color: var(--muted, #666); font-weight: 400; }
+  .sit-flag, .tag.sit-tag { color: #b26a00; }
+  .dep-sit { grid-column: 1 / -1; }
   .leg.stay, .tl.stay { list-style: none; margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px dashed var(--line); }
   .leg.stay b, .tl.stay b { display: block; }
   .stay-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
@@ -716,6 +722,7 @@
       cancelSame: 'arrive {t}, as planned', cancelLater: 'arrive {t} ({n} min later)',
       walkingTitle: 'You’re on foot: the {line} at {dep} left without you', walkingNotify: 'On foot: the {line} at {dep} left without you',
       motionSetting: 'Tell walking from riding (the phone’s motion sensors; nothing is sent)', motionNow: 'Sensors: {state}', motionWalk: '🚶 walking', motionStill: 'still', motionVehicle: '🚋 in a vehicle', motionMoving: 'moving, no steps',
+      trafficInfo: 'Traffic info', sitNotify: 'Traffic info: {line}',
       lateNotify: 'You won’t make the {line} at {dep}', missedRideNotify: '{line} at {dep} missed?', lateNotifyBody: 'Open the app: other departures from where you are.',
       lateTitle: 'You won’t make the {line} at {dep}', missedRideTitle: '{line} at {dep} missed?', laterTitle: 'Leaving later: other departures', missedSaidTitle: '{line} at {dep} missed: other departures',
       lateOption: '{lines} at {dep} · leave {leave}', lateOnBoard: 'I’m on board after all', lateState: 'Not on the planned ride: choose another departure, or cancel.',
@@ -849,6 +856,7 @@
       cancelSame: 'arrivée {t}, comme prévu', cancelLater: 'arrivée {t} ({n} min plus tard)',
       walkingTitle: 'Vous êtes à pied : le {line} de {dep} est parti sans vous', walkingNotify: 'À pied : le {line} de {dep} est parti sans vous',
       motionSetting: 'Distinguer marche et véhicule (capteurs de mouvement du téléphone ; rien n\u2019est envoyé)', motionNow: 'Capteurs : {state}', motionWalk: '🚶 à pied', motionStill: 'immobile', motionVehicle: '🚋 dans un véhicule', motionMoving: 'en mouvement, sans pas',
+      trafficInfo: 'Info trafic', sitNotify: 'Info trafic : {line}',
       lateNotify: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideNotify: '{line} de {dep} manqué ?', lateNotifyBody: 'Ouvrez l\u2019app : d\u2019autres départs depuis où vous êtes.',
       lateTitle: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideTitle: '{line} de {dep} manqué ?', laterTitle: 'Départ plus tard : autres départs', missedSaidTitle: '{line} de {dep} manqué : autres départs',
       lateOption: '{lines} à {dep} · partir à {leave}', lateOnBoard: 'Je suis à bord', lateState: 'Pas dans le véhicule prévu : choisissez un autre départ, ou annulez.',
@@ -1024,10 +1032,10 @@
       light.catch(() => {});   // awaited below; avoids an unhandled rejection if the full request fails first
       if (needFull) {
         const full = await ojpPost(OJP.stopEvents(stopId, { lang: apiLang(), from: new Date(Date.now() - 2 * 60000), limit: PATTERNS_RESULTS }), signal);
-        OJP.toStationboard(full, stopId, pat.map);
+        OJP.toStationboard(full, stopId, pat.map, apiLang());
         pat.fullAt = Date.now();
       }
-      const r = OJP.toStationboard(await light, stopId, pat.map);
+      const r = OJP.toStationboard(await light, stopId, pat.map, apiLang());
       pat.unknown = r.unknownPatterns;
       savePatterns(stopId, pat);
       return r;
@@ -1040,7 +1048,7 @@
         if (arrive) qs.set('isArrivalTime', '1');
         return getJSON(`${API}/connections?${qs}`, signal);
       }
-      return OJP.toConnections(await ojpPost(OJP.trip(a, b, { lang: apiLang(), at: ref, arrive, limit: 4 }), signal));
+      return OJP.toConnections(await ojpPost(OJP.trip(a, b, { lang: apiLang(), at: ref, arrive, limit: 4 }), signal), apiLang());
     }
   };
 
@@ -1437,7 +1445,7 @@
       lineKey, dirKey, nextStop, label, mode, style: lineStyle(j, mode, label),
       to: j.to || '', sched, real, live: !!real, time: real || sched, delay: delay || 0,
       platform: (stop.prognosis && stop.prognosis.platform) || stop.platform || '',
-      operator: j.operator || '',
+      operator: j.operator || '', situations: activeSits(j.situations, sched),
       // next stops (shown when the departure is tapped)
       stops: pl.slice(1).filter(p => p && p.station && p.station.name && p.station.id !== hereId).slice(0, 8)
         .map(p => ({ name: p.station.name,
@@ -1626,14 +1634,14 @@
     ul.innerHTML = list.map(d => {
       const plat = placeChip(d.platform, d.mode, current);   // US-48: no platform → the stop's position
       const late = d.delay > 0 ? `<span class="late">+${d.delay} min</span>` : '';
-      const meta = [plat, late].filter(Boolean).join(' · ');
+      const meta = [plat, late, d.situations.length ? `<span class="sit-flag">⚠ ${esc(t('trafficInfo'))}</span>` : ''].filter(Boolean).join(' · ');
       const id = depId(d), open = id === expanded;
       const stops = open ? `<ul class="stops">${d.stops.length ? d.stops.map(st =>
           `<li><span>${esc(st.name)}</span><span>${st.time ? hhmm(st.time) : ''}</span></li>`).join('')
           : `<li><span>${esc(t('nextStopsUnavailable'))}</span><span></span></li>`}</ul>` : '';
       return `<li class="dep" data-dep="${esc(id)}" data-dir="${esc(d.dirKey)}" aria-expanded="${open}">${lineIdHtml(d.mode, d.style, d.label)}` +
         `<div style="min-width:0"><div class="to">${esc(d.to)}</div><div class="meta">${meta || esc(modeName(d.mode))}</div></div>` +
-        `<div class="when">${whenHtml(d, now)}</div>${stops}</li>`;
+        `<div class="when">${whenHtml(d, now)}</div>${open && d.situations.length ? `<div class="dep-sit">${sitHtml(d.situations)}</div>` : ''}${stops}</li>`;
     }).join('');
   }
 
@@ -2129,6 +2137,20 @@
     return { stop: l.toStop.name, dest: next.to, track: b.track, sectors: b.sectors };
   }
   // US-54: the notice on the train's ride, when planning and when following
+  // US-67: traffic messages (OJP) of a ride or a departure, valid at its time: summary, the rest on a tap
+  const sitTime = v => v ? new Date(v).getTime() : null;
+  function activeSits(list, at) {
+    const t0 = at ? +new Date(at) : Date.now();
+    return (list || []).filter(s => !s.periods || !s.periods.length || s.periods.some(([a, b]) => (sitTime(a) == null || sitTime(a) <= t0) && (sitTime(b) == null || t0 <= sitTime(b))));
+  }
+  function sitHtml(list) {
+    if (!list || !list.length) return '';
+    return list.map(s => {
+      const more = [s.description, s.consequence, s.recommendation, s.duration].filter((x, n, a) => x && a.indexOf(x) === n && x !== s.summary);
+      const head = `⚠ ${esc(s.summary || t('trafficInfo'))}`;
+      return more.length ? `<details class="sit"><summary>${head}</summary>${more.map(x => `<p>${esc(x)}</p>`).join('')}</details>` : `<div class="sit">${head}</div>`;
+    }).join('');
+  }
   function splitNoteHtml(legs, k) {
     const l = legs[k];
     if (!l || l.type !== 'ride' || !l.multiDest) return '';
@@ -2204,7 +2226,7 @@
         const pass = j.passList || [];
         const style = lineStyle(j, mode, label);
         legs.push({ type: 'ride', mode, label, style, color: lineColor(style), to: j.to || '', category: j.category, number: j.number, multiDest: !!j.multiDest, cancelled: !!j.cancelled,
-          dep: depT, real, live: !!real, delay: delay || 0, arr: arrT, arrReal,
+          dep: depT, real, live: !!real, delay: delay || 0, arr: arrT, arrReal, situations: activeSits(j.situations, depT),
           from: stopRef(dep.station), toStop: stopRef(arr.station),
           platform: (dep.prognosis && dep.prognosis.platform) || dep.platform || '',
           arrPlatform: (arr.prognosis && arr.prognosis.platform) || arr.platform || '',
@@ -3018,6 +3040,7 @@
       const tags = [j === fastest ? `<span class="tag">${esc(t('fastest'))}</span>` : '',
                     j === leastWalk && Math.round(j.walkMin) < Math.round(fastest.walkMin) ? `<span class="tag walk">${esc(t('leastWalking'))}</span>` : '',
                     footTag ? `<span class="tag foot">${esc(footTag)}</span>` : '',
+                    j.rides.some(r => (r.situations || []).length) ? `<span class="tag sit-tag">⚠ ${esc(t('trafficInfo'))}</span>` : '',
                     j.shortcut ? `<span class="tag foot">${esc(t(j.shortcut.start ? 'tagShortcutStart' : 'tagShortcut', { stop: j.shortcut.stop }))}</span>` : ''].join('');
       const first = j.rides[0];
       const live = first && first.live ? ` · <span class="${first.delay > 0 ? 'late' : 'ok'}">${first.delay > 0 ? '+' + first.delay + ' min' : esc(t('onTime'))}</span>` : '';
@@ -3077,7 +3100,7 @@
       const colour = l.color ? ` style="--lc:${esc(l.color)}"` : '';
       const W = journeyWaits(j), change = W.byRide.get(k);
       return `<li class="leg ride"${colour}><div class="leg-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span class="leg-to">→ ${esc(l.to)}</span></div>
-        ${change ? changeWaitHtml(W.plan, change) : ''}${splitNoteHtml(j.legs, k)}
+        ${change ? changeWaitHtml(W.plan, change) : ''}${splitNoteHtml(j.legs, k)}${sitHtml(l.situations)}
         <div class="leg-stop"><b>${hhmm(l.dep)}</b>${late} ${esc(l.from.name)} ${plat}</div>
         ${via || (l.stops ? `<div class="ride-meta">${esc(count)}</div>` : '')}
         <div class="leg-stop"><b>${arr ? hhmm(arr) : ''}</b> ${esc(l.toStop.name)} ${placeChip(l.arrPlatform, l.mode, l.toStop)}</div></li>`;
@@ -3736,7 +3759,7 @@
     return j.legs.map(l => l.type === 'ride'
       ? { type: 'ride', mode: l.mode, label: l.label, style: l.style, color: l.color, category: l.category, number: l.number, to: l.to, multiDest: !!l.multiDest,
           from: l.from, toStop: l.toStop, dep: ms(l.dep), real: ms(l.real), arr: ms(l.arr), arrReal: ms(l.arrReal),
-          platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops,
+          platform: l.platform || '', arrPlatform: l.arrPlatform || '', stops: l.stops, situations: l.situations || [],
           via: (l.via || []).map(v => ({ name: v.name, id: v.id, coord: v.coord, time: ms(v.time), planned: ms(v.planned || v.time), depAt: ms(v.depAt), live: !!v.live })) }
       : l.type === 'stay' ? { type: 'stay', min: l.min, from: ms(l.from), until: ms(l.until), back: !!l.back, place: l.place }
       : { type: 'walk', min: l.min, meters: l.meters || null, start: l.start || null, end: l.end || null, edge: l.edge, to: l.to || '',
@@ -4003,6 +4026,15 @@
       } else {
         const nm = normalize(m), shift = nm.real ? nm.real.getTime() - r.dep : 0;
         r.missing = false;
+        // US-67: traffic messages of the run (OJP), as they are now; a new one is told once
+        if (Array.isArray(m.situations)) {
+          const sits = activeSits(m.situations, r.dep), had = new Set((r.situations || []).map(x => x.id));
+          if (JSON.stringify(sits.map(x => x.id)) !== JSON.stringify((r.situations || []).map(x => x.id))) { r.situations = sits; changed = true; }
+          for (const x of sits) if (!had.has(x.id) && !a.fired['sit:' + x.id] && arrOf(r) > now) {
+            a.fired['sit:' + x.id] = now; changed = true;
+            fireTrip(t('sitNotify', { line: `${modeName(r.mode)} ${r.label}` }), x.summary || x.description || t('trafficInfo'));
+          }
+        }
         r.real = nm.real ? nm.real.getTime() : null;
         r.platformLive = announcedPlatform(m.stop && m.stop.platform, m.stop && m.stop.prognosis && m.stop.prognosis.platform, r.platform);
         const at = id => (m.passList || []).find(x => x.station && x.station.id === id);
@@ -4469,7 +4501,7 @@
           }).join('')}</ul>`
         : `<div class="ride-meta">${esc(count)}</div>`;
       return `<li class="tl ride${cls}"${colour}><div class="tl-line">${lineIdHtml(l.mode, l.style, l.label, true)}<span>→ ${esc(l.to)}</span>` +
-        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) + splitNoteHtml(plan, k) +
+        `${chip ? `<span class="chip">${esc(chip)}</span>` : ''}</div>` + waitHtml(k) + splitNoteHtml(plan, k) + sitHtml(l.situations) +
         `<div>${timeHtml(l.dep, l.real)} ${esc(l.from.name)}${plat}</div>` +
         (l.missing ? `<div class="changed">${esc(t('notLive'))}</div>` : '') + via +
         `<div>${timeHtml(l.arr, l.arrReal)} ${esc(l.toStop.name)}${arrPlat}</div></li>`;

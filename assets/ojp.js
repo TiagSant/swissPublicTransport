@@ -150,6 +150,34 @@
     return { id, name: name || (p && p.name) || '', coordinate: (p && p.coordinate) || null };
   }
 
+  // US-67: traffic messages of the answer (SIRI SX situations), by their number. The text of the general perspective
+  // when there is one, in the app's language when given in it. Validity periods kept: the app shows a message only
+  // for a ride within one of them.
+  function situations(doc, lang) {
+    const map = new Map(), want = String(lang || '').toLowerCase();
+    for (const s of all(doc, 'PtSituation')) {
+      const id = txt(s, 'SituationNumber');
+      if (!id || map.has(id)) continue;
+      const actions = Array.from(s.getElementsByTagNameNS('*', 'PassengerInformationAction'));
+      const pick = actions.find(a => txt(a, 'Perspective') === 'general') || actions[0];
+      const content = pick && el(pick, 'TextualContent');
+      const text = name => {
+        if (!content) return '';
+        const nodes = Array.from(content.getElementsByTagNameNS('*', name));
+        const n = nodes.find(x => (x.getAttribute('xml:lang') || '').toLowerCase() === want) || nodes[0];
+        return n ? n.textContent.trim() : '';
+      };
+      map.set(id, { id, severity: txt(s, 'Severity') || 'normal', planned: txt(s, 'Planned') === 'true',
+        periods: kids(s, 'ValidityPeriod').map(p => [txt(p, 'StartTime') || null, txt(p, 'EndTime') || null]),
+        summary: text('SummaryText'), description: text('DescriptionText'), consequence: text('ConsequenceText'),
+        recommendation: text('RecommendationText'), duration: text('DurationText') });
+    }
+    return map;
+  }
+  // The messages a service (or a leg) refers to
+  const situationsOf = (nodes, sits) => [...new Set(nodes.filter(Boolean).flatMap(n => kids(el(n, 'SituationFullRefs'), 'SituationFullRef'))
+    .map(r => txt(r, 'SituationNumber')))].map(id => sits.get(id)).filter(Boolean);
+
   // ---------- Answers → transport.opendata.ch shapes ----------
   // /locations
   function toLocations(xml) {
@@ -217,9 +245,9 @@
    * many minutes after this stop each is reached. A full answer (with onward calls) fills it; a light refresh
    * (without onward calls) uses it to rebuild the next stops, so the direction of each departure stays known.
    */
-  function toStationboard(xml, stopId, patterns) {
+  function toStationboard(xml, stopId, patterns, lang) {
     const doc = parse(xml);
-    const places = contextPlaces(doc);
+    const places = contextPlaces(doc), sits = situations(doc, lang);
     const board = [];
     let unknown = 0;
     for (const ev of all(doc, 'StopEvent')) {
@@ -254,7 +282,7 @@
       }
       board.push({
         category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
-        multiDest: info.multiDest,
+        multiDest: info.multiDest, situations: situationsOf([service, ev], sits),
         stop: { station: { id: hereId, name: here.name }, departure: dep.planned,
                 prognosis: { departure: dep.estimated, platform: txt(call, 'EstimatedQuay') || null },
                 platform: txt(call, 'PlannedQuay') || null, delay: null },
@@ -275,9 +303,9 @@
   }
 
   // /connections
-  function toConnections(xml) {
+  function toConnections(xml, lang) {
     const doc = parse(xml);
-    const places = contextPlaces(doc);
+    const places = contextPlaces(doc), sits = situations(doc, lang);
     const connections = [];
     for (const tripEl of all(doc, 'Trip')) {
       const sections = [];
@@ -291,7 +319,7 @@
           const inter = kids(timed, 'LegIntermediate');
           sections.push({
             journey: { category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
-                       multiDest: info.multiDest,
+                       multiDest: info.multiDest, situations: situationsOf([service, timed], sits),
                        // US-61: cancelled in the live data (the run, or its stop where the rider boards or gets off)
                        cancelled: txt(service, 'Cancelled') === 'true' || txt(board, 'NotServicedStop') === 'true' || txt(alight, 'NotServicedStop') === 'true',
                        // every stop of the ride with its times (planned, and live in prognosis), as in transport.opendata.ch
