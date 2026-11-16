@@ -2040,6 +2040,21 @@
     return null;
   }
   // Stops between boarding and alighting, with their (live) time (US-30). Entries without a name are skipped.
+  // BUG-15: a late vehicle whose intermediate stops have no live time of their own (the data gives them for the
+  // departure and the arrival only): they take its delay — the departure's, moving toward the arrival's along the
+  // way — instead of the timetable (tram 14 +28 min at Bel-Air "passing Stand at 18:49": walking there looked too late)
+  function liveVia(r) {
+    const d0 = r.real && r.dep ? r.real - r.dep : null, d1 = r.arrReal && r.arr ? r.arrReal - r.arr : null;
+    if (d0 == null && d1 == null) return;
+    const a = +r.dep, b = +r.arr;
+    for (const v of r.via || []) {
+      if (v.live || !v.planned) continue;
+      const f = b > a ? Math.min(1, Math.max(0, (+v.planned - a) / (b - a))) : 0.5;
+      const d = d0 != null && d1 != null ? d0 + (d1 - d0) * f : d0 != null ? d0 : d1;
+      if (Math.abs(d) < 30000) continue;
+      v.time = new Date(+v.planned + d); v.depAt = new Date(+(v.depAt || v.planned) + d); v.live = true; v.shifted = true;
+    }
+  }
   function viaStops(pass) {
     return pass.slice(1, -1).map(p => {
       const st = p.station || {};
@@ -2187,6 +2202,7 @@
           platform: (dep.prognosis && dep.prognosis.platform) || dep.platform || '',
           arrPlatform: (arr.prognosis && arr.prognosis.platform) || arr.platform || '',
           stops: Math.max(0, pass.length - 1), via: viaStops(pass) });
+        liveVia(legs[legs.length - 1]);
       } else {
         legs.push({ type: 'walk', min: walkSectionMin(s, depT, arrT), to: (arr.station && arr.station.name) || '', edge: 'transfer' });
       }
