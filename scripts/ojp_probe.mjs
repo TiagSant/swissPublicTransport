@@ -44,8 +44,8 @@ async function post(name, body, extraHeaders = {}) {
   if (!r) { report.requests[name] = { error: String(lastError?.cause?.message || lastError) }; return ''; }
   const headers = Object.fromEntries([...r.headers].filter(([k]) => KEEP_HEADERS.test(k)));
   report.requests[name] = { status: r.status, ms: Date.now() - t0, bytes: text.length, headers };
-  writeFileSync(join(OUT, `${name}.request.xml`), body);
-  writeFileSync(join(OUT, `${name}.xml`), text);
+  // only a real answer replaces the recorded one: a refusal (429 over the key's limit, 5xx) keeps the last good fixture
+  if (r.ok) { writeFileSync(join(OUT, `${name}.request.xml`), body); writeFileSync(join(OUT, `${name}.xml`), text); }
   console.log(`${name.padEnd(22)} ${r.status} ${String(Date.now() - t0).padStart(5)} ms ${String(text.length).padStart(8)} B`);
   return text;
 }
