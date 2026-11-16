@@ -187,7 +187,8 @@ def best_possible(run1, run2, ride1, ride2, need):
                      "off": f'{best[4]} {best[5]}'.strip(), "board": f'{best[6]} {best[7]}'.strip()}
 
 # ---------------- the app ----------------
-HOOK = ("  window.__audit = () => journeyBase.slice(0, 8).map(j => ({ key: j.key, enriched: !!j._enriched, stayOns: j.stayOns || null,"
+HOOK = ("  window.__probe = () => journeyBase.map(j => ({ key: j.key, sc: j.shortcut || null, leave: j.leaveAt, rides: j.rides.map(r => ({ l: r.label, from: r.from.name, dep: r.dep, real: r.real, via: (r.via || []).map(v => [v.name, v.time && new Date(v.time).toTimeString().slice(0,5), v.planned && new Date(v.planned).toTimeString().slice(0,5), v.live]) })) }));\n"
+        "  window.__audit = () => journeyBase.slice(0, 8).map(j => ({ key: j.key, enriched: !!j._enriched, stayOns: j.stayOns || null,"
         " raw: tripConnections(planOf(j)).map(c => ({ walk: c.walk, slack: c.slack, cur: c.cur, next: c.next })),"
         " fin: tripConnections(planOf(withStayOn(j))).map(c => ({ walk: c.walk, slack: c.slack, cur: c.cur, next: c.next })) }));\n")
 def add_hook():
@@ -227,7 +228,7 @@ def run_app(pairs):
                     pg.on("request", on_req); pg.on("requestfinished", on_done); pg.on("requestfailed", lambda r: on_done(r, True))
                     pg.clock.install(time=t0.timestamp())
                     pg.goto(PAGE)
-                    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False},
+                    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 15, "realWalk": False},
                              "journey:from": a, "journey:to": z}
                     if src == "ojp": store["ojpKey"] = TOKEN
                     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
@@ -243,6 +244,7 @@ def run_app(pairs):
                         res = res or pg.evaluate("window.__audit()")
                         if os.environ.get("DEBUG"):
                             for e in pg.evaluate("window.__dbg || []"): print("    DBG", json.dumps(e, ensure_ascii=False))
+                        for e in pg.evaluate("window.__probe()"): print("    PROBE", json.dumps(e, ensure_ascii=False))
                     except Exception as e:
                         print("  app error", a["name"], "→", z["name"], src, e)
                     if state.get("codes"): print("    failed requests:", state["codes"], flush=True)
