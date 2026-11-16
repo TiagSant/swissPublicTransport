@@ -11,6 +11,8 @@
            Same at the start: walk to where the second ride leaves instead of taking the first one.
   - US-64: get off earlier and finish on foot — a stop an earlier ride passes near the destination, walking from there
            instead of changing; listed as a journey of its own when it arrives no later.
+  - BUG-14: the journey followed has the better change place: "Follow" waits for the check; changes still ahead are
+           checked on the way (a journey followed before the check, or an alternative found on the way).
   - US-38: a followed journey shows every step live (delays, platforms, progress); a missed connection is detected
            and alternatives are offered: the next run of the same line, another route, or finishing on foot.
   - US-39: a tight connection says it plainly (walk vs time between the rides) and offers options with a comfortable
@@ -2218,7 +2220,7 @@
   const onwardBoards = new Map();
   function boardNear(stopId, at) {
     const key = stopId + '|' + Math.floor(at / 300000);
-    if (!onwardBoards.has(key)) onwardBoards.set(key, data.board(stopId, new Date(at - 3 * 60000)).catch(() => null));
+    if (!onwardBoards.has(key)) onwardBoards.set(key, data.board(stopId, new Date(at - 3 * 60000)).catch(() => { onwardBoards.delete(key); return null; }));   // a failure is not kept
     return onwardBoards.get(key);
   }
   async function onwardStops(r) {
@@ -2291,7 +2293,7 @@
     }
     return null;
   }
-  async function bestChange(j, c, quays) {
+  async function bestChange(j, c, quays, notBefore) {
     const cur = j.legs[c.i], next = j.legs[c.k];
     if (c.walk < 1) return null;   // no walk: nothing to save
     const target = platformPos(quays, next.from.id, next.from.coord, next.platform);
@@ -2322,6 +2324,7 @@
       const samePlace = (board || y) && same && s.platform && yPlat && up(s.platform) === up(yPlat);
       const min = estimate(from, to, same, samePlace);
       const dep = board ? board.depAt : y ? y.at : +depOf(next);
+      if (notBefore && (s.at < notBefore || dep < notBefore)) return;   // BUG-14: already passed (following)
       const slack = Math.floor((dep - (s.at + min * 60000)) / 60000);
       if (slack < need || min > limit) return;
       if (!best || min < best.min || (min === best.min && n < best.n && early == null && !y))
@@ -2505,49 +2508,61 @@
   let searchGen = 0;   // a new search: what an older one still works out is no longer drawn
   async function enrichJourneys(list) {
     const gen = searchGen;
-    const quays = await loadQuays().catch(() => ({}));
     for (const j of list) {
       if (gen !== searchGen) return;
-      if (j._enriched) continue;
-      j._enriched = true;
-      try {
-        // US-61: a vehicle no longer in the live departures of its stop (cancelled): the journey is not suggested
-        if (await checkCancelled(j)) { if (gen === searchGen && journeyBase.includes(j)) renderJourneys(); continue; }
-        await loadQuays(journeyStopIds(j));   // the platforms of its stops, anywhere in Switzerland
-        // BUG-08: walks between platforms estimated before the platforms' positions were known
-        for (const l of j.legs) if (l.estimated && l.start && l.end) {
-          const pa = platformPos(quays, l.start.stopId, l.start.coord, l.start.platform), pb = platformPos(quays, l.end.stopId, l.end.coord, l.end.platform);
-          if (pa && pb) { const d = distanceM(pa, pb), min = Math.max(1, walkMinutes(d)); j.walkMin += min - l.min; Object.assign(l, { min, meters: d * DETOUR }); j._waits = null; }
-        }
-        for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
-        await loadQuays(journeyStopIds(j));   // and of the next stops just found
-        const cs = tripConnections(planOf(j));
-        const found = [];
-        for (const c of cs) found.push(await bestChange(j, c, quays));
-        j.stayOns = found.filter(Boolean);
-        // the platform where the rider now gets off (shown, and the change walked from it), then the choice again
-        if (j.stayOns.some(a => a.n >= 0 && !j.legs[a.i].onward[a.n].platform)) {
-          for (const a of j.stayOns) if (a.n >= 0) await platformAt(j.legs[a.i].onward[a.n], j.legs[a.i]);
-          const again = [];
-          for (const c of cs) again.push(await bestChange(j, c, quays));
-          j.stayOns = again.filter(Boolean);
-        }
-        if (!(j.segments > 1)) await routeWalks(j);   // a trip in parts keeps its planned stays
-        // the walk at the end, from the best stop: its street route in the cache for footAlternative
-        let alt = footAlternative(withStayOn(j));
-        if (alt && alt.ext != null && !alt.start.platform) {   // finishing on foot from a later stop: its platform too
-          const w = withStayOn(j), prev = w.rides[w.rides.length - 2];   // the ride as changed (got off earlier: its own next stops)
-          if (await platformAt(prev.onward[alt.ext], prev)) alt = footAlternative(withStayOn(j));
-        }
-        if (alt && places.to && places.to.coord) await walkRoute(platformPos(quays, alt.start.stopId, alt.start.coord, alt.start.platform), places.to.coord);
-      } catch { /* keep the journey as found */ }
-      if (gen === searchGen && journeyBase.includes(j)) renderJourneys();
+      await enrichOne(j, gen);
     }
     // US-61: journeys left out as cancelled: the ones now shown in their place are checked and enriched too
     if (gen === searchGen && list.some(j => j._cancelled)) {
       const next = rankJourneys(journeyBase.filter(j => !journeyWaits(j).missed && !isCancelled(j)), getPrio(), readWhen().mode).slice(0, 8);
       if (next.some(j => !j._enriched)) enrichJourneys(next);
     }
+  }
+  // One journey, once (BUG-14: "Follow" waits for it — the promise is kept on the journey)
+  function enrichOne(j, gen = searchGen) {
+    if (!j._enrichP) { j._enriched = true; j._enrichP = enrichBody(j, gen); }
+    return j._enrichP;
+  }
+  async function enrichBody(j, gen) {
+    const quays = await loadQuays().catch(() => ({}));
+    try {
+      // US-61: a vehicle no longer in the live departures of its stop (cancelled): the journey is not suggested
+      if (await checkCancelled(j)) { if (gen === searchGen && journeyBase.includes(j)) renderJourneys(); return; }
+      await loadQuays(journeyStopIds(j));   // the platforms of its stops, anywhere in Switzerland
+      // BUG-08: walks between platforms estimated before the platforms' positions were known
+      for (const l of j.legs) if (l.estimated && l.start && l.end) {
+        const pa = platformPos(quays, l.start.stopId, l.start.coord, l.start.platform), pb = platformPos(quays, l.end.stopId, l.end.coord, l.end.platform);
+        if (pa && pb) { const d = distanceM(pa, pb), min = Math.max(1, walkMinutes(d)); j.walkMin += min - l.min; Object.assign(l, { min, meters: d * DETOUR }); j._waits = null; }
+      }
+      j.stayOns = await betterChanges(j, quays, tripConnections(planOf(j)));
+      if (!(j.segments > 1)) await routeWalks(j);   // a trip in parts keeps its planned stays
+      // the walk at the end, from the best stop: its street route in the cache for footAlternative
+      let alt = footAlternative(withStayOn(j));
+      if (alt && alt.ext != null && !alt.start.platform) {   // finishing on foot from a later stop: its platform too
+        const w = withStayOn(j), prev = w.rides[w.rides.length - 2];   // the ride as changed (got off earlier: its own next stops)
+        if (await platformAt(prev.onward[alt.ext], prev)) alt = footAlternative(withStayOn(j));
+      }
+      if (alt && places.to && places.to.coord) await walkRoute(platformPos(quays, alt.start.stopId, alt.start.coord, alt.start.platform), places.to.coord);
+    } catch { /* keep the journey as found */ }
+    j._done = true;
+    if (gen === searchGen && journeyBase.includes(j)) renderJourneys();
+  }
+  // US-50 / US-53 / BUG-11 / BUG-12: the best place for each change cs of a journey (its rides' next stops loaded
+  // first). notBefore: while following, places the rider has already passed are left out.
+  async function betterChanges(j, quays, cs, notBefore) {
+    for (const r of j.rides.slice(0, -1)) if (!r.onward) r.onward = await onwardStops(r);
+    await loadQuays(journeyStopIds(j));   // and of the next stops just found
+    const found = [];
+    for (const c of cs) found.push(await bestChange(j, c, quays, notBefore));
+    let stayOns = found.filter(Boolean);
+    // the platform where the rider now gets off (shown, and the change walked from it), then the choice again
+    if (stayOns.some(a => a.n >= 0 && !j.legs[a.i].onward[a.n].platform)) {
+      for (const a of stayOns) if (a.n >= 0) await platformAt(j.legs[a.i].onward[a.n], j.legs[a.i]);
+      const again = [];
+      for (const c of cs) again.push(await bestChange(j, c, quays, notBefore));
+      stayOns = again.filter(Boolean);
+    }
+    return stayOns;
   }
   // US-61: a journey with a cancelled vehicle — flagged by the data (OJP), or missing from the live departures of the
   // stop where it is boarded (the same rule as when following: the line not there at that time, later ones listed)
@@ -2793,7 +2808,7 @@
       if (known.has(key) || out.has(key)) continue;
       out.set(key, Object.assign({}, j, { legs, rides, arriveAt, durationMin: (arriveAt - j.leaveAt) / 60000, transfers: rides.length - 1,
         walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0), live: rides.some(x => x.live), key,
-        stayOns: null, _waits: null, _enriched: false, _cancelled: false, shortcut: { stop: best.s.name, min: best.min, from: j.key } }));
+        stayOns: null, _waits: null, _enriched: false, _enrichP: null, _cancelled: false, shortcut: { stop: best.s.name, min: best.min, from: j.key } }));
     }
     return [...out.values()];
   }
@@ -3361,6 +3376,19 @@
     return gps.watch ? t('gpsWaiting') : '';
   }
 
+  // BUG-14: "Follow" tapped before the journey's changes were checked (the API's own change place, e.g. a 4-min walk
+  // from Sainte-Clotilde instead of staying on to Jonction): wait for the check (a few seconds at most), then follow
+  // the journey as it is now shown
+  async function followWhenReady(j, btn) {
+    const key = (j.base || j).key, raw = journeyBase.find(x => x.key === key);
+    if (raw && !raw._done) {
+      btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> ${esc(t('loading'))}`;
+      await Promise.race([enrichOne(raw).then(() => { raw._done = true; }), new Promise(r => setTimeout(r, 8000))]);
+      const same = x => (x.base || x).key === key && (x.onFoot || '') === (j.onFoot || '');
+      j = journeys.find(same) || (raw._done ? displayJourney(raw) : j);
+    }
+    createAlarm(j);
+  }
   function createAlarm(j) {
     const f = j.rides[0];
     const alarm = {
@@ -3550,6 +3578,7 @@
     // US-38: every ride of the followed journeys, at its boarding stop
     for (const a of list) {
       if (!a.plan) continue;
+      if (await improveFollowed(a)) changed = true;
       if (await refreshTrip(a, boardOf, schedOf)) changed = true;
     }
     if (changed) { saveAlarmsMerged(list); renderAlarms(); tickAlarms(); }
@@ -3775,6 +3804,30 @@
     if (!vs.length || !lo || !hi) return;
     const ok = vs.every((v, n) => v.time >= lo - 60000 && v.time <= hi + 60000 && (n === 0 || v.time >= vs[n - 1].time));
     if (!ok) vs.forEach((v, n) => { v.time = Math.round(lo + (hi - lo) * (n + 1) / (vs.length + 1)); v.planned = r.dep + (r.arr - r.dep) * (n + 1) / (vs.length + 1); v.shift = 0; });
+  }
+  // BUG-14: a followed journey's changes still ahead are checked like the planner's (once each): a journey followed
+  // before its check was done, or replaced by an alternative found on the way, gets the better place too. Silent,
+  // like the planner (PO decision): nothing to offer, the rider just walks less. Places already passed are left out.
+  async function improveFollowed(a) {
+    const now = Date.now(), plan = a.plan;
+    const keyOf = c => `${plan[c.i].label}@${plan[c.i].dep}>${plan[c.k].label}@${plan[c.k].dep}`;
+    const done = a.changesChecked || [], tries = a.changeTries || (a.changeTries = {});
+    const cs = tripConnections(plan).filter(c => arrOf(plan[c.i]) > now + 60000 && !done.includes(keyOf(c)));
+    if (!cs.length) return false;
+    try {
+      const j = hydrate(plan), quays = await loadQuays(journeyStopIds(j)).catch(() => ({}));
+      j.stayOns = await betterChanges(j, quays, cs, now + 60000);
+      // checked once the next stops of the ride were known (else again at the next refresh, 3 times at most: no data)
+      const ok = cs.filter(c => (j.legs[c.i].onward || []).length || (tries[keyOf(c)] = (tries[keyOf(c)] || 0) + 1) >= 3);
+      a.changesChecked = [...done, ...ok.map(keyOf)].slice(-20);
+      if (!j.stayOns.length || a.plan !== plan) return true;
+      const from = Math.min(...j.stayOns.map(x => x.i));
+      a.plan = planOf(withStayOn(j)); a.alts = null;
+      const ck = tripConnections(a.plan);   // the new changes are checked already
+      a.changesChecked = [...a.changesChecked, ...ck.map(c => `${a.plan[c.i].label}@${a.plan[c.i].dep}>${a.plan[c.k].label}@${a.plan[c.k].dep}`)].slice(-20);
+      replanAlights(a, from);
+    } catch { /* keep the plan */ }
+    return true;
   }
   async function refreshTrip(a, boardOf, schedOf) {
     const now = Date.now();
@@ -4753,7 +4806,7 @@
       renderJourneys(); return;
     }
     const al = e.target.closest('.set-alarms');
-    if (al) { const j = journeys[+al.dataset.i]; if (j) createAlarm(j); return; }
+    if (al) { const j = journeys[+al.dataset.i]; if (j) followWhenReady(j, al); return; }
     const b = e.target.closest('.jr');
     if (!b) return;
     const j = journeys[+b.dataset.i], k = (j.base || j).key;
