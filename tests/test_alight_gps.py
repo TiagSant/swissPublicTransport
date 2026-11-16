@@ -24,6 +24,7 @@ BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 CORNAVIN = st("8587057", "Genève, gare Cornavin", 46.209733, 6.142437)
 HOME = (46.1700, 6.1150)
 AT_BELAIR = (46.204800, 6.143000)                  # ~10 m from the Bel-Air stop
+AT_COMMUNES = (46.174560, 6.121950)                # at the first stop before the tram (US-62: at home after it left = missed)
 PAST_BELAIR = (46.206100, 6.142800)                # ~150 m further, towards Cornavin
 
 def end(s, m, kind, plat=""):
@@ -116,7 +117,7 @@ with sync_playwright() as p:
     ctx, pg = session(b, gps=True)
     go(pg, 14, AT_BELAIR); move(pg, PAST_BELAIR)
     assert banner(pg) in (None, "ready", "leave"), "near Bel-Air before boarding: no get-off reminder"
-    go(pg, 16.5, HOME)
+    go(pg, 16.5, AT_COMMUNES)
     go(pg, 29.5, AT_BELAIR)
     assert banner(pg) is None
     assert "Following your position" in pg.inner_text("#alarmList"), pg.inner_text("#alarmList")
@@ -130,7 +131,7 @@ with sync_playwright() as p:
 
     # 3. Position holds the reminder back while the tram is still at Bel-Air after the live time
     ctx, pg = session(b, gps=True)
-    go(pg, 16.5, HOME); dismiss_departure_alarms(pg)
+    go(pg, 16.5, AT_COMMUNES); dismiss_departure_alarms(pg)
     go(pg, 33, AT_BELAIR); dismiss_departure_alarms(pg)
     assert banner(pg) is None, "still at Bel-Air at 08:03: no reminder yet"
     move(pg, PAST_BELAIR)
@@ -140,7 +141,7 @@ with sync_playwright() as p:
 
     # 4. No fresh position (tunnel): the live time decides again
     ctx, pg = session(b, gps=True)
-    go(pg, 16.5, HOME); dismiss_departure_alarms(pg)
+    go(pg, 16.5, AT_COMMUNES); dismiss_departure_alarms(pg)
     go(pg, 25, AT_BELAIR); dismiss_departure_alarms(pg)            # last fix at 07:55, then nothing
     go(pg, 31.2); dismiss_departure_alarms(pg)
     assert banner(pg) == "alight", banner(pg)
