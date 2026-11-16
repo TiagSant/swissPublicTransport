@@ -18,10 +18,12 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROME_PATH"))
     ctx = b.new_context(locale="en-US", viewport={"width": 390, "height": 844}, device_scale_factor=2)
     ctx.route("https://transport.opendata.ch/**", api)
-    ctx.add_init_script(f"""if (!sessionStorage.getItem('seeded')) {{ sessionStorage.setItem('seeded', '1');
-        localStorage.setItem('tpp:stops', {json.dumps(json.dumps(STOPS))}); localStorage.setItem('tpp:lastStop', '"8587418"'); }}""")
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
+    # the stops seeded once (an init script guarded by sessionStorage seeded them again on some reloads, bringing a
+    # removed stop back: the test failed now and then)
     pg.goto(PAGE)
+    pg.evaluate("([s, l]) => { localStorage.setItem('tpp:stops', s); localStorage.setItem('tpp:lastStop', l); }", [json.dumps(STOPS), '"8587418"'])
+    pg.reload()
     names = lambda: [e.inner_text().rsplit("\n", 1)[0].rstrip("0123456789×").strip() for e in pg.locator("#recent .stop-open").all()]
     stored = lambda: sorted(json.loads(pg.evaluate("localStorage.getItem('tpp:stops')")).keys())
     assert names() == ["Genève, Bel-Air", "Petit-Lancy, Les Esserts", "Genève, gare Cornavin"], names()
@@ -44,7 +46,7 @@ with sync_playwright() as p:
     assert json.loads(pg.evaluate("localStorage.getItem('tpp:lastStop')")) is None
     pg.screenshot(path=str(ROOT / "tests/out/favorites_removed.png"))
     pg.reload(); pg.wait_for_timeout(300)
-    assert pg.locator("#board").is_hidden() and names() == ["Genève, Bel-Air", "Genève, gare Cornavin"]
+    assert pg.locator("#board").is_hidden() and names() == ["Genève, Bel-Air", "Genève, gare Cornavin"], (pg.locator("#board").is_hidden(), names())
     print("3 last stop removed → not reopened")
 
     # 4. Clear all, then undo, then clear all for good (toast expires)
