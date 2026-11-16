@@ -104,7 +104,9 @@ with sync_playwright() as p:
     pg.screenshot(path=str(OUT / "follow-foot-offer.png"))
 
     # 3. other ways from here
-    pg.click("#alarmList [data-act=here]"); pg.wait_for_selector("#alarmList .early .trip-alt", timeout=10000)
+    pg.click("#alarmList [data-act=here]")
+    pg.wait_for_function("""() => [...document.querySelectorAll('#alarmList .early .trip-alt')]
+        .some(e => e.innerText.includes('jusqu’au bout'))""", timeout=10000)   # the answer, not the foot offer already shown
     ways = [" ".join(x.split()) for x in pg.locator("#alarmList .early .trip-alt").all_inner_texts()]
     assert any("À pied jusqu’au bout" in w for w in ways) and any("Bus 19 à 09:21" in w for w in ways), ways
     print("3 from here → ", ways)
