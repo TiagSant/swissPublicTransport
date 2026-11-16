@@ -7,6 +7,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tools/probe/probe_board_vs_trips.py
+      - run: python3 tools/probe/probe_bus2.py
         env:
           OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
