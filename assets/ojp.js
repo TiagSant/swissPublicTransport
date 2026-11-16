@@ -292,6 +292,8 @@
           sections.push({
             journey: { category: info.category, number: info.number, name: info.name, operator: info.operator, operatorRef: info.operatorRef, to: info.to,
                        multiDest: info.multiDest,
+                       // US-61: cancelled in the live data (the run, or its stop where the rider boards or gets off)
+                       cancelled: txt(service, 'Cancelled') === 'true' || txt(board, 'NotServicedStop') === 'true' || txt(alight, 'NotServicedStop') === 'true',
                        // every stop of the ride with its times (planned, and live in prognosis), as in transport.opendata.ch
                        passList: [board, ...inter, alight].map(c => {
                          const ca = callTimes(c, 'ServiceArrival'), cd = callTimes(c, 'ServiceDeparture');
