@@ -13,6 +13,8 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - US-66: walking or riding, from the phone's own motion sensors (no Google service, nothing sent): still walking a
+           minute after the first vehicle left → other ways from there; the reading shown on the followed journey.
   - BUG-14: the journey followed has the better change place: "Follow" waits for the check; changes still ahead are
            checked on the way (a journey followed before the check, or an alternative found on the way).
   - US-38: a followed journey shows every step live (delays, platforms, progress); a missed connection is detected
@@ -585,6 +587,7 @@
     <label class="set-row"><span data-i18n="alightSetting"></span><input id="setAlight" type="checkbox"></label>
     <label class="set-row"><span data-i18n="footSetting"></span><span><input id="setFootMax" type="number" min="0" max="30" step="1" inputmode="numeric"> min</span></label>
     <label class="set-row"><span data-i18n="realWalkSetting"></span><input id="setRealWalk" type="checkbox"></label>
+    <label class="set-row"><span data-i18n="motionSetting"></span><input id="setMotion" type="checkbox"></label>
     <p class="note" data-i18n="realWalkNote"></p>
     <div class="set-row"><span data-i18n="notifications"></span><span><button id="enableNotif" class="ghost" data-i18n="enableNotif"></button> <span id="notifState" class="status"></span></span></div>
     <h4 data-i18n="simTitle"></h4>
@@ -711,6 +714,8 @@
       cancelNotify: '{line} at {dep} cancelled?', cancelNotifyBody: 'No longer in the live departures of {stop}. Open the app for what replaces it.',
       cancelTitle: '{line} at {dep}: cancelled?', cancelBody: 'It is no longer in the live departures of {stop}.', cancelOptions: 'Instead:',
       cancelSame: 'arrive {t}, as planned', cancelLater: 'arrive {t} ({n} min later)',
+      walkingTitle: 'You’re on foot: the {line} at {dep} left without you', walkingNotify: 'On foot: the {line} at {dep} left without you',
+      motionSetting: 'Tell walking from riding (the phone’s motion sensors; nothing is sent)', motionNow: 'Sensors: {state}', motionWalk: '🚶 walking', motionStill: 'still', motionVehicle: '🚋 in a vehicle', motionMoving: 'moving, no steps',
       lateNotify: 'You won’t make the {line} at {dep}', missedRideNotify: '{line} at {dep} missed?', lateNotifyBody: 'Open the app: other departures from where you are.',
       lateTitle: 'You won’t make the {line} at {dep}', missedRideTitle: '{line} at {dep} missed?', laterTitle: 'Leaving later: other departures', missedSaidTitle: '{line} at {dep} missed: other departures',
       lateOption: '{lines} at {dep} · leave {leave}', lateOnBoard: 'I’m on board after all', lateState: 'Not on the planned ride: choose another departure, or cancel.',
@@ -842,6 +847,8 @@
       cancelNotify: '{line} de {dep} supprimé ?', cancelNotifyBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}. Ouvrez l\u2019app pour le remplacer.',
       cancelTitle: '{line} de {dep} : supprimé ?', cancelBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}.', cancelOptions: 'À la place :',
       cancelSame: 'arrivée {t}, comme prévu', cancelLater: 'arrivée {t} ({n} min plus tard)',
+      walkingTitle: 'Vous êtes à pied : le {line} de {dep} est parti sans vous', walkingNotify: 'À pied : le {line} de {dep} est parti sans vous',
+      motionSetting: 'Distinguer marche et véhicule (capteurs de mouvement du téléphone ; rien n\u2019est envoyé)', motionNow: 'Capteurs : {state}', motionWalk: '🚶 à pied', motionStill: 'immobile', motionVehicle: '🚋 dans un véhicule', motionMoving: 'en mouvement, sans pas',
       lateNotify: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideNotify: '{line} de {dep} manqué ?', lateNotifyBody: 'Ouvrez l\u2019app : d\u2019autres départs depuis où vous êtes.',
       lateTitle: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideTitle: '{line} de {dep} manqué ?', laterTitle: 'Départ plus tard : autres départs', missedSaidTitle: '{line} de {dep} manqué : autres départs',
       lateOption: '{lines} à {dep} · partir à {leave}', lateOnBoard: 'Je suis à bord', lateState: 'Pas dans le véhicule prévu : choisissez un autre départ, ou annulez.',
@@ -1854,7 +1861,7 @@
   // ---------- Settings (US-18) ----------
   // Walking time = straight-line distance × DETOUR / walking speed (streets are rarely straight).
   const DETOUR = 1.3;
-  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true, footMaxMin: 15, realWalk: true };
+  const DEFAULT_SETTINGS = { prepMin: 10, speedKmh: 4.8, marginMin: 1, learned: 0, samples: [], alightReminder: true, footMaxMin: 15, realWalk: true, motionSensors: true };
   const getSettings = () => Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {}));
   const saveSettings = s => store.set('settings', s);
   const speedMPerMin = () => getSettings().speedKmh * 1000 / 60;
@@ -3294,6 +3301,70 @@
   }
   // US-62: late start, or the first ride missed. Watched with the GPS from the time to leave until a few minutes
   // after the first ride left (not when already on board, nor once flagged or dismissed)
+  // ---------- US-66: walking or not, from the phone's own motion sensors ----------
+  // The browser's accelerometer (W3C DeviceMotion; in the APK, Android's own SensorManager), read on the phone only:
+  // no Google service, nothing sent. Every 2 s, the last 4 s are looked at: walking shows as steps (a regular swing
+  // of 1.3–3.3 Hz, strong enough), still as almost no movement, anything else as moving without steps (a vehicle, or
+  // standing with the phone in hand: the GPS speed, when there is one, tells them apart). Only walking drives a
+  // decision (a first ride gone without the rider); the rest is shown.
+  const motion = { listening: false, perm: null, buf: [], ts: 0, lastWin: 0, wins: [], kind: null, since: 0 };
+  const MOTION_WIN_MS = 4000, MOTION_STEP_MS = 2000, WALK_SD = 0.8, WALK_PEAK = 0.3, STILL_SD = 0.08, WALKING_MS = 60000;
+  function classifyMotion(buf) {
+    if (buf.length < 40) return null;
+    const span = (buf[buf.length - 1][0] - buf[0][0]) / 1000;
+    if (span < 3) return null;
+    const hz = (buf.length - 1) / span, n = buf.length;
+    const mean = buf.reduce((x, b) => x + b[1], 0) / n, x = buf.map(b => b[1] - mean);
+    const energy = x.reduce((e, v) => e + v * v, 0), sd = Math.sqrt(energy / n);
+    if (sd < STILL_SD) return { kind: 'still', sd, peak: 0 };
+    let peak = 0;   // the strongest regular swing at a step's pace (autocorrelation)
+    for (let lag = Math.max(1, Math.round(0.3 * hz)); lag <= Math.round(0.77 * hz) && lag < n - 1; lag++) {
+      let c = 0; for (let i = 0; i + lag < n; i++) c += x[i] * x[i + lag];
+      peak = Math.max(peak, (c / energy) * (n / (n - lag)));
+    }
+    return { kind: sd >= WALK_SD && peak >= WALK_PEAK ? 'walk' : 'moving', sd, peak };
+  }
+  function onMotion(e) {
+    const g = e.accelerationIncludingGravity || e.acceleration;
+    if (!g || g.x == null) return;
+    const step = e.interval > 0 ? (e.interval < 1 ? e.interval * 1000 : e.interval) : 16;   // ms (some browsers: s)
+    const ts = motion.ts = Math.max(Date.now(), motion.ts + step);
+    motion.buf.push([ts, Math.hypot(g.x, g.y, g.z)]);
+    while (motion.buf.length && motion.buf[0][0] < ts - MOTION_WIN_MS) motion.buf.shift();
+    if (ts - motion.lastWin < MOTION_STEP_MS) return;
+    motion.lastWin = ts;
+    const w = classifyMotion(motion.buf);
+    if (!w) return;
+    motion.wins.push(w.kind); if (motion.wins.length > 3) motion.wins.shift();
+    const votes = motion.wins.filter(k => k === w.kind).length;
+    const kind = votes >= 2 || motion.kind == null ? w.kind : motion.kind;   // 2 windows of 3 to change (~4 s)
+    if (kind !== motion.kind) {
+      const was = motion.kind; motion.kind = kind; motion.since = ts - (votes >= 2 ? MOTION_STEP_MS : 0);
+      if (was !== kind && !$('alarmCard').hidden) renderAlarms();
+    }
+  }
+  const motionOn = () => getSettings().motionSensors !== false;
+  const tripOver = (a, now) => { const end = a.plan && tripArrival(a.plan); return end != null && now > end + 10 * 60000; };
+  // Walking without a stop for at least a minute, all of it after t
+  const motionFresh = now => motion.listening && motion.kind && motion.ts >= now - 10000;   // no samples for 10 s (page asleep): unknown
+  const walkingSince = (t, now) => motionOn() && motionFresh(now) && motion.kind === 'walk' && motion.since <= now - WALKING_MS && now - WALKING_MS >= t;
+  function updateMotionWatch() {
+    const need = motionOn() && motion.perm !== 'denied' && getAlarms().some(a => a.plan && !tripOver(a, Date.now()));
+    if (need && !motion.listening && 'DeviceMotionEvent' in window) { window.addEventListener('devicemotion', onMotion); motion.listening = true; }
+    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null }); }
+  }
+  // iOS asks once, on a tap ("Follow"); Android does not ask
+  function askMotionPermission() {
+    if (!motionOn() || motion.perm || typeof DeviceMotionEvent === 'undefined' || typeof DeviceMotionEvent.requestPermission !== 'function') return;
+    motion.perm = 'asked';
+    DeviceMotionEvent.requestPermission().then(r => { motion.perm = r === 'granted' ? 'granted' : 'denied'; updateMotionWatch(); }).catch(() => { motion.perm = 'denied'; });
+  }
+  function motionLine(a, now) {
+    if (!motionOn() || !motionFresh(now) || !a.plan || tripOver(a, now)) return '';
+    const fast = gpsFresh(now) && gps.speed > 4;   // > 14 km/h
+    const state = motion.kind === 'walk' ? t('motionWalk') : motion.kind === 'still' ? t('motionStill') : fast ? t('motionVehicle') : t('motionMoving');
+    return `<div class="status" data-k="motion">${esc(t('motionNow', { state }))}</div>`;
+  }
   function lateWatched(a, now) {
     if (!a.plan || a.onBoard || a.late) return null;
     const r = a.plan.find(l => l.type === 'ride');
@@ -3305,7 +3376,9 @@
   // at its stop or at home
   function checkLate(a, now) {
     const r = lateWatched(a, now);
-    if (!r || !gpsFresh(now)) return null;
+    if (!r) return null;
+    if (walkingSince(depOf(r), now)) return 'walking';   // US-66: still walking a minute after it left: not on board
+    if (!gpsFresh(now)) return null;
     const p = gps.fix.p, dStop = distanceM(p, r.from.coord), dep = depOf(r);
     if (now < dep) {
       const eta = dStop <= NEAR_M ? now : now + walkMinutes(dStop) * 60000;
@@ -3322,6 +3395,7 @@
     a.alts = null;
     const line = `${modeName(r.mode)} ${r.label}`, dep = hhmm(new Date(depOf(r)));
     if (reason === 'late' || reason === 'missed') fireTrip(t(reason === 'late' ? 'lateNotify' : 'missedRideNotify', { line, dep }), t('lateNotifyBody'));
+    if (reason === 'walking') { a.late.left = true; fireTrip(t('walkingNotify', { line, dep }), t('lateNotifyBody')); }
   }
   // US-45: a stay is watched from its arrival until 30 min after its planned end
   const stayWatched = (a, now) => (a.plan || []).map((l, k) => ({ l, k })).filter(({ l }) => l.type === 'stay' && l.place && l.place.coord &&
@@ -3342,7 +3416,9 @@
   function onGpsFix(pos) {
     if (pos.coords.accuracy > GPS_MAX_ACC) return;
     const first = !gpsFresh(Date.now());
-    gps.fix = { p: [pos.coords.latitude, pos.coords.longitude], t: Date.now() };
+    const prev = gps.fix, p = [pos.coords.latitude, pos.coords.longitude], tNow = Date.now();
+    gps.speed = pos.coords.speed != null ? pos.coords.speed : prev && tNow - prev.t > 3000 ? distanceM(prev.p, p) / ((tNow - prev.t) / 1000) : gps.speed;   // m/s
+    gps.fix = { p, t: tNow };
     checkGpsAlights();
     checkGpsStart();
     checkGpsStays();
@@ -3440,6 +3516,7 @@
   // from Sainte-Clotilde instead of staying on to Jonction): wait for the check (a few seconds at most), then follow
   // the journey as it is now shown
   async function followWhenReady(j, btn) {
+    askMotionPermission();   // US-66: on the tap (iOS asks then)
     const key = (j.base || j).key, raw = journeyBase.find(x => x.key === key);
     if (raw && !raw._done) {
       btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> ${esc(t('loading'))}`;
@@ -3479,6 +3556,7 @@
 
   function renderAlarms() {
     const list = getAlarms(), s = getSettings();
+    updateMotionWatch();
     const told = list.filter(a => a.toast);   // US-63: the followed run changed by itself: say so once
     if (told.length) { const msg = told[0].toast; told.forEach(a => delete a.toast); saveAlarms(list); showToast(msg, null); }
     $('alarmCard').hidden = list.length === 0;
@@ -3496,7 +3574,7 @@
         <div class="al-line">${lineIdHtml(f.mode, f.style, f.label, true)} <span>→ ${esc(f.to)} · ${esc(f.stopName)}${esc(plat)}</span></div>
         <div class="status" data-k="src">${esc(src)} · ${esc(t('walkInfo', { min: fmtMin(tm.walk), speed: s.speedKmh.toFixed(1), margin: s.marginMin, prep: s.prepMin }))}</div>
         ${a.onBoard ? `<div class="status" data-k="onboard">${esc(t('onBoard'))}</div>` : tight}
-        ${alightLine(a, s)}
+        ${alightLine(a, s)}${motionLine(a, Date.now())}
         ${tripHtml(a)}
         <div class="al-actions">
           <button class="ghost" data-act="test-ready">${esc(t('testReady'))}</button>
@@ -3740,10 +3818,13 @@
       .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 3)
       .map(jj => ({ kind: 'cancel', fromIdx: idx, dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), arrive: jj.arriveAt.getTime(),
         later: Math.floor(jj.arriveAt.getTime() / 60000) - Math.floor(endAt / 60000),
-        lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
+        lines: linesOf(jj), plan: planOf(jj) }));
   }
   // US-62: other departures after a late start or a missed first ride: from the rider's position when known (another
   // stop may suit better), else from where the trip starts (not left yet) or from the stop; without the run missed
+  // The lines of an option, with the walk of a shortcut (US-64 / US-65): "🚶 Genève, Stand › Tram 14"
+  const linesOf = jj => [jj.shortcut && jj.shortcut.start ? `🚶 ${jj.shortcut.stop}` : null, ...jj.rides.map(x => `${modeName(x.mode)} ${x.label}`),
+    jj.shortcut && !jj.shortcut.start ? '🚶' : null].filter(Boolean).join(' › ');
   async function findLater(a) {
     const idx = a.plan.findIndex(l => l.type === 'ride'), r = a.plan[idx], dest = destAfter(a, idx);
     if (!r || !dest) return [];
@@ -3754,7 +3835,8 @@
     // leaving later: after the time planned to leave, not before
     const earliest = Math.max(point || a.late.reason !== 'later' ? now : now + (alarmTimes(a).walk + getSettings().marginMin) * 60000,
       a.late.reason === 'later' && a.late.leave ? a.late.leave + 60000 : 0);
-    const list = await journeysBetween(from, dest, { mode: 'depart', at: new Date(earliest) }, null);
+    let list = await journeysBetween(from, dest, { mode: 'depart', at: new Date(earliest) }, null);
+    list = list.concat(shortcutJourneys(list, point || from, dest, earliest - 60000));   // US-64 / US-65: walking part of it
     const endAt = arrivalBefore(a.plan, segmentEnd(a.plan, idx));
     const theRun = x => String(x.category) === String(r.category) && String(x.number) === String(r.number) && Math.abs(+x.dep - r.dep) < 90000;
     return list.filter(jj => jj.leaveAt.getTime() >= earliest - 60000 && !jj.rides.some(theRun) && !isCancelled(jj) && !journeyWaits(jj).missed)
@@ -3762,7 +3844,7 @@
       .map(jj => ({ kind: 'late', fromIdx: point ? seg : idx, origin: point ? point.coord : null, accessMeters: point ? jj.accessMeters : null,
         dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), leave: jj.leaveAt.getTime(), arrive: jj.arriveAt.getTime(),
         later: Math.floor(jj.arriveAt.getTime() / 60000) - Math.floor(endAt / 60000),
-        lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
+        lines: linesOf(jj), plan: planOf(jj) }));
   }
   // US-63: the earlier run boarded becomes the followed one: its times, its stops' times, then the get-off reminders
   function followEarlierRun(a, idx, { j, n }) {
@@ -3835,7 +3917,7 @@
     const out = list.filter(jj => jj.leaveAt.getTime() >= start - 60000 && !isCancelled(jj) && !journeyWaits(jj).missed)
       .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 3)
       .map(jj => ({ kind: 'here', fromIdx, dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), leave: jj.leaveAt.getTime(), arrive: jj.arriveAt.getTime(),
-        later: vs(jj.arriveAt.getTime()), lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
+        later: vs(jj.arriveAt.getTime()), lines: linesOf(jj), plan: planOf(jj) }));
     const fromC = from.coord, straight = distanceM(fromC, dest.coord), rt = routeCached(fromC, dest.coord);
     const min = rt ? routeMin(rt.meters) : walkMinutes(straight), meters = rt ? rt.meters : straight * DETOUR;
     if (min <= 60) {
@@ -4280,12 +4362,12 @@
   function lateHtml(a) {
     if (!a.late) return '';
     const r = a.plan.find(l => l.type === 'ride'), line = `${modeName(r.mode)} ${r.label}`, dep = hhmm(new Date(a.late.dep));
-    const title = t({ late: 'lateTitle', missed: 'missedRideTitle', later: 'laterTitle', missedSaid: 'missedSaidTitle' }[a.late.reason] || 'laterTitle', { line, dep });
+    const title = t({ late: 'lateTitle', missed: 'missedRideTitle', later: 'laterTitle', missedSaid: 'missedSaidTitle', walking: 'walkingTitle' }[a.late.reason] || 'laterTitle', { line, dep });
     const list = a.alts && a.alts.for === 'late' ? a.alts.list : null;
     const opts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? `<small>${esc(t('altNone'))}</small>` :
       `<small>${esc(t('cancelOptions'))}</small>` + altButtons(list, o => t('lateOption', { lines: o.lines, dep: hhmm(new Date(o.dep)), leave: hhmm(new Date(o.leave)) }),
         o => arriveVsPlan(o));
-    const back = a.late.reason === 'missed' ? `<button class="ghost" data-act="late-ok">${esc(t('lateOnBoard'))}</button>` : '';
+    const back = a.late.reason === 'missed' || a.late.reason === 'walking' ? `<button class="ghost" data-act="late-ok">${esc(t('lateOnBoard'))}</button>` : '';
     return `<div class="trip-warn"><b>${esc(title)}</b>${opts}${back}</div>`;
   }
   // US-61: the first ride cancelled: what replaces it, in one tap
@@ -4636,6 +4718,7 @@
     const s = getSettings();
     $('setPrep').value = s.prepMin; $('setSpeed').value = s.speedKmh.toFixed(1); $('setMargin').value = s.marginMin;
     $('setAlight').checked = s.alightReminder !== false;
+    $('setMotion').checked = s.motionSensors !== false;
     $('setRealWalk').checked = s.realWalk !== false;
     $('setFootMax').value = s.footMaxMin;
     const last = s.samples && s.samples.length ? s.samples[s.samples.length - 1].kmh.toFixed(1) : null;
@@ -4654,6 +4737,7 @@
     s.speedKmh = Math.round(num('setSpeed', 2, 8, s.speedKmh) * 10) / 10;
     s.marginMin = Math.round(num('setMargin', 0, 15, s.marginMin));
     s.alightReminder = $('setAlight').checked;
+    s.motionSensors = $('setMotion').checked;
     s.realWalk = $('setRealWalk').checked;
     s.footMaxMin = Math.round(num('setFootMax', 0, 30, s.footMaxMin));
     saveSettings(s); renderAlarms(); tickAlarms();
@@ -4913,7 +4997,7 @@
   $('walkStop').addEventListener('click', () => { finishWalkTracking(); $('walkStatus').hidden = true; });
   $('settingsBtn').addEventListener('click', () => { unlockAudio(); renderSettings(); $('settingsSheet').hidden = false; });
   $('settingsClose').addEventListener('click', () => { $('settingsSheet').hidden = true; });
-  ['setPrep', 'setSpeed', 'setMargin', 'setAlight', 'setFootMax', 'setRealWalk'].forEach(id => $(id).addEventListener('change', readSettingsForm));
+  ['setPrep', 'setSpeed', 'setMargin', 'setAlight', 'setFootMax', 'setRealWalk', 'setMotion'].forEach(id => $(id).addEventListener('change', readSettingsForm));
   $('resetLearning').addEventListener('click', () => {
     const s = getSettings(); s.speedKmh = DEFAULT_SETTINGS.speedKmh; s.learned = 0; s.samples = [];
     saveSettings(s); renderSettings(); renderAlarms();
