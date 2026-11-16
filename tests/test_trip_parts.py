@@ -150,10 +150,13 @@ with sync_playwright() as p:
     print("delay       → stay 26 min instead of 30: later part 2 offered (bus 3 08:30)")
 
     # ---- position: leaving the stopover early
-    ctx, pg = session(b, s2, geo={"latitude": 46.2047, "longitude": 6.1431})
+    # at Plainpalais for the bus 1 at 07:35, then on it (US-62: a position elsewhere before it leaves now means it is missed)
+    ctx, pg = session(b, s2, geo={"latitude": 46.1983, "longitude": 6.1416})
     pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")
     pg.click("#journeyList .jr >> nth=0"); pg.click("#journeyList .jr-detail .set-alarms"); pg.wait_for_selector("#alarmList .trip"); dismiss(pg)
-    pg.clock.run_for(int((at(11) - NOW).total_seconds() * 1000)); dismiss(pg)   # 07:41: at Bel-Air
+    pg.clock.run_for(int((at(5.5) - NOW).total_seconds() * 1000)); dismiss(pg)
+    ctx.set_geolocation({"latitude": 46.2047, "longitude": 6.1431}); pg.wait_for_timeout(400)
+    pg.clock.run_for(int((at(11) - at(5.5)).total_seconds() * 1000)); dismiss(pg)   # 07:41: at Bel-Air
     pg.wait_for_timeout(1500); pg.clock.run_for(6000); pg.wait_for_timeout(1500)
     assert pg.evaluate("JSON.parse(localStorage.getItem('tpp:alarms'))[0].staySeen"), "not seen at the stay"
     ctx.set_geolocation({"latitude": 46.2095, "longitude": 6.1420})                # 550 m away, 08:10 - 25 min

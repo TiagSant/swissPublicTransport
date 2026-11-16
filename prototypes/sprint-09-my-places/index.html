@@ -705,6 +705,10 @@
       cancelNotify: '{line} at {dep} cancelled?', cancelNotifyBody: 'No longer in the live departures of {stop}. Open the app for what replaces it.',
       cancelTitle: '{line} at {dep}: cancelled?', cancelBody: 'It is no longer in the live departures of {stop}.', cancelOptions: 'Instead:',
       cancelSame: 'arrive {t}, as planned', cancelLater: 'arrive {t} ({n} min later)',
+      lateNotify: 'You won’t make the {line} at {dep}', missedRideNotify: '{line} at {dep} missed?', lateNotifyBody: 'Open the app: other departures from where you are.',
+      lateTitle: 'You won’t make the {line} at {dep}', missedRideTitle: '{line} at {dep} missed?', laterTitle: 'Leaving later: other departures', missedSaidTitle: '{line} at {dep} missed: other departures',
+      lateOption: '{lines} at {dep} · leave {leave}', lateOnBoard: 'I’m on board after all', lateState: 'Not on the planned ride: choose another departure, or cancel.',
+      leaveLater: 'I’m leaving later', missedIt: 'I missed the {line}',
       allMissed: 'With the current delays, the changes of the journeys found are missed. Try a later departure.',
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
       altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
@@ -830,6 +834,10 @@
       cancelNotify: '{line} de {dep} supprimé ?', cancelNotifyBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}. Ouvrez l\u2019app pour le remplacer.',
       cancelTitle: '{line} de {dep} : supprimé ?', cancelBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}.', cancelOptions: 'À la place :',
       cancelSame: 'arrivée {t}, comme prévu', cancelLater: 'arrivée {t} ({n} min plus tard)',
+      lateNotify: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideNotify: '{line} de {dep} manqué ?', lateNotifyBody: 'Ouvrez l\u2019app : d\u2019autres départs depuis où vous êtes.',
+      lateTitle: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideTitle: '{line} de {dep} manqué ?', laterTitle: 'Départ plus tard : autres départs', missedSaidTitle: '{line} de {dep} manqué : autres départs',
+      lateOption: '{lines} à {dep} · partir à {leave}', lateOnBoard: 'Je suis à bord', lateState: 'Pas dans le véhicule prévu : choisissez un autre départ, ou annulez.',
+      leaveLater: 'Je pars plus tard', missedIt: 'J\u2019ai raté le {line}',
       allMissed: 'Avec les retards actuels, les correspondances des itinéraires trouvés sont manquées. Essayez un départ plus tard.',
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
       altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
@@ -3156,12 +3164,43 @@
     if (a.fired.leave && !a.early) return null;   // left at the planned time: nothing to adjust
     return r;
   }
+  // US-62: late start, or the first ride missed. Watched with the GPS from the time to leave until a few minutes
+  // after the first ride left (not when already on board, nor once flagged or dismissed)
+  function lateWatched(a, now) {
+    if (!a.plan || a.onBoard || a.late) return null;
+    const r = a.plan.find(l => l.type === 'ride');
+    if (!r || !r.from.coord || r.missing || a.lateOk === r.dep) return null;
+    if (now < alarmTimes(a).leave || now > depOf(r) + 6 * 60000) return null;
+    return r;
+  }
+  // 'late': it can no longer be reached on foot before it leaves; 'missed': it left 2 min ago and the rider is still
+  // at its stop or at home
+  function checkLate(a, now) {
+    const r = lateWatched(a, now);
+    if (!r || !gpsFresh(now)) return null;
+    const p = gps.fix.p, dStop = distanceM(p, r.from.coord), dep = depOf(r);
+    if (now < dep) {
+      const eta = dStop <= NEAR_M ? now : now + walkMinutes(dStop) * 60000;
+      return eta > dep + 30000 ? 'late' : null;
+    }
+    if (now < dep + 2 * 60000) return null;
+    const atHome = a.origin && distanceM(p, a.origin) < LEFT_HOME_M;
+    return dStop <= 150 || atHome ? 'missed' : null;
+  }
+  function setLate(a, reason, now) {
+    const r = a.plan.find(l => l.type === 'ride');
+    a.late = { reason, at: now, dep: r.dep, gps: gpsFresh(now) ? gps.fix.p : null, left: !!(a.fired.leave || a.early), leave: alarmTimes(a).leave };
+    a.fired.ready = a.fired.ready || now; a.fired.leave = a.fired.leave || now;   // the planned departure alarms no longer apply
+    a.alts = null;
+    const line = `${modeName(r.mode)} ${r.label}`, dep = hhmm(new Date(depOf(r)));
+    if (reason === 'late' || reason === 'missed') fireTrip(t(reason === 'late' ? 'lateNotify' : 'missedRideNotify', { line, dep }), t('lateNotifyBody'));
+  }
   // US-45: a stay is watched from its arrival until 30 min after its planned end
   const stayWatched = (a, now) => (a.plan || []).map((l, k) => ({ l, k })).filter(({ l }) => l.type === 'stay' && l.place && l.place.coord &&
     now >= (arrivalBefore(a.plan, a.plan.indexOf(l)) || l.from) - 5 * 60000 && now <= l.until + 30 * 60000);
   function updateGpsWatch() {
     const now = Date.now();
-    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord) || getAlarms().some(a => startWatched(a, now) || stayWatched(a, now).length);
+    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord) || getAlarms().some(a => startWatched(a, now) || lateWatched(a, now) || stayWatched(a, now).length);
     if (need && !gps.watch && !gps.denied && navigator.geolocation) {
       gps.watch = navigator.geolocation.watchPosition(onGpsFix, err => {
         if (err && err.code === 1) { gps.denied = true; stopGpsWatch(); renderAlarms(); }
@@ -3320,11 +3359,27 @@
           <button class="ghost" data-act="test-ready">${esc(t('testReady'))}</button>
           <button class="ghost" data-act="test-leave">${esc(t('testLeave'))}</button>
           ${(a.alights || []).length ? `<button class="ghost" data-act="test-alight">${esc(t('testAlight'))}</button>` : ''}
+          ${lateButton(a)}
           <button class="ghost" data-act="cancel">${esc(t('cancel'))}</button>
         </div></li>`;
     }).join('');
   }
 
+  // US-62: "I'm leaving later" before the first ride leaves, "I missed the …" until it arrives
+  function lateButton(a) {
+    const r = a.plan && a.plan.find(l => l.type === 'ride'), now = Date.now();
+    if (!r || a.late || r.missing || arrOf(r) < now) return '';
+    return depOf(r) > now ? `<button class="ghost" data-act="late">${esc(t('leaveLater'))}</button>`
+      : `<button class="ghost" data-act="late">${esc(t('missedIt', { line: `${modeName(r.mode)} ${r.label}` }))}</button>`;
+  }
+  async function markLate(id, reason) {
+    const list = getAlarms(), a = list.find(x => x.id === id); if (!a) return;
+    setLate(a, reason, Date.now());
+    saveAlarms(list); renderAlarms();
+    try { a.alts = { for: 'late', at: Date.now(), list: await findLater(a) }; } catch { a.alts = { for: 'late', at: Date.now(), list: [] }; }
+    const fresh = getAlarms(), b = fresh.find(x => x.id === id);
+    if (b) { b.late = a.late; b.alts = a.alts; saveAlarms(fresh); renderAlarms(); }
+  }
   function tickAlarms() {
     const now = Date.now(), s = getSettings();
     let list = getAlarms(), changed = false;
@@ -3343,7 +3398,7 @@
       });
       // get-off reminders: only the latest one due rings (no burst after the phone slept); while they are
       // switched off, due reminders are marked as passed so they don't ring when switched back on
-      const due = (a.alights || []).map((x, n) => ({ x, n }))
+      const due = a.late ? [] : (a.alights || []).map((x, n) => ({ x, n }))   // US-62: not on the ride missed
         .filter(({ x, n }) => !a.fired['alight' + n] && now >= alightAt(a, x) && !(s.alightReminder !== false && gpsHolds(a, x, n, now)));
       if (due.length) {
         due.forEach(({ n }) => { a.fired['alight' + n] = now; });
@@ -3353,7 +3408,7 @@
       }
     }
     // forget alarms 10 min after the departure, or after the last get-off reminder
-    const kept = list.filter(a => now <= Math.max(alarmTimes(a, s).dep, lastAlightAt(a), (a.plan && tripArrival(a.plan)) || 0) + 10 * 60000);
+    const kept = list.filter(a => now <= Math.max(alarmTimes(a, s).dep, lastAlightAt(a), (a.plan && tripArrival(a.plan)) || 0, a.late ? a.late.at + 50 * 60000 : 0) + 10 * 60000);
     if (changed || kept.length !== list.length) { saveAlarms(kept); renderAlarms(); }
   }
 
@@ -3521,6 +3576,28 @@
         later: Math.floor(jj.arriveAt.getTime() / 60000) - Math.floor(endAt / 60000),
         lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
   }
+  // US-62: other departures after a late start or a missed first ride: from the rider's position when known (another
+  // stop may suit better), else from where the trip starts (not left yet) or from the stop; without the run missed
+  async function findLater(a) {
+    const idx = a.plan.findIndex(l => l.type === 'ride'), r = a.plan[idx], dest = destAfter(a, idx);
+    if (!r || !dest) return [];
+    const now = Date.now(), here = a.late && a.late.gps;
+    let seg = idx; while (seg > 0 && a.plan[seg - 1].type !== 'stay') seg--;
+    const point = here ? { kind: 'point', coord: here, near: null } : (a.late.reason === 'later' || !a.late.left) && a.origin && seg === 0 ? { kind: 'point', coord: a.origin, near: null } : null;
+    const from = point || { kind: 'stop', id: r.from.id, name: r.from.name, coord: r.from.coord };
+    // leaving later: after the time planned to leave, not before
+    const earliest = Math.max(point || a.late.reason !== 'later' ? now : now + (alarmTimes(a).walk + getSettings().marginMin) * 60000,
+      a.late.reason === 'later' && a.late.leave ? a.late.leave + 60000 : 0);
+    const list = await journeysBetween(from, dest, { mode: 'depart', at: new Date(earliest) }, null);
+    const endAt = arrivalBefore(a.plan, segmentEnd(a.plan, idx));
+    const theRun = x => String(x.category) === String(r.category) && String(x.number) === String(r.number) && Math.abs(+x.dep - r.dep) < 90000;
+    return list.filter(jj => jj.leaveAt.getTime() >= earliest - 60000 && !jj.rides.some(theRun) && !isCancelled(jj) && !journeyWaits(jj).missed)
+      .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 3)
+      .map(jj => ({ kind: 'late', fromIdx: point ? seg : idx, origin: point ? point.coord : null, accessMeters: point ? jj.accessMeters : null,
+        dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), leave: jj.leaveAt.getTime(), arrive: jj.arriveAt.getTime(),
+        later: Math.floor(jj.arriveAt.getTime() / 60000) - Math.floor(endAt / 60000),
+        lines: jj.rides.map(x => `${modeName(x.mode)} ${x.label}`).join(' › '), plan: planOf(jj) }));
+  }
   async function findEarlier(a, idx) {
     const r = a.plan[idx], dest = destAfter(a, idx);
     if (!r.from.id || !dest) return [];
@@ -3625,6 +3702,14 @@
     // US-61: the first ride no longer in the live data (cancelled?): warn once, and offer what replaces it
     const firstIdx = a.plan.findIndex(l => l.type === 'ride'), first = firstIdx >= 0 ? a.plan[firstIdx] : null;
     const gone = first && first.missing && depOf(first) > now - 2 * 60000;
+    // US-62: late start or first ride missed (GPS, or the rider said so): other departures from where the rider is
+    const why = !gone && checkLate(a, now);
+    if (why) { setLate(a, why, now); changed = true; }
+    if (a.late && !gone && (!a.alts || a.alts.for !== 'late' || now - a.alts.at > 2 * 60000)) {
+      a.alts = { for: 'late', at: now, list: null };
+      try { a.alts.list = await findLater(a); } catch { a.alts.list = []; }
+      changed = true;
+    }
     if (gone) {
       const key = 'cancel' + first.dep;
       if (!a.fired[key]) {
@@ -3638,7 +3723,7 @@
       }
     }
     // US-44: left early or at the first stop early: earlier ways, refreshed every 3 min
-    if (!gone && a.early && firstIdx >= 0 && depOf(a.plan[firstIdx]) > now) {
+    if (!gone && !a.late && a.early && firstIdx >= 0 && depOf(a.plan[firstIdx]) > now) {
       const wait = Math.floor((depOf(a.plan[firstIdx]) - a.early.eta) / 60000);
       if (wait >= EARLY_MIN && (!a.alts || a.alts.for !== 'early' || now - a.alts.at > 3 * 60000)) {
         a.alts = { for: 'early', at: now, list: null };
@@ -3660,7 +3745,7 @@
     }
     // US-39: a tight change (no missed one): look for options with a comfortable margin
     const missedOne = tripConnections(a.plan).some(c => (c.state === 'missed' || c.next.missing) && depOf(c.next) > now - 10 * 60000);
-    const busy = gone || (a.alts && /^(stay|early)/.test(String(a.alts.for)) && now - a.alts.at < 5 * 60000);   // the rider's own options first
+    const busy = gone || !!a.late || (a.alts && /^(stay|early)/.test(String(a.alts.for)) && now - a.alts.at < 5 * 60000);   // the rider's own options first
     const tight = !missedOne && !busy && tripConnections(a.plan).find(c => c.state === 'tight' && depOf(c.cur) > now - 60000);
     if (tight && (!a.alts || a.alts.for !== 'tight' + tight.next.dep || now - a.alts.at > 2 * 60000)) {
       a.alts = { for: 'tight' + tight.next.dep, at: now, list: null };
@@ -3800,12 +3885,17 @@
     if (!a || !a.alts || !a.alts.list || !a.alts.list[n]) return;
     const o = a.alts.list[n];
     let what, firstChanged = false, keepFrom = null;
-    if (o.kind === 'stay' || o.kind === 'early' || o.kind === 'cancel') {
+    if (o.kind === 'stay' || o.kind === 'early' || o.kind === 'cancel' || o.kind === 'late') {
       const from = o.kind === 'stay' ? o.k + 1 : o.fromIdx;
       if (o.kind === 'stay') { const st = a.plan[o.k]; st.until = o.leave; st.changed = true; if (a.stayGps) delete a.stayGps[o.k]; delete a.fired['stay' + o.k]; }
       a.plan = spliceSegment(a.plan, from, o.plan);
       what = `${o.lines} ${hhmm(new Date(o.dep))}`; keepFrom = from;
       if (o.kind === 'early' || o.kind === 'cancel') { const keep = { ready: a.fired.ready, leave: a.fired.leave }; syncFirst(a); Object.assign(a.fired, keep); }
+      if (o.kind === 'late') {   // US-62: not left yet: the departure alarms ring again for the new departure, when still ahead
+        if (o.origin) { a.origin = o.origin; a.accessMeters = o.accessMeters || 0; }
+        delete a.late; a.early = null; a.onBoard = false;
+        syncFirst(a);
+      }
     }
     const forDep = String(a.alts.for).replace(/^tight/, '');
     const c = keepFrom != null ? null : tripConnections(a.plan).find(x => String(x.next.dep) === forDep);
@@ -3879,6 +3969,20 @@
     return `<li class="tl stay"><b>${l.back ? '⇄' : '⏸'} ${esc(head)}</b><small>${esc(when)}</small>${actions}${opts}</li>`;
   }
   // US-44: left early / at the stop early
+  const arriveVsPlan = o => o.later > 0 ? t('cancelLater', { t: hhmm(new Date(o.arrive)), n: o.later })
+    : o.later < 0 ? t('altEarlyDetail', { t: hhmm(new Date(o.arrive)), n: -o.later }) : t('cancelSame', { t: hhmm(new Date(o.arrive)) });
+  // US-62: late start or first ride missed: other departures, in one tap (or "I'm on board" when the GPS was wrong)
+  function lateHtml(a) {
+    if (!a.late) return '';
+    const r = a.plan.find(l => l.type === 'ride'), line = `${modeName(r.mode)} ${r.label}`, dep = hhmm(new Date(a.late.dep));
+    const title = t({ late: 'lateTitle', missed: 'missedRideTitle', later: 'laterTitle', missedSaid: 'missedSaidTitle' }[a.late.reason] || 'laterTitle', { line, dep });
+    const list = a.alts && a.alts.for === 'late' ? a.alts.list : null;
+    const opts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? `<small>${esc(t('altNone'))}</small>` :
+      `<small>${esc(t('cancelOptions'))}</small>` + altButtons(list, o => t('lateOption', { lines: o.lines, dep: hhmm(new Date(o.dep)), leave: hhmm(new Date(o.leave)) }),
+        o => arriveVsPlan(o));
+    const back = a.late.reason === 'missed' ? `<button class="ghost" data-act="late-ok">${esc(t('lateOnBoard'))}</button>` : '';
+    return `<div class="trip-warn"><b>${esc(title)}</b>${opts}${back}</div>`;
+  }
   // US-61: the first ride cancelled: what replaces it, in one tap
   function cancelHtml(a, now) {
     const r = a.plan && a.plan.find(l => l.type === 'ride');
@@ -3887,7 +3991,7 @@
     const head = `<b>${esc(t('cancelTitle', { line: `${modeName(r.mode)} ${r.label}`, dep: hhmm(new Date(r.dep)) }))}</b><span>${esc(t('cancelBody', { stop: r.from.name }))}</span>`;
     const opts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? `<small>${esc(t('altNone'))}</small>` :
       `<small>${esc(t('cancelOptions'))}</small>` + altButtons(list, o => t('altEarly', { lines: o.lines, dep: hhmm(new Date(o.dep)) }),
-        o => t(o.later > 0 ? 'cancelLater' : 'cancelSame', { t: hhmm(new Date(o.arrive)), n: o.later }));
+        o => arriveVsPlan(o));
     return `<div class="trip-warn">${head}${opts}</div>`;
   }
   function earlyHtml(a, now) {
@@ -3919,6 +4023,7 @@
       state = t('tripNowWait', { line: `${modeName(nextRide.mode)} ${nextRide.label}`, t: hhmm(new Date(depOf(nextRide))), stop: nextRide.from.name,
         plat: p ? ` (${t(nextRide.mode === 'train' ? 'track' : 'platform', { p })})` : '' });
     } else state = t('tripNowWalk', { to: placeLabel(a.dest) || t('yourDestination') });
+    if (a.late) state = t('lateState');   // US-62: not on the ride planned: waiting for the rider's choice
     const stayNow = plan.find(l => l.type === 'stay' && arrivalBefore(plan, plan.indexOf(l)) <= now && l.until > now);
     if (stayNow && !onBoard) state = t(stayNow.back ? 'stayReturn' : 'stayTitle', { place: stayNow.place.name, min: fmtMin(stayNow.min) }) + ' · ' +
       t('stayUntil', { from: hhmm(new Date(arrivalBefore(plan, plan.indexOf(stayNow)))), until: hhmm(new Date(stayNow.until)) });
@@ -4018,11 +4123,11 @@
         `<span>${esc(missed ? t('missedBody', vars) : t(broken.walk ? 'tightBodyWalk' : 'tightBodyNoWalk', vars))}</span>${alts}</div>`;
     }
     // with a missed connection, the planned arrival no longer holds
-    const lost = broken && (broken.state === 'missed' || broken.next.missing);
+    const lost = !!a.late || (broken && (broken.state === 'missed' || broken.next.missing));   // US-62: not on the planned ride either
     const head = lost ? `${esc(t('arriveAt', { t: '' }))}<span class="was">${arrive ? tm(arrive) : ''}</span> <span class="changed">${esc(t('arrivalLost'))}</span>`
       : `${esc(t('arriveAt', { t: arrive ? tm(arrive) : '—' }))} · <small>${esc(t(live ? 'tripLive' : 'tripPlanned'))}</small>`;
     return `<div class="trip"><div class="trip-head"><span>${head}</span></div>` +
-      `<div class="trip-now">${esc(state)}</div>${cancelHtml(a, now)}${earlyHtml(a, now)}${warn}<ol class="trip-legs">${rows}</ol></div>`;
+      `<div class="trip-now">${esc(state)}</div>${lateHtml(a)}${cancelHtml(a, now)}${earlyHtml(a, now)}${a.late ? '' : warn}<ol class="trip-legs">${rows}</ol></div>`;
   }
 
   // ---------- Ringing: banner, sound, vibration, notification ----------
@@ -4476,6 +4581,11 @@
     unlockAudio();
     if (b.dataset.act === 'cancel') { saveAlarms(getAlarms().filter(x => x.id !== id)); renderAlarms(); }
     else if (b.dataset.act === 'alt') applyAlternative(a.id, +b.dataset.n);
+    else if (b.dataset.act === 'late') { const r = a.plan.find(l => l.type === 'ride'); markLate(a.id, depOf(r) > Date.now() ? 'later' : 'missedSaid'); }
+    else if (b.dataset.act === 'late-ok') {   // US-62: the GPS was wrong: on board after all
+      const list = getAlarms(), x = list.find(y => y.id === a.id);
+      if (x) { x.lateOk = x.late && x.late.dep; delete x.late; x.alts = null; saveAlarms(list); renderAlarms(); }
+    }
     else if (b.dataset.act === 'stay-now') requestStayOptions(a.id, +b.dataset.k, Date.now(), 'now');
     else if (b.dataset.act === 'stay-more') { const st = a.plan[+b.dataset.k]; requestStayOptions(a.id, +b.dataset.k, Math.max(st.until, Date.now()) + 15 * 60000, 'more'); }
     else if (b.dataset.act === 'via') {   // unfold / fold the stops of a ride (kept open across live refreshes)
