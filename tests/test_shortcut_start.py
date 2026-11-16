@@ -35,7 +35,15 @@ def walk(a, b, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - 
 def tram14(t0, a=BELAIR):   # tram 14 from Bel-Air: Stand +2, Palladium +4, Jonction +6, Les Esserts +12
     mid = [(STAND, at(t0 + 2)), (PALLADIUM, at(t0 + 4)), (JONCTION, at(t0 + 6))]
     return ride("T", "14", "Bernex-Vailly", a, ESSERTS, at(t0), at(t0 + 12), "D", "B", mid=mid)
+def late(r, d):   # BUG-15: live times at departure and arrival only, none for the stops in between (as seen 16.11, 19:05)
+    for k, kind in (("departure", "departure"), ("arrival", "arrival")):
+        t = dt.datetime.strptime(r[k][kind], "%Y-%m-%dT%H:%M:%S%z") + dt.timedelta(minutes=d)
+        r[k]["prognosis"] = {kind: fmt(t)}; r[k]["delay"] = d
+    return r
 def connections():   # from Place de Neuve (the app walks there from the address): tram 12 to Bel-Air, then tram 14
+    if S.get("late"):   # tram 14 planned 18:35 at Bel-Air, 20 min late (18:55)
+        return [{"sections": [ride("T", "12", "Moillesulaz", NEUVE, BELAIR, at(4), at(7), "B", "C"),
+                              walk(BELAIR, BELAIR, at(7), at(8)), late(tram14(-10), 20)]}]
     return [{"sections": [ride("T", "12", "Moillesulaz", NEUVE, BELAIR, at(4), at(7), "B", "C"),
                           walk(BELAIR, BELAIR, at(7), at(8)), tram14(11)]}]
 def near(s, d): return dict(s, distance=d)
@@ -99,7 +107,16 @@ with sync_playwright() as p:
     ctx.close()
     print("followed    → walk to Stand, tram 14 from there")
 
-    # 2. finishing / starting on foot turned off: journeys as found
+    # 2. BUG-15: tram 14 20 min late, no live times for its stops in between: Stand still offered, at its late time
+    S["late"] = True
+    ctx, pg = session(b, ON)
+    sc = [c for c in cards(pg) if "À pied jusqu’à Genève, Stand" in c]
+    assert len(sc) == 1, cards(pg)
+    assert sc[0].startswith("18:49"), sc[0]   # tram at Stand 18:57 (18:37 + 20), 8 min on foot
+    ctx.close(); S["late"] = False
+    print("late tram   →", sc[0])
+
+    # 3. finishing / starting on foot turned off: journeys as found
     ctx, pg = session(b, {"footMaxMin": 0, "realWalk": False})
     assert not any("À pied jusqu’à" in c for c in cards(pg)), cards(pg)
     ctx.close()
