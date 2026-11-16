@@ -41,7 +41,10 @@ PAIRS = [  # (from, to) by name; resolved to the first stop OJP gives
 TIMES = [dt.datetime(2026, 11, 16, 8, 0, tzinfo=TZ), dt.datetime(2026, 11, 16, 17, 30, tzinfo=TZ)]
 SOURCES = ["opendata", "ojp"]
 if os.environ.get("QUICK"): PAIRS, TIMES, SOURCES = PAIRS[:2], TIMES[:1], SOURCES[:1]
-if os.environ.get("DEBUG"): PAIRS, TIMES, SOURCES = [("Carouge GE, Rondeau", "Meyrin, Gravière"), ("Kriens, Zentrum Pilatus", "Luzern, Verkehrshaus")], TIMES[1:], ["opendata"]
+if os.environ.get("CASE"):   # one case: "from|to|HH:MM,HH:MM|ojp,opendata" (debug output on)
+    _a, _z, _t, _s = os.environ["CASE"].split("|"); PAIRS = [(_a, _z)]; SOURCES = _s.split(",")
+    TIMES = [dt.datetime(2026, 11, 16, int(x[:2]), int(x[3:]), tzinfo=TZ) for x in _t.split(",")]; os.environ["DEBUG"] = "1"
+elif os.environ.get("DEBUG"): PAIRS, TIMES, SOURCES = [("Carouge GE, Rondeau", "Meyrin, Gravière"), ("Kriens, Zentrum Pilatus", "Luzern, Verkehrshaus")], TIMES[1:], ["opendata"]
 
 # ---------------- OJP from Python (the independent side) ----------------
 def iso(t): return t.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

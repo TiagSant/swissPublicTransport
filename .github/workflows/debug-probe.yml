@@ -1,0 +1,20 @@
+name: Probe (temporary)
+on:
+  push:
+    branches: [debug-probe-ste-clotilde]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright==1.48.0 && python -m playwright install --with-deps chromium
+      - env:
+          OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
+          OUT: audit-out
+          CASE: "Genève, Musée d'ethnographie|Petit-Lancy, Les Esserts|11:20,12:20|ojp,opendata"
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &
+          sleep 2
+          python tools/audit/audit_changes.py
