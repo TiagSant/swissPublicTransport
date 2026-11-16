@@ -62,31 +62,36 @@ Preferences (visited stops, hidden lines and directions, usage scores per direct
 
 ## Tests
 
-End-to-end tests with Playwright. The API is mocked with fixtures, so tests are reproducible without a network.
+End-to-end tests with Playwright, on the current prototype only (Sprint 9); the tests of earlier sprints were removed. The API is mocked with fixtures, so tests are reproducible without a network.
 
 ```bash
 pip install -r tests/requirements.txt
 python -m playwright install chromium   # or CHROME_PATH=/path/to/chrome
-python tests/test_sprint01.py
-python tests/test_sprint02.py
-python tests/test_sprint03.py
-python tests/test_sprint04.py            # screenshots in tests/out/
-python tests/test_delayed_departures.py  # BUG-01 regression (reproduces the bug on Sprint 3)
-python tests/test_sprint05.py            # LEAFLET_DIR / TILE_PNG serve Leaflet and tiles locally (optional)
+# optional: LEAFLET_DIR / TILE_PNG serve Leaflet and map tiles locally
 python tests/test_build_quays.py         # platform data builder, synthetic CSV
-python tests/test_sprint06.py            # journeys and alarms, with a frozen browser clock
-python tests/test_api_outage.py          # API down / 503 / 429 / no answer → banner, 10 s timeout
-python tests/test_favorites.py           # remove one stop / clear all, with undo
-python tests/test_sprint07_ojp.py        # OJP key in Settings, departures / search / journeys from recorded real answers
-python tests/test_sprint08.py            # journey details, line colours, intermediate stops, get-off reminders, walk map
 python tests/test_sprint09.py            # my places, address search, next stop after removal, alarms set late
 python tests/test_alight_gps.py          # get-off reminders: live time of each ride, position, tunnel fallback
 python tests/test_finish_on_foot.py      # finish / start on foot: offer, switch both ways, learning, limits
 python tests/test_followed_journey.py    # followed journey: live steps, platform change, missed / tight connection, alternatives
 python tests/test_languages.py           # English, French, German, Italian, Romansh
-python tests/test_follow_changes.py      # earlier run boarded, finish on foot, other ways from here
-python tests/test_late_start.py          # late start / first ride missed: GPS, “I'm leaving later”, “I'm on board after all”
+python tests/test_line_colors.py         # line colours and pictograms of every Swiss operator
+python tests/test_onward_ojp.py          # next stops of each run rebuilt from official data (OJP)
+python tests/test_run_direction.py       # a followed ride matched by line and direction
+python tests/test_walk_platform.py       # a walk ends on the platform of the next ride
+python tests/test_change_walk.py         # changing platform means walking
+python tests/test_stops_and_order.py     # intermediate stops: credible times, passed stops greyed out
+python tests/test_trip_parts.py          # leaving early, stopovers, round trips
+python tests/test_plan_waits.py          # walking and waiting at each change, when planning
+python tests/test_stop_without_platform.py   # a stop without platform shown like a platform
+python tests/test_departures_stop_chip.py    # "Stop" button on the Departures tab
+python tests/test_smarter_walking.py     # stay on to the change's stop, finish on foot later, walking along streets
+python tests/test_get_off_earlier.py     # get off earlier when it is closer to the next ride
+python tests/test_change_place.py        # change place checked on real data across Switzerland
+python tests/test_hide_missed.py         # a journey whose change is missed is not suggested
+python tests/test_dedupe_journeys.py     # same journeys shown once, alternatives grouped
 python tests/test_cancelled_run.py       # a cancelled vehicle: not suggested; replaced in one tap when following
+python tests/test_late_start.py          # late start / first ride missed: GPS, “I'm leaving later”, “I'm on board after all”
+python tests/test_follow_changes.py      # earlier run boarded, finish on foot, other ways from here
 python tests/test_split_train.py         # trains that split (OJP notice A__FL): notice, same train, get-off reminder
 ```
 
