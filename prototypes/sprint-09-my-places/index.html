@@ -11,6 +11,8 @@
            Same at the start: walk to where the second ride leaves instead of taking the first one.
   - US-64: get off earlier and finish on foot — a stop an earlier ride passes near the destination, walking from there
            instead of changing; listed as a journey of its own when it arrives no later.
+  - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
+           to where that ride starts); also among "Other options from here".
   - BUG-14: the journey followed has the better change place: "Follow" waits for the check; changes still ahead are
            checked on the way (a journey followed before the check, or an alternative found on the way).
   - US-38: a followed journey shows every step live (delays, platforms, progress); a missed connection is detected
@@ -673,7 +675,7 @@
       footSetting: 'Suggest finishing on foot up to', footOffer: '🚶 Finish on foot from {from}', footAll: '🚶 Walk all the way',
       footDetail: '{min} min · {dist} · arrive {arr}', footDelta: '{d}', footSame: 'same arrival time', footBetter: 'faster than waiting for the {line}',
       busAlt: '🚌 Take the {line} instead', busAltDetail: 'arrive {arr} · {d}', footLearned: 'You often finish on foot here.',
-      tagShortcut: '🚶 Off at {stop}, then on foot', tagFootPossible: '🚶 Finish on foot?', tagFootBetter: '🚶 Faster on foot', tagOnFoot: '🚶 On foot at the end',
+      tagShortcut: '🚶 Off at {stop}, then on foot', tagShortcutStart: '🚶 On foot to {stop}', tagFootPossible: '🚶 Finish on foot?', tagFootBetter: '🚶 Faster on foot', tagOnFoot: '🚶 On foot at the end',
       startOffer: '🚶 Start on foot to {to}', startDetail: '{min} min · {dist} · leave {leave}', startLater: 'leave {d} later — no wait for the {line}',
       startEarlier: 'leave {d} earlier', startSame: 'leave at the same time', busStartAlt: '🚌 Take the {line} first instead', busStartDetail: 'leave {leave} · {d}',
       startLearned: 'You often start on foot here.', minSooner: '{n} min sooner', minLater: '{n} min later',
@@ -804,7 +806,7 @@
       footSetting: 'Proposer de finir à pied jusqu\u2019à', footOffer: '🚶 Finir à pied depuis {from}', footAll: '🚶 Tout à pied',
       footDetail: '{min} min · {dist} · arrivée {arr}', footDelta: '{d}', footSame: 'même heure d\u2019arrivée', footBetter: 'plus rapide qu\u2019attendre le {line}',
       busAlt: '🚌 Prendre plutôt le {line}', busAltDetail: 'arrivée {arr} · {d}', footLearned: 'Vous finissez souvent à pied ici.',
-      tagShortcut: '🚶 Descente à {stop}, puis à pied', tagFootPossible: '🚶 Fin à pied ?', tagFootBetter: '🚶 Plus rapide à pied', tagOnFoot: '🚶 Fin à pied',
+      tagShortcut: '🚶 Descente à {stop}, puis à pied', tagShortcutStart: '🚶 À pied jusqu’à {stop}', tagFootPossible: '🚶 Fin à pied ?', tagFootBetter: '🚶 Plus rapide à pied', tagOnFoot: '🚶 Fin à pied',
       startOffer: '🚶 Partir à pied jusqu\u2019à {to}', startDetail: '{min} min · {dist} · départ {leave}', startLater: 'partez {d} plus tard — sans attendre le {line}',
       startEarlier: 'partez {d} plus tôt', startSame: 'départ à la même heure', busStartAlt: '🚌 Prendre plutôt le {line} au départ', busStartDetail: 'départ {leave} · {d}',
       startLearned: 'Vous partez souvent à pied ici.', minSooner: '{n} min plus tôt', minLater: '{n} min plus tard',
@@ -2657,7 +2659,7 @@
         journeyBase = journeyBase.concat(more.filter(j => !keys.has(j.key)));
       }
       // US-64: getting off earlier and finishing on foot, as journeys of their own
-      if (pts.length === 2) journeyBase = journeyBase.concat(shortcutJourneys(journeyBase));
+      if (pts.length === 2) journeyBase = journeyBase.concat(shortcutJourneys(journeyBase, places.from, places.to, readWhen().mode === 'now' ? Date.now() - 60000 : null));
       // US-45 / US-46: each next part leaves once the time at the place is over; each journey of the first part
       // gets the best next part it can catch (one search per part, from the earliest possible time)
       if (pts.length > 2) {
@@ -2775,15 +2777,23 @@
   // fewer changes, arriving no later. Added to the list (ranked by the rider's priority like any other journey);
   // the journey with the change stays. The stops looked at: those the ride passes before the change (the change
   // stop itself only when it is not the last change: walking from there is the US-36 offer).
-  function shortcutJourneys(list) {
-    const maxMin = getSettings().footMaxMin, dest = places.to && places.to.coord;
-    if (!maxMin || !dest) return [];
-    const endName = ['saved', 'addr', 'stop'].includes(places.to.kind) ? placeLabel(places.to) : t('yourDestination');
-    const walkOf = from => { const r = routeCached(from, dest), straight = distanceM(from, dest);
-      return r ? { min: routeMin(r.meters), meters: r.meters } : { min: walkMinutes(straight), meters: straight * DETOUR }; };
+  // US-65: the same at the start (rue De-Candolle → Les Esserts: tram 12 from Place de Neuve to Bel-Air, then tram 14;
+  // walking, Stand — a stop tram 14 passes after Bel-Air — is as close, and its tram leaves later): walk to a stop a
+  // later ride passes, board it there. Same arrival, fewer rides; kept when it leaves later than walking to where that
+  // ride starts (the US-36 offer) or walks less. notBefore: leaving before it is too late (searching for now).
+  function shortcutJourneys(list, fromPlace = places.from, toPlace = places.to, notBefore = null) {
+    const maxMin = getSettings().footMaxMin, dest = toPlace && toPlace.coord, origin = fromPlace && fromPlace.coord;
+    if (!maxMin) return [];
+    const endName = toPlace && ['saved', 'addr', 'stop'].includes(toPlace.kind) ? placeLabel(toPlace) : t('yourDestination');
+    const startName = fromPlace && ['saved', 'addr', 'stop'].includes(fromPlace.kind) ? placeLabel(fromPlace) : t('yourStart');
+    const walkFrom = (a, b) => { const r = routeCached(a, b), straight = distanceM(a, b);
+      return r ? { min: routeMin(r.meters), meters: r.meters, straight } : { min: walkMinutes(straight), meters: straight * DETOUR, straight }; };
+    const walkOf = from => walkFrom(from, dest);
     const out = new Map(), known = new Set(list.map(j => j.key));
     for (const j of list) {
       if (j.segments > 1 || j.rides.length < 2) continue;
+      if (origin) startShortcut(j);
+      if (!dest) continue;
       let best = null;
       j.rides.slice(0, -1).forEach((r, k) => {
         const spots = (r.via || []).map((v, e) => ({ e, s: earlySpot(r, e) }));
@@ -2811,6 +2821,39 @@
         stayOns: null, _waits: null, _enriched: false, _enrichP: null, _cancelled: false, shortcut: { stop: best.s.name, min: best.min, from: j.key } }));
     }
     return [...out.values()];
+
+    function startShortcut(j) {
+      const second = j.rides[1], w0 = second.from.coord ? walkFrom(origin, second.from.coord) : null;
+      const leave0 = w0 && w0.min <= maxMin ? +depOf(second) - w0.min * 60000 : null;   // the US-36 offer
+      let best = null;
+      j.rides.slice(1).forEach((r, n) => {
+        const k = n + 1;
+        const spots = (r.via || []).map((v, m) => ({ m, s: laterSpot(r, m) }));
+        if (k >= 2 && r.from.coord) spots.push({ m: null, s: { id: r.from.id, name: r.from.name, coord: r.from.coord, at: +depOf(r), platform: r.platform || '' } });
+        for (const { m, s } of spots) {
+          if (!s || !s.coord || !s.at) continue;
+          const w = walkFrom(origin, s.coord);
+          if (w.min > maxMin) continue;
+          const leaveAt = s.at - w.min * 60000;
+          if (notBefore && leaveAt < notBefore) continue;
+          if (shownMinDiff(leaveAt, j.leaveAt) < -FOOT_MAX_LATER) continue;
+          if (leave0 != null) { const d = shownMinDiff(leaveAt, leave0); if (d < 0 || (d === 0 && w.min >= w0.min - 0.5)) continue; }
+          if (!best || leaveAt > best.leaveAt + 30000 || (Math.abs(leaveAt - best.leaveAt) <= 30000 && w.min < best.min)) best = Object.assign({ k, m, s, leaveAt }, w);
+        }
+      });
+      if (!best) return;
+      const r = j.rides[best.k], ride = best.m == null ? r : boardLater(r, best.s);
+      const walk = { type: 'walk', min: best.min, meters: best.meters, edge: 'access', foot: true, to: best.s.name,
+                     start: { name: startName, coord: origin }, end: { name: best.s.name, stopId: best.s.id, coord: best.s.coord, platform: best.s.platform || '', mode: r.mode } };
+      const legs = [walk, ride, ...j.legs.slice(j.legs.indexOf(r) + 1)];
+      const rides = legs.filter(l => l.type === 'ride'), leaveAt = new Date(best.leaveAt);
+      const key = 'from:' + (best.s.id || fold(best.s.name)) + '|' + rides.map(x => `${x.label}@${x.dep.getTime()}`).join('|') + (j.shortcut ? '|' + j.key : '');
+      if (known.has(key) || out.has(key)) return;
+      out.set(key, Object.assign({}, j, { legs, rides, leaveAt, durationMin: (j.arriveAt - leaveAt) / 60000, transfers: rides.length - 1,
+        walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0), walkBefore: best.min, accessMeters: best.straight, apiWalkBefore: 0,
+        live: rides.some(x => x.live), key, stayOns: null, _waits: null, _enriched: false, _enrichP: null, _cancelled: false,
+        shortcut: { stop: best.s.name, min: best.min, from: j.key, start: true } }));
+    }
   }
 
   const footRecords = () => store.get('foot', {});
@@ -2830,7 +2873,8 @@
   function displayJourney(j0) {
     const j = withStayOn(j0);
     if (j.segments > 1) return j;   // a trip in parts: no walk / bus switch at its ends
-    const end = j.shortcut ? null : footAlternative(j), start = startAlternative(j);   // US-64: a shortcut already ends on foot
+    const end = j.shortcut && !j.shortcut.start ? null : footAlternative(j);   // US-64: a shortcut already ends on foot
+    const start = j.shortcut && j.shortcut.start ? null : startAlternative(j);   // US-65: … or starts on foot
     const state = (alt, side) => {
       if (!alt) return null;
       const ck = j.key + '|' + side, pref = footPref(alt.key);
@@ -2951,7 +2995,7 @@
       const tags = [j === fastest ? `<span class="tag">${esc(t('fastest'))}</span>` : '',
                     j === leastWalk && Math.round(j.walkMin) < Math.round(fastest.walkMin) ? `<span class="tag walk">${esc(t('leastWalking'))}</span>` : '',
                     footTag ? `<span class="tag foot">${esc(footTag)}</span>` : '',
-                    j.shortcut ? `<span class="tag foot">${esc(t('tagShortcut', { stop: j.shortcut.stop }))}</span>` : ''].join('');
+                    j.shortcut ? `<span class="tag foot">${esc(t(j.shortcut.start ? 'tagShortcutStart' : 'tagShortcut', { stop: j.shortcut.stop }))}</span>` : ''].join('');
       const first = j.rides[0];
       const live = first && first.live ? ` · <span class="${first.delay > 0 ? 'late' : 'ok'}">${first.delay > 0 ? '+' + first.delay + ' min' : esc(t('onTime'))}</span>` : '';
       const open = (j.base || j).key === openJourney;
@@ -3771,6 +3815,7 @@
     const vs = x => Math.floor(x / 60000) - Math.floor(endAt / 60000);
     let list = [];
     try { list = await journeysBetween(from, dest, { mode: 'depart', at: new Date(start) }, null); } catch { list = []; }
+    list = list.concat(shortcutJourneys(list, here ? from : null, dest, start - 60000));   // US-64 / US-65: walking part of it
     const out = list.filter(jj => jj.leaveAt.getTime() >= start - 60000 && !isCancelled(jj) && !journeyWaits(jj).missed)
       .sort((x, y) => x.arriveAt - y.arriveAt).slice(0, 3)
       .map(jj => ({ kind: 'here', fromIdx, dep: (jj.rides[0].real || jj.rides[0].dep).getTime(), leave: jj.leaveAt.getTime(), arrive: jj.arriveAt.getTime(),
