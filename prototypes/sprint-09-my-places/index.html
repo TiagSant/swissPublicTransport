@@ -14,7 +14,7 @@
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
   - BUG-18: getting off earlier (US-64): the earliest and the least-walking stops kept; once the walks follow the
-           streets, a beaten one is left out (Stand, not Palladium across the Rhône).
+           streets, a beaten one is left out (Les Esserts → Saint-Jean: Palladium sooner, Stand less walking).
   - BUG-17: following what really happens: leaving now (no alarm); on board after all (the run where the rider is);
            in a vehicle when stopped in traffic; a vehicle faster than the last walk; a vehicle taken outside the plan.
   - US-67: traffic messages (OJP, SIRI SX situations) on departures, journeys and followed rides; a new one told once.
@@ -2857,8 +2857,8 @@
       if (origin) startShortcut(j);
       if (!dest) continue;
       // BUG-18: two stops kept — the earliest arrival and the least walking (Google's Stand, 2 min less on foot than
-      // Palladium, 1 min later). A straight line cannot see a river: once the walks follow the streets (enrichment),
-      // a dominated one is left out of the list (renderJourneys)
+      // Palladium, 1 min later). Once the walks follow the streets (enrichment), a dominated one is left out of the
+      // list (renderJourneys)
       let best = null, least = null;
       j.rides.slice(0, -1).forEach((r, k) => {
         const spots = (r.via || []).map((v, e) => ({ e, s: earlySpot(r, e) }));

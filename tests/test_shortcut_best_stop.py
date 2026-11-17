@@ -1,11 +1,12 @@
-"""BUG-18: getting off earlier (US-64) at the right stop — the one the streets make best, not the straight line.
+"""BUG-18: getting off earlier (US-64): the stop with the least walking kept too, and the stop the streets make best.
 
 The PO's case (17.11.2026, 18:16): Les Esserts → Rue de Saint-Jean 98. The API: tram 14 to Bel-Air, then bus 7.
-Real data (probe 18:40): the app offered tram 14 to Palladium + 8 min on foot (straight line), Google tram 14 to
-Stand + 8 min. From Palladium the walk crosses the Rhône by a detour: along the streets it is much longer.
-Now both stops are kept (earliest arrival, least walking); once the walks follow the streets, the beaten one goes.
-Stop ids / positions real (Les Esserts, Jonction, Palladium, Stand, Bel-Air); "Mercier" and the street lengths
-approximate. transport.opendata.ch and the street routing are mocked."""
+The app offered only tram 14 to Palladium (the earliest arrival); Google tram 14 to Stand (less walking).
+Now both are kept (earliest arrival, least walking); once the walks follow the streets, a beaten one goes.
+Real data (probe 17.11 19:00, street walks): Palladium 7.8 min on foot, 1 min sooner; Stand 5.9 min: both offered.
+Here the street lengths are made up to check the second rule (Palladium 1050 m: beaten by Stand).
+Stop ids / positions real (Les Esserts, Jonction, Palladium, Stand, Bel-Air); "Mercier" approximate.
+transport.opendata.ch and the street routing are mocked."""
 import os, json, math, datetime as dt
 from pathlib import Path
 from urllib.parse import urlparse, urlsplit, parse_qs, unquote
@@ -52,7 +53,7 @@ def api(route):
         body = {"stations": sorted([dict(s, distance=round(dist(p, C(s)))) for s in STOPS if dist(p, C(s)) < 600], key=lambda s: s["distance"])}
     else: body = {"stations": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
-def osrm(route):   # walking along the streets: from Palladium the Rhône is crossed by a detour
+def osrm(route):   # walking along the streets (made-up lengths: from Palladium much longer)
     a, b = unquote(urlsplit(route.request.url).path.rsplit("/", 1)[-1]).split(";")   # (urlparse would cut at ";")
     (lon1, lat1), (lon2, lat2) = [tuple(map(float, x.split(","))) for x in (a, b)]
     d = dist((lat1, lon1), (lat2, lon2)) * 1.25
