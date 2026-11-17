@@ -13,6 +13,8 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - BUG-18: getting off earlier (US-64): the earliest and the least-walking stops kept; once the walks follow the
+           streets, a beaten one is left out (Stand, not Palladium across the Rhône).
   - BUG-17: following what really happens: leaving now (no alarm); on board after all (the run where the rider is);
            in a vehicle when stopped in traffic; a vehicle faster than the last walk; a vehicle taken outside the plan.
   - US-67: traffic messages (OJP, SIRI SX situations) on departures, journeys and followed rides; a new one told once.
@@ -2830,6 +2832,17 @@
   // walking, Stand — a stop tram 14 passes after Bel-Air — is as close, and its tram leaves later): walk to a stop a
   // later ride passes, board it there. Same arrival, fewer rides; kept when it leaves later than walking to where that
   // ride starts (the US-36 offer) or walks less. notBefore: leaving before it is too late (searching for now).
+  // BUG-18: a get-off-earlier journey (US-64) whose walk, once it follows the streets, makes it arrive later than the
+  // journey it comes from, or one beaten by another stop of the same journey (no sooner and no less walking), is
+  // left out of the list
+  function shortcutBeaten(j) {
+    const sc = (j.base || j).shortcut;
+    if (!sc || sc.start) return false;
+    const me = j.base || j, from = journeyBase.find(x => x.key === sc.from);
+    if (from && shownMinDiff(me.arriveAt, from.arriveAt) > 0) return true;
+    return journeyBase.some(o => o !== me && o.shortcut && !o.shortcut.start && o.shortcut.from === sc.from
+      && shownMinDiff(o.arriveAt, me.arriveAt) <= 0 && o.walkMin <= me.walkMin && (shownMinDiff(o.arriveAt, me.arriveAt) < 0 || o.walkMin < me.walkMin - 0.5));
+  }
   function shortcutJourneys(list, fromPlace = places.from, toPlace = places.to, notBefore = null) {
     const maxMin = getSettings().footMaxMin, dest = toPlace && toPlace.coord, origin = fromPlace && fromPlace.coord;
     if (!maxMin) return [];
@@ -2843,7 +2856,10 @@
       if (j.segments > 1 || j.rides.length < 2) continue;
       if (origin) startShortcut(j);
       if (!dest) continue;
-      let best = null;
+      // BUG-18: two stops kept — the earliest arrival and the least walking (Google's Stand, 2 min less on foot than
+      // Palladium, 1 min later). A straight line cannot see a river: once the walks follow the streets (enrichment),
+      // a dominated one is left out of the list (renderJourneys)
+      let best = null, least = null;
       j.rides.slice(0, -1).forEach((r, k) => {
         const spots = (r.via || []).map((v, e) => ({ e, s: earlySpot(r, e) }));
         if (k < j.rides.length - 2 && r.toStop.coord) spots.push({ e: null, s: { id: r.toStop.id, name: r.toStop.name, coord: r.toStop.coord, at: +(r.arrReal || r.arr), platform: r.arrPlatform || '' } });
@@ -2854,9 +2870,14 @@
           const at = s.at + w.min * 60000;
           if (shownMinDiff(at, j.arriveAt) > 0) continue;   // no later than the journey with the change
           if (!best || at < best.at - 30000 || (Math.abs(at - best.at) <= 30000 && w.min < best.min)) best = Object.assign({ k, e, s, at }, w);
+          if (!least || w.min < least.min - 0.5 || (Math.abs(w.min - least.min) <= 0.5 && at < least.at)) least = Object.assign({ k, e, s, at }, w);
         }
       });
-      if (!best) continue;
+      for (const pick of [best, least]) if (pick) endShortcut(j, pick);
+    }
+    return [...out.values()];
+
+    function endShortcut(j, best) {
       const r = j.rides[best.k], ride = best.e == null ? r : cutRide(r, best.e);
       const end = { name: endName, coord: dest };
       const walk = { type: 'walk', min: best.min, meters: best.meters, edge: 'egress', to: '', foot: true, routed: !!routeCached(best.s.coord, dest),
@@ -2864,12 +2885,11 @@
       const legs = [...j.legs.slice(0, j.legs.indexOf(r)), ride, walk];
       const rides = legs.filter(l => l.type === 'ride'), arriveAt = new Date(best.at);
       const key = rides.map(x => `${x.label}@${x.dep.getTime()}`).join('|') + '|off:' + (best.s.id || fold(best.s.name));
-      if (known.has(key) || out.has(key)) continue;
+      if (known.has(key) || out.has(key)) return;
       out.set(key, Object.assign({}, j, { legs, rides, arriveAt, durationMin: (arriveAt - j.leaveAt) / 60000, transfers: rides.length - 1,
         walkMin: legs.filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0), live: rides.some(x => x.live), key,
         stayOns: null, _waits: null, _enriched: false, _enrichP: null, _cancelled: false, shortcut: { stop: best.s.name, min: best.min, from: j.key } }));
     }
-    return [...out.values()];
 
     function startShortcut(j) {
       const second = j.rides[1], w0 = second.from.coord ? walkFrom(origin, second.from.coord) : null;
@@ -3011,7 +3031,7 @@
     const box = $('journeyResults');
     if (!journeyBase.length) { box.hidden = true; return; }
     // US-57: a journey whose change is missed at the current times (delays) is not suggested
-    journeys = journeyBase.map(displayJourney).filter(j => !journeyWaits(j).missed && !isCancelled(j));
+    journeys = journeyBase.map(displayJourney).filter(j => !journeyWaits(j).missed && !isCancelled(j) && !shortcutBeaten(j));
     if (!journeys.length) { box.hidden = true; $('journeyStatus').textContent = t(journeyBase.some(j => isCancelled(j)) ? 'allGone' : 'allMissed'); return; }
     if ([t('allMissed'), t('allGone')].includes($('journeyStatus').textContent)) $('journeyStatus').textContent = '';
     const mode = readWhen().mode;
