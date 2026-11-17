@@ -13,6 +13,8 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - US-69: the GPS only when it helps (boarding, approach of the get-off stop, doubts, a check every 5 min); the motion
+           sensors follow the ride in between and sense the stops served. Without them: on all the ride, as before.
   - BUG-19: stops passed on a followed ride: the GPS placed along the line (wins over the times when fresh), a stop it
            saw passed stays so; by time without GPS.
   - BUG-18: getting off earlier (US-64): the earliest and the least-walking stops kept; once the walks follow the
@@ -727,7 +729,7 @@
       cancelTitle: '{line} at {dep}: cancelled?', cancelBody: 'It is no longer in the live departures of {stop}.', cancelOptions: 'Instead:',
       cancelSame: 'arrive {t}, as planned', cancelLater: 'arrive {t} ({n} min later)',
       walkingTitle: 'You’re on foot: the {line} at {dep} left without you', walkingNotify: 'On foot: the {line} at {dep} left without you',
-      motionSetting: 'Tell walking from riding (the phone’s motion sensors; nothing is sent)', motionNow: 'Sensors: {state}', motionWalk: '🚶 walking', motionStill: 'still', motionVehicle: '🚋 in a vehicle', motionMoving: 'moving, no steps',
+      motionSetting: 'Tell walking from riding (the phone’s motion sensors; nothing is sent)', motionNow: 'Sensors: {state}', motionWalk: '🚶 walking', motionStill: 'still', motionVehicle: '🚋 in a vehicle', motionMoving: 'moving, no steps', gpsResting: 'GPS resting',
       trafficInfo: 'Traffic info', sitNotify: 'Traffic info: {line}',
       lateNotify: 'You won’t make the {line} at {dep}', missedRideNotify: '{line} at {dep} missed?', lateNotifyBody: 'Open the app: other departures from where you are.',
       lateTitle: 'You won’t make the {line} at {dep}', missedRideTitle: '{line} at {dep} missed?', laterTitle: 'Leaving later: other departures', missedSaidTitle: '{line} at {dep} missed: other departures',
@@ -862,7 +864,7 @@
       cancelTitle: '{line} de {dep} : supprimé ?', cancelBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}.', cancelOptions: 'À la place :',
       cancelSame: 'arrivée {t}, comme prévu', cancelLater: 'arrivée {t} ({n} min plus tard)',
       walkingTitle: 'Vous êtes à pied : le {line} de {dep} est parti sans vous', walkingNotify: 'À pied : le {line} de {dep} est parti sans vous',
-      motionSetting: 'Distinguer marche et véhicule (capteurs de mouvement du téléphone ; rien n\u2019est envoyé)', motionNow: 'Capteurs : {state}', motionWalk: '🚶 à pied', motionStill: 'immobile', motionVehicle: '🚋 dans un véhicule', motionMoving: 'en mouvement, sans pas',
+      motionSetting: 'Distinguer marche et véhicule (capteurs de mouvement du téléphone ; rien n\u2019est envoyé)', motionNow: 'Capteurs : {state}', motionWalk: '🚶 à pied', motionStill: 'immobile', motionVehicle: '🚋 dans un véhicule', motionMoving: 'en mouvement, sans pas', gpsResting: 'GPS en veille',
       trafficInfo: 'Info trafic', sitNotify: 'Info trafic : {line}',
       lateNotify: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideNotify: '{line} de {dep} manqué ?', lateNotifyBody: 'Ouvrez l\u2019app : d\u2019autres départs depuis où vous êtes.',
       lateTitle: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideTitle: '{line} de {dep} manqué ?', laterTitle: 'Départ plus tard : autres départs', missedSaidTitle: '{line} de {dep} manqué : autres départs',
@@ -3393,6 +3395,11 @@
     if (kind === 'walk') motion.walkAt = ts;
     else if (w.kind === 'moving' && gpsFresh(Date.now()) && gps.speed > VEHICLE_MS) motion.vehicleAt = ts;
     if (kind !== motion.kind) {
+      // US-69: a stop of the vehicle (still between 8 s and 90 s, then moving again): a stop served, most likely
+      if (motion.kind === 'still' && kind === 'moving' && motion.vehicleAt > (motion.walkAt || 0)) {
+        const d = ts - motion.since;
+        if (d >= 8000 && d <= DOUBT_STILL_MS) { (motion.dwells = motion.dwells || []).push(ts); if (motion.dwells.length > 40) motion.dwells.shift(); }
+      }
       const was = motion.kind; motion.kind = kind; motion.since = ts - (votes >= 2 ? MOTION_STEP_MS : 0);
       if (was !== kind && !$('alarmCard').hidden) renderAlarms();
     }
@@ -3412,7 +3419,7 @@
     // refusal of the permission API alone switched the sensors off for good)
     const need = motionOn() && getAlarms().some(a => a.plan && !tripOver(a, Date.now()));
     if (need && !motion.listening && 'DeviceMotionEvent' in window) { window.addEventListener('devicemotion', onMotion); motion.listening = true; }
-    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null, vehicleAt: 0, walkAt: 0 }); }
+    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null, vehicleAt: 0, walkAt: 0, dwells: [] }); }
   }
   // iOS asks once, on a tap ("Follow"); Android does not ask
   function askMotionPermission() {
@@ -3424,7 +3431,7 @@
     if (!motionOn() || !motionFresh(now) || !a.plan || tripOver(a, now)) return '';
     const fast = gpsFresh(now) && gps.speed > 4;   // > 14 km/h
     const state = motion.kind === 'walk' ? t('motionWalk') : inVehicle(now) || fast ? t('motionVehicle') : motion.kind === 'still' ? t('motionStill') : t('motionMoving');
-    return `<div class="status" data-k="motion">${esc(t('motionNow', { state }))}</div>`;
+    return `<div class="status" data-k="motion">${esc(t('motionNow', { state }))}${gpsResting(now) ? ' · ' + esc(t('gpsResting')) : ''}</div>`;
   }
   function lateWatched(a, now) {
     if (!a.plan || a.onBoard || a.late) return null;
@@ -3464,7 +3471,7 @@
     now >= (arrivalBefore(a.plan, a.plan.indexOf(l)) || l.from) - 5 * 60000 && now <= l.until + 30 * 60000);
   function updateGpsWatch() {
     const now = Date.now();
-    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord) || getAlarms().some(a => startWatched(a, now) || lateWatched(a, now) || stayWatched(a, now).length
+    const need = pendingAlights().some(({ a, x }) => x.prevCoord && x.stopCoord && alightGpsNeeded(a, x, now)) || getAlarms().some(a => startWatched(a, now) || (lateWatched(a, now) && !aboardBySensors(a, now)) || stayWatched(a, now).length
       || bug17Watched(a, now));
     if (need && !gps.watch && !gps.denied && navigator.geolocation) {
       gps.watch = navigator.geolocation.watchPosition(onGpsFix, err => {
@@ -3472,6 +3479,29 @@
       }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
     } else if (!need && gps.watch) stopGpsWatch();
   }
+  // ---------- US-69: the GPS only when it helps; the motion sensors follow the ride in between ----------
+  // On board, while the sensors say "in a vehicle" (the accelerometer costs about a hundredth of the GPS), the GPS is
+  // off between stops. It is on:
+  //  - until 2 min after the ride left (which run was boarded, US-63);
+  //  - from 3 min before leaving the stop before the get-off stop (the reminder rings when leaving it, US-28);
+  //  - on a doubt: standing still 90 s or more (traffic? a breakdown?), or the sensors no longer "in a vehicle";
+  //  - for a check every 5 min, until a fix comes.
+  // Without the sensors (none, switched off, page asleep): on all the ride, as before.
+  const BOARDING_MS = 2 * 60000, APPROACH_MS = 3 * 60000, DOUBT_STILL_MS = 90000, CHECK_EVERY_MS = 5 * 60000;
+  function alightGpsNeeded(a, x, now) {
+    if (!(motionOn() && motionFresh(now) && inVehicle(now))) return true;
+    if (now < (x.boardAt || 0) + BOARDING_MS) return true;
+    if (now >= alightAt(a, x) - APPROACH_MS) return true;
+    if (motion.kind === 'still' && now - motion.since >= DOUBT_STILL_MS) return true;
+    return !gps.fix || now - gps.fix.t >= CHECK_EVERY_MS;
+  }
+  // In a vehicle by the sensors, 2 min after the first ride left: the US-62 watch (missed it?) needs no GPS
+  function aboardBySensors(a, now) {
+    const r = a.plan && a.plan.find(l => l.type === 'ride');
+    return !!r && motionOn() && motionFresh(now) && inVehicle(now) && now >= depOf(r) + BOARDING_MS;
+  }
+  // The GPS resting by choice (shown on the followed journey)
+  const gpsResting = now => !gps.watch && !gps.denied && pendingAlights(now).some(({ a, x }) => x.prevCoord && x.stopCoord && !alightGpsNeeded(a, x, now));
   function stopGpsWatch() {
     if (gps.watch != null) { try { navigator.geolocation.clearWatch(gps.watch); } catch { /* already stopped */ } }
     gps.watch = null;
@@ -3936,7 +3966,7 @@
   // to "to come") or within 60 m of a stop (lost once 60 m past it). Now:
   // - the GPS, when fresh, placed along the line (between which stops the rider is), not only near a stop;
   // - when it is on the line it wins over the times (a late tram not yet reported: a stop not reached stays to come);
-  // - a stop the GPS saw passed stays passed for that run (memory per followed ride).
+  // - a stop the GPS saw passed (or the sensors, US-69) stays passed for that run (memory per followed ride).
   const viaProgress = new Map();   // `${alarm id}#${line}#${planned departure}` → stops passed
   const PASS_M = 25, ON_LINE_M = 80;   // past a stop by 25 m; within 80 m of the line (detours between stops)
   function lineProgress(l, p) {   // stops of l passed by position p, or null when p is not on its line
@@ -3963,8 +3993,14 @@
     const byGps = fix ? lineProgress(l, fix) : null;
     // only what the GPS saw is kept: by time alone a stop may look passed while the vehicle is late (not reported
     // yet); its delay, once reported, rightly puts it back to come
-    const seen = Math.max(byGps || 0, viaProgress.get(key) || 0);
-    if (byGps != null) viaProgress.set(key, seen);
+    // US-69: without the GPS, each stop of the vehicle sensed within 2 min of a stop's time serves that stop
+    let byMotion = 0;   // the stops of the vehicle since it left, matched in order (each once)
+    if (byGps == null && motionOn()) for (const at of (motion.dwells || []).filter(x => x >= depOf(l))) {
+      const j = l.via.findIndex((v, n) => n >= byMotion && v.time && Math.abs(v.time - at) <= 2 * 60000);
+      if (j >= 0) byMotion = j + 1;
+    }
+    const seen = Math.max(byGps || 0, byMotion, viaProgress.get(key) || 0);
+    if (byGps != null || byMotion > 0) viaProgress.set(key, seen);
     const upTo = byGps != null ? seen : Math.max(byTime, seen);
     return { upTo, next: upTo < l.via.length ? upTo : -1 };
   }
