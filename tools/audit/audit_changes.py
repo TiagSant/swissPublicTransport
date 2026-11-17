@@ -13,7 +13,7 @@
 Same rules as the app: straight line × 1.3 at 4.8 km/h, platform positions from ATLAS (assets/quays.js), a change
 keeps its margin (at least 1 min, at most 3), same stop and same platform means no walk.
 Env: OJP_TOKEN (never printed), OUT (folder for the report)."""
-import json, math, os, re, sys, time, datetime as dt, urllib.request, xml.etree.ElementTree as ET
+import json, math, os, re, sys, time, datetime as dt, urllib.request, urllib.parse, xml.etree.ElementTree as ET
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from playwright.sync_api import sync_playwright
@@ -43,7 +43,7 @@ SOURCES = ["opendata", "ojp"]
 if os.environ.get("QUICK"): PAIRS, TIMES, SOURCES = PAIRS[:2], TIMES[:1], SOURCES[:1]
 if os.environ.get("CASE"):   # one case: "from|to|HH:MM,HH:MM|ojp,opendata" (debug output on)
     _a, _z, _t, _s = os.environ["CASE"].split("|"); PAIRS = [(_a, _z)]; SOURCES = _s.split(",")
-    TIMES = [dt.datetime(2026, 11, 16, int(x[:2]), int(x[3:]), tzinfo=TZ) for x in _t.split(",")]; os.environ["DEBUG"] = "1"
+    TIMES = [dt.datetime(2026, 11, 17, int(x[:2]), int(x[3:]), tzinfo=TZ) for x in _t.split(",")]; os.environ["DEBUG"] = "1"
 elif os.environ.get("DEBUG"): PAIRS, TIMES, SOURCES = [("Carouge GE, Rondeau", "Meyrin, Gravière"), ("Kriens, Zentrum Pilatus", "Luzern, Verkehrshaus")], TIMES[1:], ["opendata"]
 
 # ---------------- OJP from Python (the independent side) ----------------
@@ -82,6 +82,12 @@ def id7(ref):
 def ptime(s): return int(dt.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp() * 1000) if s else None
 
 def resolve(name):
+    if name.startswith("addr:"):   # an address: Nominatim
+        q = urllib.parse.quote(name[5:])
+        req = urllib.request.Request(f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1", headers={"User-Agent": "swissPublicTransport-probe"})
+        with urllib.request.urlopen(req, timeout=30) as r: d = json.load(r)
+        print("  geocoded", name, "→", d[0]["lat"], d[0]["lon"], d[0]["display_name"][:80], flush=True)
+        return {"kind": "addr", "name": name[5:], "coord": [float(d[0]["lat"]), float(d[0]["lon"])]}
     r = ojp(f'<OJPLocationInformationRequest><siri:RequestTimestamp>{{TS}}</siri:RequestTimestamp><InitialInput><Name>{name}</Name></InitialInput>'
             '<Restrictions><Type>stop</Type><NumberOfResults>5</NumberOfResults></Restrictions></OJPLocationInformationRequest>')
     for pr in (r.iter("PlaceResult") if r is not None else []):
@@ -187,7 +193,7 @@ def best_possible(run1, run2, ride1, ride2, need):
                      "off": f'{best[4]} {best[5]}'.strip(), "board": f'{best[6]} {best[7]}'.strip()}
 
 # ---------------- the app ----------------
-HOOK = ("  window.__probe = () => journeyBase.map(j => ({ key: j.key, sc: j.shortcut || null, leave: j.leaveAt, rides: j.rides.map(r => ({ l: r.label, from: r.from.name, dep: r.dep, real: r.real, via: (r.via || []).map(v => [v.name, v.time && new Date(v.time).toTimeString().slice(0,5), v.planned && new Date(v.planned).toTimeString().slice(0,5), v.live]) })) }));\n"
+HOOK = ("  window.__probe = () => journeyBase.map(j => ({ key: j.key, sc: j.shortcut || null, leave: j.leaveAt, arrive: j.arriveAt, walk: j.walkMin, shown: journeys.some(x => (x.base || x).key === j.key), rides: j.rides.map(r => ({ l: r.label, from: r.from.name, to: r.toStop.name, dep: r.dep, real: r.real, via: (r.via || []).map(v => [v.name, v.time && new Date(v.time).toTimeString().slice(0,5), v.planned && new Date(v.planned).toTimeString().slice(0,5), v.live]) })) }));\n"
         "  window.__audit = () => journeyBase.slice(0, 8).map(j => ({ key: j.key, enriched: !!j._enriched, stayOns: j.stayOns || null,"
         " raw: tripConnections(planOf(j)).map(c => ({ walk: c.walk, slack: c.slack, cur: c.cur, next: c.next })),"
         " fin: tripConnections(planOf(withStayOn(j))).map(c => ({ walk: c.walk, slack: c.slack, cur: c.cur, next: c.next })) }));\n")
@@ -313,11 +319,12 @@ if __name__ == "__main__":
     pairs = []
     for a, z in PAIRS:
         A, Z = resolve(a), resolve(z)
-        print(f"{a} → {A and A['name']} ({A and A['id']}) | {z} → {Z and Z['name']} ({Z and Z['id']})", flush=True)
+        print(f"{a} → {A and A['name']} ({A and A.get('id')}) | {z} → {Z and Z['name']} ({Z and Z.get('id')})", flush=True)
         if A and Z: pairs.append((A, Z))
     add_hook()
     dumps = run_app(pairs)
     (OUT / "app.json").write_text(json.dumps(dumps, ensure_ascii=False))
+    if os.environ.get("CASE"): sys.exit(0)   # a probe of one case: the app's journeys printed above
     rows = audit(dumps)
     (OUT / "rows.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1))
     from collections import Counter
