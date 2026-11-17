@@ -10,6 +10,8 @@ on:
       - assets/ojp.js
       - .github/workflows/ojp-probe.yml
 
+concurrency: { group: ojp-probe, cancel-in-progress: false }   # one at a time: two together go over the key's limit
+
 permissions:
   contents: write
 
