@@ -248,15 +248,14 @@ with sync_playwright() as p:
     print("late ready  →", body)
     pg.context.close()
 
-    pg = alarm_at(0)   # set at 07:45:30, past the leave time: only "Leave"
+    pg = alarm_at(0)   # set at 07:45:30, past the leave time: leaving now (BUG-17, PO 17.11.2026: nothing rings)
     pg.click("#searchJourney"); pg.locator("#journeyList .jr").first.click()
     pg.clock.run_for(15 * 60000 + 30000)
-    pg.click(".set-alarms")
-    pg.wait_for_selector("#alarmBanner:not([hidden])")
-    assert pg.get_attribute("#alarmBanner", "data-kind") == "leave", pg.inner_text("#alarmBanner")
-    pg.click("#abOk"); pg.clock.run_for(6000)
-    assert pg.is_hidden("#alarmBanner"), "no 'Get ready' after 'Leave'"
-    print("past leave  →", "only 'Leave' rang")
+    pg.click(".set-alarms"); pg.wait_for_selector("#alarmList .alarm")
+    pg.clock.run_for(6000)
+    assert pg.is_hidden("#alarmBanner"), pg.inner_text("#alarmBanner")
+    assert "Leaving now" in pg.inner_text("#alarmList .alarm"), pg.inner_text("#alarmList .alarm")
+    print("past leave  →", "leaving now: nothing rang")
     pg.context.close()
 
     pg = alarm_at(0)   # set at 07:47, the tram left at 07:46: on board

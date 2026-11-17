@@ -13,6 +13,8 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - BUG-17: following what really happens: leaving now (no alarm); on board after all (the run where the rider is);
+           in a vehicle when stopped in traffic; a vehicle faster than the last walk; a vehicle taken outside the plan.
   - US-67: traffic messages (OJP, SIRI SX situations) on departures, journeys and followed rides; a new one told once.
   - US-66: walking or riding, from the phone's own motion sensors (no Google service, nothing sent): still walking a
            minute after the first vehicle left → other ways from there; the reading shown on the followed journey.
@@ -727,7 +729,8 @@
       lateTitle: 'You won’t make the {line} at {dep}', missedRideTitle: '{line} at {dep} missed?', laterTitle: 'Leaving later: other departures', missedSaidTitle: '{line} at {dep} missed: other departures',
       lateOption: '{lines} at {dep} · leave {leave}', lateOnBoard: 'I’m on board after all', lateState: 'Not on the planned ride: choose another departure, or cancel.',
       leaveLater: 'I’m leaving later', missedIt: 'I missed the {line}',
-      earlierRun: 'You are on the {line} at {dep}: journey updated', tripFootOffer: 'Finish on foot from {stop}', footOfferDetail: '{min} min · arrive {t} ({cmp})',
+      earlierRun: 'You are on the {line} at {dep}: journey updated', leavingNow: 'Leaving now: no “Get ready” or “Leave” alarm.',
+      fasterTitle: 'Faster than walking: {lines} at {dep}', fasterDetail: 'arrive {t} ({n} min sooner than the {min} min walk)', tripFootOffer: 'Finish on foot from {stop}', footOfferDetail: '{min} min · arrive {t} ({cmp})',
       sooner: '{n} min sooner', laterN: '{n} min later', sameArrival: 'same arrival', hereBtn: 'Other ways from here', hereTitle: 'Other ways from here:', onFootAll: 'On foot all the way',
       allMissed: 'With the current delays, the changes of the journeys found are missed. Try a later departure.',
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
@@ -861,7 +864,8 @@
       lateTitle: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideTitle: '{line} de {dep} manqué ?', laterTitle: 'Départ plus tard : autres départs', missedSaidTitle: '{line} de {dep} manqué : autres départs',
       lateOption: '{lines} à {dep} · partir à {leave}', lateOnBoard: 'Je suis à bord', lateState: 'Pas dans le véhicule prévu : choisissez un autre départ, ou annulez.',
       leaveLater: 'Je pars plus tard', missedIt: 'J\u2019ai raté le {line}',
-      earlierRun: 'Vous êtes dans le {line} de {dep} : suivi mis à jour', tripFootOffer: 'Finir à pied depuis {stop}', footOfferDetail: '{min} min · arrivée {t} ({cmp})',
+      earlierRun: 'Vous êtes dans le {line} de {dep} : suivi mis à jour', leavingNow: 'Départ maintenant : pas d’alarme « Préparez-vous » ni « Partir ».',
+      fasterTitle: 'Plus rapide qu’à pied : {lines} à {dep}', fasterDetail: 'arrivée {t} ({n} min plus tôt que les {min} min à pied)', tripFootOffer: 'Finir à pied depuis {stop}', footOfferDetail: '{min} min · arrivée {t} ({cmp})',
       sooner: '{n} min plus tôt', laterN: '{n} min plus tard', sameArrival: 'même heure d\u2019arrivée', hereBtn: 'Autres options d\u2019ici', hereTitle: 'Autres options d\u2019ici :', onFootAll: 'À pied jusqu\u2019au bout',
       allMissed: 'Avec les retards actuels, les correspondances des itinéraires trouvés sont manquées. Essayez un départ plus tard.',
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
@@ -3292,6 +3296,7 @@
   // While a followed ride is under way and the page is open, the position decides: the reminder rings when I
   // leave the stop before my get-off stop. Without a recent, precise fix (tunnel, permission refused, phone
   // asleep) the live time above decides.
+  const LEAVING_NOW_MS = 2 * 60000;   // BUG-17: followed this close to the time to leave: leaving now
   const NEAR_M = 60;              // "at the stop before"
   const LEFT_M = 90;              // "has left it"
   const GPS_MAX_ACC = 50;         // fixes less precise than this are ignored
@@ -3361,6 +3366,10 @@
     motion.wins.push(w.kind); if (motion.wins.length > 3) motion.wins.shift();
     const votes = motion.wins.filter(k => k === w.kind).length;
     const kind = votes >= 2 || motion.kind == null ? w.kind : motion.kind;   // 2 windows of 3 to change (~4 s)
+    // BUG-17: in a vehicle once moving without steps at vehicle speed (GPS), and still so when it stops in traffic,
+    // until steps again
+    if (kind === 'walk') motion.walkAt = ts;
+    else if (w.kind === 'moving' && gpsFresh(Date.now()) && gps.speed > VEHICLE_MS) motion.vehicleAt = ts;
     if (kind !== motion.kind) {
       const was = motion.kind; motion.kind = kind; motion.since = ts - (votes >= 2 ? MOTION_STEP_MS : 0);
       if (was !== kind && !$('alarmCard').hidden) renderAlarms();
@@ -3370,11 +3379,18 @@
   const tripOver = (a, now) => { const end = a.plan && tripArrival(a.plan); return end != null && now > end + 10 * 60000; };
   // Walking without a stop for at least a minute, all of it after t
   const motionFresh = now => motion.listening && motion.kind && motion.ts >= now - 10000;   // no samples for 10 s (page asleep): unknown
+  const VEHICLE_MS = 4;   // m/s (14 km/h): faster than walking
+  // In a vehicle: seen moving without steps at vehicle speed, no steps since (stopped in traffic included); without
+  // the sensors, the GPS speed alone
+  const inVehicle = now => motionOn() && motionFresh(now) ? !!motion.vehicleAt && motion.vehicleAt > (motion.walkAt || 0) && motion.kind !== 'walk'
+    : gpsFresh(now) && gps.speed > VEHICLE_MS;
   const walkingSince = (t, now) => motionOn() && motionFresh(now) && motion.kind === 'walk' && motion.since <= now - WALKING_MS && now - WALKING_MS >= t;
   function updateMotionWatch() {
-    const need = motionOn() && motion.perm !== 'denied' && getAlarms().some(a => a.plan && !tripOver(a, Date.now()));
+    // listened even when the permission asked was refused: a phone that really refuses sends nothing (BUG-17: a
+    // refusal of the permission API alone switched the sensors off for good)
+    const need = motionOn() && getAlarms().some(a => a.plan && !tripOver(a, Date.now()));
     if (need && !motion.listening && 'DeviceMotionEvent' in window) { window.addEventListener('devicemotion', onMotion); motion.listening = true; }
-    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null }); }
+    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null, vehicleAt: 0, walkAt: 0 }); }
   }
   // iOS asks once, on a tap ("Follow"); Android does not ask
   function askMotionPermission() {
@@ -3385,7 +3401,7 @@
   function motionLine(a, now) {
     if (!motionOn() || !motionFresh(now) || !a.plan || tripOver(a, now)) return '';
     const fast = gpsFresh(now) && gps.speed > 4;   // > 14 km/h
-    const state = motion.kind === 'walk' ? t('motionWalk') : motion.kind === 'still' ? t('motionStill') : fast ? t('motionVehicle') : t('motionMoving');
+    const state = motion.kind === 'walk' ? t('motionWalk') : inVehicle(now) || fast ? t('motionVehicle') : motion.kind === 'still' ? t('motionStill') : t('motionMoving');
     return `<div class="status" data-k="motion">${esc(t('motionNow', { state }))}</div>`;
   }
   function lateWatched(a, now) {
@@ -3408,6 +3424,7 @@
       return eta > dep + 30000 ? 'late' : null;
     }
     if (now < dep + 2 * 60000) return null;
+    if (inVehicle(now) && (motion.vehicleAt || now) >= dep - 60000) return null;   // BUG-17: on board, stopped in traffic near the stop
     const atHome = a.origin && distanceM(p, a.origin) < LEFT_HOME_M;
     return dStop <= 150 || atHome ? 'missed' : null;
   }
@@ -3425,7 +3442,8 @@
     now >= (arrivalBefore(a.plan, a.plan.indexOf(l)) || l.from) - 5 * 60000 && now <= l.until + 30 * 60000);
   function updateGpsWatch() {
     const now = Date.now();
-    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord) || getAlarms().some(a => startWatched(a, now) || lateWatched(a, now) || stayWatched(a, now).length);
+    const need = pendingAlights().some(({ x }) => x.prevCoord && x.stopCoord) || getAlarms().some(a => startWatched(a, now) || lateWatched(a, now) || stayWatched(a, now).length
+      || bug17Watched(a, now));
     if (need && !gps.watch && !gps.denied && navigator.geolocation) {
       gps.watch = navigator.geolocation.watchPosition(onGpsFix, err => {
         if (err && err.code === 1) { gps.denied = true; stopGpsWatch(); renderAlarms(); }
@@ -3566,9 +3584,11 @@
     };
     // US-33: set after the first vehicle left → already on board: no departure alarms, only get-off reminders.
     // Set after the leave time → only "Leave" rings (at once). Set after the get-ready time → "Get ready" rings at once.
+    // BUG-17: followed when it is time to leave (2 min or less before, or after): the rider is leaving now — neither
+    // "Get ready" nor "Leave" rings (PO, 17.11.2026: "1 min to leave" rang while he was already on his way)
     const tm0 = alarmTimes(alarm), now0 = Date.now();
     if (now0 >= tm0.dep) { alarm.onBoard = true; alarm.fired.ready = alarm.fired.leave = now0; }
-    else if (now0 >= tm0.leave) alarm.fired.ready = now0;
+    else if (now0 >= tm0.leave - LEAVING_NOW_MS) { alarm.fired.ready = alarm.fired.leave = now0; alarm.leavingNow = true; }
     saveAlarms([alarm, ...getAlarms()].slice(0, 5));
     unlockAudio(); askNotificationPermission();
     if (getSettings().alightReminder !== false && navigator.geolocation && alarm.alights.length)
@@ -3596,7 +3616,7 @@
         </div>
         <div class="al-line">${lineIdHtml(f.mode, f.style, f.label, true)} <span>→ ${esc(f.to)} · ${esc(f.stopName)}${esc(plat)}</span></div>
         <div class="status" data-k="src">${esc(src)} · ${esc(t('walkInfo', { min: fmtMin(tm.walk), speed: s.speedKmh.toFixed(1), margin: s.marginMin, prep: s.prepMin }))}</div>
-        ${a.onBoard ? `<div class="status" data-k="onboard">${esc(t('onBoard'))}</div>` : tight}
+        ${a.onBoard ? `<div class="status" data-k="onboard">${esc(t('onBoard'))}</div>` : a.leavingNow ? `<div class="status" data-k="leaving-now">${esc(t('leavingNow'))}</div>` : tight}
         ${alightLine(a, s)}${motionLine(a, Date.now())}
         ${tripHtml(a)}
         <div class="al-actions">
@@ -3876,12 +3896,140 @@
     const arrLive = p && (parseTime(p.prognosis && p.prognosis.arrival) || null);
     Object.assign(r, { dep: n.sched.getTime(), real: n.real ? n.real.getTime() : null, arr: r.arr + shift, arrReal: arrLive ? arrLive.getTime() : null,
                        platformLive: null, arrPlatformLive: null, missing: false });
-    (r.via || []).forEach(v => { v.time += shift; v.planned = v.planned ? v.planned + shift : v.planned; v.depAt = v.depAt ? v.depAt + shift : null; v.shift = 0; });
+    // BUG-17: its stops at its own times — planned (moved by the gap between the runs) plus the delay of the run
+    // boarded, not of the one left (the get-off reminder rang at once: four stops early)
+    const d = n.real ? n.real.getTime() - n.sched.getTime() : 0;
+    (r.via || []).forEach(v => { const pl = (v.planned != null ? v.planned : v.time - (v.shift || 0)) + shift;
+      Object.assign(v, { planned: pl, time: pl + d, depAt: null, live: !!d || v.live, shift: d }); });
+    viaInOrder(r);
     const keep = { ready: a.fired.ready, leave: a.fired.leave };
     syncFirst(a); Object.assign(a.fired, keep);
     a.onBoard = true; a.early = null; a.alts = null;
+    if (a.late) { delete a.late; a.lateOk = r.dep; }   // BUG-17: on board: the warning that it would be missed is over
     replanAlights(a, idx);   // (no rev bump: an update of the live refresh, saved with it)
     a.toast = t('earlierRun', { line: `${modeName(r.mode)} ${r.label}`, dep: hhmm(new Date(depOf(r))) });
+  }
+  // ---------- BUG-17: following what really happens (PO, 17.11.2026) ----------
+  // The GPS also while flagged late (on board after all?) and around the walk after the last ride (a vehicle taken?)
+  function bug17Watched(a, now) {
+    if (!a.plan) return false;
+    const r = a.plan.find(l => l.type === 'ride');
+    if (a.late && !a.onBoard && r && now <= depOf(r) + 30 * 60000) return true;
+    const L = lastLeg(a);
+    return !!L && L.walk >= 4 && now >= arrOf(L.r) - 2 * 60000 && now <= L.planned + 10 * 60000;
+  }
+  // Flagged late (or gone without the rider), but on board after all: the GPS on the line away from the stop and the
+  // phone in a vehicle. The run followed is the one that is where the rider is (how far along the line it should be,
+  // from its live departure); flagged late but at its stop in time: no longer late.
+  async function boardedAfterAll(a, now, boardOf) {
+    const fi = a.plan.findIndex(l => l.type === 'ride'), r = fi >= 0 ? a.plan[fi] : null;
+    if (!r || !a.late || a.onBoard || r.missing || !gpsFresh(now) || !r.from.coord || !r.from.id) return false;
+    const p = gps.fix.p, dStop = distanceM(p, r.from.coord);
+    if (a.late.reason === 'late' && dStop <= 2 * NEAR_M && now < depOf(r)) {   // there in time after all
+      delete a.late; a.lateOk = r.dep; a.alts = null; return true;
+    }
+    if (dStop <= 250 || !inVehicle(now) || now > depOf(r) + 30 * 60000) return false;
+    // the line from the stop: positions, times of the run followed, distance along it
+    const path = [{ c: r.from.coord, t: depOf(r) }, ...(r.via || []).map(v => ({ c: v.coord, t: v.time })), { c: r.toStop.coord, t: arrOf(r) }].filter(x => x.c && x.t);
+    if (path.length < 2 || !path.slice(1).some(x => distanceM(p, x.c) < 250)) return false;
+    const cum = [0]; for (let n = 1; n < path.length; n++) cum.push(cum[n - 1] + distanceM(path[n - 1].c, path[n].c));
+    // where the rider is along it (on the segment the GPS is closest to), and where each run should be by now
+    let along = 0, best = Infinity;
+    for (let n = 0; n + 1 < path.length; n++) {
+      const da = distanceM(p, path[n].c), db = distanceM(p, path[n + 1].c), len = cum[n + 1] - cum[n], off = da + db - len;
+      if (off < best) { best = off; along = cum[n] + (da + db > 0 ? len * da / (da + db) : 0); }
+    }
+    const expected = shift => { const t0 = now - shift;
+      if (t0 <= path[0].t) return 0;
+      for (let n = 0; n + 1 < path.length; n++) if (t0 <= path[n + 1].t) return cum[n] + (cum[n + 1] - cum[n]) * (t0 - path[n].t) / Math.max(1, path[n + 1].t - path[n].t);
+      return cum[cum.length - 1]; };
+    const board = await boardOf(r.from.id, new Date(now - 30 * 60000));
+    const same = j => String(j.category) === String(r.category) && String(j.number) === String(r.number)
+      && ((j.passList || []).some(x => x.station && x.station.id === r.toStop.id) || sameTerminus(r.to, j.to) !== false);
+    const since = (a.late.at || now) - 15 * 60000;
+    const runs = ((board && board.stationboard) || []).filter(same).map(j => ({ j, n: normalize(j) })).filter(x => x.n.sched)
+      .map(x => Object.assign(x, { left: (x.n.real || x.n.sched).getTime() })).filter(x => x.left <= now && x.left >= since);
+    if (!runs.length) return false;
+    const off = x => Math.abs(expected(x.left - depOf(r)) - along);
+    const run = runs.sort((x, y) => off(x) - off(y) || y.left - x.left)[0];
+    if (Math.abs(run.n.sched.getTime() - r.dep) < 60000) { delete a.late; a.lateOk = r.dep; a.alts = null; a.onBoard = true; a.early = null; return true; }
+    followEarlierRun(a, fi, run);
+    return true;
+  }
+  // The last ride and the walk after it (to the end of its part)
+  function lastLeg(a) {
+    let k = -1; a.plan.forEach((l, n) => { if (l.type === 'ride') k = n; });
+    if (k < 0) return null;
+    const end = segmentEnd(a.plan, k), r = a.plan[k];
+    const walk = a.plan.slice(k + 1, end).filter(l => l.type === 'walk').reduce((x, l) => x + l.min, 0);
+    return { k, r, end, walk, planned: arrOf(r) + walk * 60000, dest: destAfter(a, k) };
+  }
+  // On the last ride, or walking after it, with a walk of 4 min or more: a vehicle from the stop where that ride ends
+  // getting to the destination at least 2 min sooner (tram 14 late at Jonction, bus 19 there) — offered in one tap,
+  // looked for every 2 min
+  async function fasterThanWalking(a, now) {
+    const L = lastLeg(a);
+    const want = L && !a.late && L.walk >= 4 && L.r.toStop.id && L.dest && L.dest.coord && now >= depOf(L.r) - 60000 && now < L.planned - 3 * 60000;
+    if (!want) { if (a.faster && now > ((a.faster.offer && a.faster.offer.dep) || 0) + 60000) { a.faster = null; return true; } return false; }
+    const key = `${L.r.label}@${L.r.dep}`;
+    if (a.faster && a.faster.for === key && now - a.faster.at < 2 * 60000) return false;
+    const start = Math.max(now, arrOf(L.r));
+    let offer = null;
+    try {
+      const from = { kind: 'stop', id: L.r.toStop.id, name: L.r.toStop.name, coord: L.r.toStop.coord };
+      let list = await journeysBetween(from, L.dest, { mode: 'depart', at: new Date(start) }, null);
+      list = list.concat(shortcutJourneys(list, null, L.dest, start - 60000));
+      const best = list.filter(jj => jj.rides.length && jj.leaveAt.getTime() >= start - 30000 && !isCancelled(jj) && !journeyWaits(jj).missed
+        && Math.floor(jj.arriveAt.getTime() / 60000) <= Math.floor(L.planned / 60000) - 2).sort((x, y) => x.arriveAt - y.arriveAt)[0];
+      if (best) offer = { fromIdx: L.k + 1, dep: (best.rides[0].real || best.rides[0].dep).getTime(), arrive: best.arriveAt.getTime(),
+        gain: Math.floor(L.planned / 60000) - Math.floor(best.arriveAt.getTime() / 60000), walk: L.walk, lines: linesOf(best), plan: planOf(best) };
+    } catch { offer = a.faster && a.faster.for === key ? a.faster.offer : null; }
+    a.faster = { for: key, at: now, offer };
+    return true;
+  }
+  function fasterHtml(a, now) {
+    const o = a.faster && a.faster.offer;
+    if (!o || a.late || o.dep < now - 60000) return '';
+    return `<div class="early"><button class="trip-alt best" data-act="faster"><span>⚡ ${esc(t('fasterTitle', { lines: o.lines, dep: hhmm(new Date(o.dep)) }))}</span>` +
+      `<small>${esc(t('fasterDetail', { t: hhmm(new Date(o.arrive)), n: o.gain, min: fmtMin(o.walk) }))}</small></button></div>`;
+  }
+  // The plan from the stop where the last ride ends replaced by the way taken (offer tapped, or vehicle taken)
+  function takeWay(a, o, toast) {
+    a.plan = spliceSegment(a.plan, o.fromIdx, o.plan);
+    replanAlights(a, o.fromIdx);
+    a.faster = null; a.alts = null;
+    a.changesChecked = [...(a.changesChecked || []), ...tripConnections(a.plan).map(c => `${a.plan[c.i].label}@${a.plan[c.i].dep}>${a.plan[c.k].label}@${a.plan[c.k].dep}`)].slice(-20);
+    if (toast) a.toast = toast;
+  }
+  function takeFaster(id) {
+    const list = getAlarms(), a = list.find(x => x.id === id); if (!a || !a.faster || !a.faster.offer) return;
+    const o = a.faster.offer;
+    takeWay(a, o, null); a.rev = (a.rev || 0) + 1;
+    saveAlarms(list); renderAlarms(); tickAlarms();
+    showToast(t('altApplied', { what: `${o.lines} ${hhmm(new Date(o.dep))}` }), null);
+  }
+  // Walking after the last ride, but in a vehicle (sensors and GPS): which one — the vehicle offered, else one that
+  // left the stop since the rider got there and passes where the rider is — and the plan follows it
+  async function vehicleTaken(a, now) {
+    const L = lastLeg(a);
+    if (!L || a.late || !L.r.toStop.id || !L.r.toStop.coord || !L.dest || !L.dest.coord || now < arrOf(L.r) + 60000 || now > L.planned + 10 * 60000) return false;
+    if (!inVehicle(now) || !gpsFresh(now) || (motion.vehicleAt && motion.vehicleAt < arrOf(L.r))) return false;
+    const p = gps.fix.p;
+    if (distanceM(p, L.r.toStop.coord) < 200 || (a.takenAt && now - a.takenAt < 60000)) return false;
+    a.takenAt = now;
+    const onIt = plan => { const r0 = plan.find(l => l.type === 'ride'); if (!r0 || depOf(r0) > now + 60000) return false;
+      return [...(r0.via || []).map(v => v.coord), r0.toStop.coord].filter(Boolean).some(c => distanceM(p, c) < 250); };
+    const o = a.faster && a.faster.offer;
+    if (o && onIt(o.plan)) { takeWay(a, o, t('earlierRun', { line: o.lines, dep: hhmm(new Date(o.dep)) })); return true; }
+    try {
+      const from = { kind: 'stop', id: L.r.toStop.id, name: L.r.toStop.name, coord: L.r.toStop.coord };
+      const list = await journeysBetween(from, L.dest, { mode: 'depart', at: new Date(arrOf(L.r) - 60000) }, null);
+      const jj = list.filter(x => x.rides.length && (x.rides[0].real || x.rides[0].dep).getTime() >= arrOf(L.r) - 2 * 60000).find(x => onIt(planOf(x)));
+      if (!jj) return true;
+      const r0 = jj.rides[0];
+      takeWay(a, { fromIdx: L.k + 1, plan: planOf(jj) }, t('earlierRun', { line: `${modeName(r0.mode)} ${r0.label}`, dep: hhmm(r0.real || r0.dep) }));
+      return true;
+    } catch { return true; }
   }
   // Get-off reminders planned afresh for the rides from plan index `from` on (those before keep theirs)
   function replanAlights(a, from) {
@@ -4089,19 +4237,24 @@
     // from the stop, before the planned run leaves → follow the run that left last
     {
       const fi = a.plan.findIndex(l => l.type === 'ride'), r = fi >= 0 ? a.plan[fi] : null;
-      if (r && a.early && !r.missing && now < depOf(r) - 30000 && gpsFresh(now) && r.from.coord && r.from.id) {
+      // BUG-17: also without "left early" when the phone is in a vehicle (on the earlier tram after a late warning)
+      if (r && (a.early || (!a.onBoard && inVehicle(now))) && !r.missing && now < depOf(r) - 30000 && gpsFresh(now) && r.from.coord && r.from.id) {
         const p = gps.fix.p, path = [...(r.via || []).map(v => v.coord), r.toStop.coord].filter(Boolean);
         if (distanceM(p, r.from.coord) > 250 && path.some(c => distanceM(p, c) < 250)) {
           const board = await boardOf(r.from.id, new Date(now - LOOKBACK_MIN * 60000));
           const same = j => String(j.category) === String(r.category) && String(j.number) === String(r.number) && (j.passList || []).some(x => x.station && x.station.id === r.toStop.id);
           const run = ((board && board.stationboard) || []).filter(same).map(j => ({ j, n: normalize(j) }))
             .filter(({ n }) => n.sched && n.sched.getTime() < r.dep - 30000 && (n.real || n.sched).getTime() <= now
-              && (n.real || n.sched).getTime() >= (a.early.atStop ? a.early.atStop - 60000 : (a.early.at || now) - 5 * 60000))   // not one gone before the rider got there
+              && (n.real || n.sched).getTime() >= (!a.early ? now - 15 * 60000 : a.early.atStop ? a.early.atStop - 60000 : (a.early.at || now) - 5 * 60000))   // not one gone before the rider got there
             .sort((x, y) => (y.n.real || y.n.sched) - (x.n.real || x.n.sched))[0];
           if (run) { followEarlierRun(a, fi, run); changed = true; }
         }
       }
     }
+    // BUG-17: on board after all; a faster vehicle than the walk after the last ride; a vehicle taken not in the plan
+    if (await boardedAfterAll(a, now, boardOf)) changed = true;
+    if (await fasterThanWalking(a, now)) changed = true;
+    if (await vehicleTaken(a, now)) changed = true;
     // US-61: the first ride no longer in the live data (cancelled?): warn once, and offer what replaces it
     const firstIdx = a.plan.findIndex(l => l.type === 'ride'), first = firstIdx >= 0 ? a.plan[firstIdx] : null;
     const gone = first && first.missing && depOf(first) > now - 2 * 60000;
@@ -4546,7 +4699,7 @@
     const head = lost ? `${esc(t('arriveAt', { t: '' }))}<span class="was">${arrive ? tm(arrive) : ''}</span> <span class="changed">${esc(t('arrivalLost'))}</span>`
       : `${esc(t('arriveAt', { t: arrive ? tm(arrive) : '—' }))} · <small>${esc(t(live ? 'tripLive' : 'tripPlanned'))}</small>`;
     return `<div class="trip"><div class="trip-head"><span>${head}</span></div>` +
-      `<div class="trip-now">${esc(state)}</div>${lateHtml(a)}${cancelHtml(a, now)}${earlyHtml(a, now)}${hereHtml(a)}${footOfferHtml(a, now)}${a.late ? '' : warn}<ol class="trip-legs">${rows}</ol></div>`;
+      `<div class="trip-now">${esc(state)}</div>${lateHtml(a)}${cancelHtml(a, now)}${earlyHtml(a, now)}${hereHtml(a)}${footOfferHtml(a, now)}${fasterHtml(a, now)}${a.late ? '' : warn}<ol class="trip-legs">${rows}</ol></div>`;
   }
 
   // ---------- Ringing: banner, sound, vibration, notification ----------
@@ -5004,6 +5157,7 @@
     else if (b.dataset.act === 'alt') applyAlternative(a.id, +b.dataset.n);
     else if (b.dataset.act === 'here') askFromHere(a.id);
     else if (b.dataset.act === 'foot-offer') takeFootOffer(a.id);
+    else if (b.dataset.act === 'faster') takeFaster(a.id);
     else if (b.dataset.act === 'late') { const r = a.plan.find(l => l.type === 'ride'); markLate(a.id, depOf(r) > Date.now() ? 'later' : 'missedSaid'); }
     else if (b.dataset.act === 'late-ok') {   // US-62: the GPS was wrong: on board after all
       const list = getAlarms(), x = list.find(y => y.id === a.id);
