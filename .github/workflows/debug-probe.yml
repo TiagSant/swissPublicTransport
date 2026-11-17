@@ -13,7 +13,7 @@ jobs:
       - env:
           OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
           OUT: audit-out
-          CASE: "Petit-Lancy, Les Esserts|addr:Rue de Saint-Jean 98, 1201 Genève|18:40|ojp"
+          CASE: "Petit-Lancy, Les Esserts|addr:Rue de Saint-Jean 98, 1201 Genève|19:00|ojp"
         run: |
           python -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &
           sleep 2

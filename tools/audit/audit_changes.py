@@ -234,7 +234,7 @@ def run_app(pairs):
                     pg.on("request", on_req); pg.on("requestfinished", on_done); pg.on("requestfailed", lambda r: on_done(r, True))
                     pg.clock.install(time=t0.timestamp())
                     pg.goto(PAGE)
-                    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 15, "realWalk": False},
+                    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 15, "realWalk": True},
                              "journey:from": a, "journey:to": z}
                     if src == "ojp": store["ojpKey"] = TOKEN
                     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
