@@ -46,15 +46,18 @@ with sync_playwright() as p:
                     {"tab": "journey", "lang": lang[:2], "settings": {"footMaxMin": 0}, "journey:from": STOP(PLAIN), "journey:to": STOP(CORN)})
         pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")
         jr = pg.locator("#journeyList .jr")
-        m0, m1 = jr.nth(0).locator(".jr-meta").inner_text(), jr.nth(1).locator(".jr-meta").inner_text()
-        assert words[0] in m0 and jr.nth(0).locator(".wait-total.changed").count() == 0, m0
-        assert words[2] in m1 and jr.nth(1).locator(".wait-total.changed").count() == 1, m1     # tight: in orange
-        jr.nth(0).click()
+        # by content (BUG-20: the shorter journey, B, now comes first under "fastest")
+        ia = next(i for i in range(jr.count()) if "07:35" in jr.nth(i).locator(".jr-top").inner_text())
+        ib = next(i for i in range(jr.count()) if "07:45" in jr.nth(i).locator(".jr-top").inner_text())
+        m0, m1 = jr.nth(ia).locator(".jr-meta").inner_text(), jr.nth(ib).locator(".jr-meta").inner_text()
+        assert words[0] in m0 and jr.nth(ia).locator(".wait-total.changed").count() == 0, m0
+        assert words[2] in m1 and jr.nth(ib).locator(".wait-total.changed").count() == 1, m1     # tight: in orange
+        jr.nth(ia).click()
         w = pg.locator("#journeyList .jr-detail .leg.ride .wait")
         assert w.count() == 1 and w.inner_text() == "⏱ " + words[1], w.all_inner_texts()
         assert w.evaluate("e => e.closest('.leg.ride').querySelector('.leg-to').textContent").endswith("Cornavin")   # on the bus taken after the change
         pg.screenshot(path=str(OUT / f"plan-waits-{lang[:2]}.png"))
-        jr.nth(0).click(); jr.nth(1).click()
+        jr.nth(ia).click(); jr.nth(ib).click()   # A closed, B opened
         det = pg.locator("#journeyList .jr-detail").first
         assert words[3] in det.locator(".leg.change").inner_text(), det.locator(".leg.change").inner_text()
         tight = det.locator(".leg.ride .wait.changed")

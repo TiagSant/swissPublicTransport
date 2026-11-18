@@ -172,7 +172,7 @@ with sync_playwright() as p:
     assert pg.is_checked("#roundTrip") and pg.is_visible("#returnStayBox") and pg.input_value("#returnStay") == "60"
     pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")
     jr = pg.locator("#journeyList .jr").first
-    assert jr.locator(".jr-top b").inner_text() == "07:35 → 08:55", jr.locator(".jr-top b").inner_text()   # back on the 08:50
+    assert jr.locator(".jr-top b").inner_text() == "07:40 → 08:55", jr.locator(".jr-top b").inner_text()   # back on the 08:50; the shorter first (BUG-20)
     assert "⇄ 60′" in jr.locator(".jr-segs").inner_text()
     assert jr.locator(".jr-meta").inner_text().startswith("Round trip"), jr.locator(".jr-meta").inner_text()
     jr.click()
@@ -189,7 +189,7 @@ with sync_playwright() as p:
     deps = pg.locator("#alarmList .alarm b[data-k=dep]").all_inner_texts()
     assert deps == sorted(deps), deps
     ctx.close()
-    print("round trip  → 07:35 → 08:55, ⇄ 60′ at Bel-Air; two followed journeys kept in time order")
+    print("round trip  → 07:40 → 08:55, ⇄ 60′ at Bel-Air; two followed journeys kept in time order")
 
     # ---- US-44: leaving home early, then at the stop early → alarms cancelled, earlier bus offered
     s4 = dict(BASE, **{"journey:from": {"kind": "point", "coord": list(HOME), "near": None}, "journey:to": STOP(BELAIR)})

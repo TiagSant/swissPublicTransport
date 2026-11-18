@@ -13,6 +13,8 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - BUG-20: "fastest" is the journey that lasts the least (arriving earlier breaks a tie).
+  - BUG-21: the same vehicles, boarded and left at the same stops, are one card (least walking, then the later start).
   - US-69: the GPS only when it helps (boarding, approach of the get-off stop, doubts, a check every 5 min); the motion
            sensors follow the ride in between and sense the stops served. Without them: on all the ride, as before.
   - BUG-19: stops passed on a followed ride: the GPS placed along the line (wins over the times when fresh), a stop it
@@ -2267,7 +2269,11 @@
   function rankJourneys(list, prio, mode) {
     const byTime = (x, y) => mode === 'arrive' ? (y.leaveAt - x.leaveAt) : (x.arriveAt - y.arriveAt);
     const byWalk = (x, y) => Math.round(x.walkMin) - Math.round(y.walkMin);
-    return list.slice().sort(prio === 'walk' ? (x, y) => byWalk(x, y) || byTime(x, y) : (x, y) => byTime(x, y) || byWalk(x, y));
+    // BUG-20: the fastest is the one that lasts the least (PO, 17.11.2026: 22:15 → 22:45, 29 min, was "fastest"
+    // before 22:34 → 22:52, 18 min); arriving earlier then breaks a tie
+    const byDuration = (x, y) => Math.round(x.durationMin) - Math.round(y.durationMin);
+    return list.slice().sort(prio === 'walk' ? (x, y) => byWalk(x, y) || byTime(x, y)
+      : mode === 'arrive' ? (x, y) => byTime(x, y) || byWalk(x, y) : (x, y) => byDuration(x, y) || byTime(x, y) || byWalk(x, y));
   }
 
   // ---------- US-50 / US-51: where to get off ----------
@@ -3056,6 +3062,19 @@
       if (first) { (first.altGroup || (first.altGroup = [first])).push(j); continue; }
       groups.set(g, j); delete j.altGroup; ranked.push(j);
     }
+    // BUG-21: the same vehicles, boarded and left at the same stops, are the same journey whatever led to it (a walk
+    // a minute shorter, a bus turned into a walk): one card, the least walking (then the later start) kept, in the
+    // place of the first
+    const byRides = new Map(), kept = [];
+    const ridesKey = j => j.rides.length ? j.rides.map(r => `${r.label}@${+r.dep}@${r.from.id || r.from.name}>${r.toStop.id || r.toStop.name}`).join('|') + '|' + (j.segments || 1) : null;
+    const better = (x, y) => Math.round(x.walkMin) - Math.round(y.walkMin) || y.leaveAt - x.leaveAt || x.arriveAt - y.arriveAt;
+    for (const j of ranked) {
+      const k = ridesKey(j);
+      if (k == null || !byRides.has(k)) { if (k != null) byRides.set(k, kept.length); kept.push(j); continue; }
+      const n = byRides.get(k);
+      if (better(j, kept[n]) < 0) kept[n] = j;
+    }
+    ranked.length = 0; ranked.push(...kept);
     journeys = ranked;
     const fastest = rankJourneys(journeys, 'fast', mode)[0], leastWalk = rankJourneys(journeys, 'walk', mode)[0];
     journeys = ranked;
