@@ -13,6 +13,7 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - BUG-22: an alternative chosen on the way (it starts with its vehicle) keeps the walk between the two platforms.
   - BUG-20: "fastest" is the journey that lasts the least (arriving earlier breaks a tie).
   - BUG-21: the same vehicles, boarded and left at the same stops, are one card (least walking, then the later start).
   - US-69: the GPS only when it helps (boarding, approach of the get-off stop, doubts, a check every 5 min); the motion
@@ -3890,7 +3891,9 @@
   // US-45 / US-46: a trip in parts. A part ends at a stay (or at the end); alternatives stay within their part.
   const segmentEnd = (plan, from) => { const k = plan.findIndex((l, n) => n >= from && l.type === 'stay'); return k < 0 ? plan.length : k; };
   const destAfter = (a, idx) => { const k = segmentEnd(a.plan, idx); return k < a.plan.length ? a.plan[k].place : a.dest; };
-  const spliceSegment = (plan, from, legs) => [...plan.slice(0, from), ...legs, ...plan.slice(segmentEnd(plan, from))];
+  // BUG-22: the part put in its place starts with its vehicle (an alternative found from the change stop): the walk
+  // from the platform where the rider gets off to the one it leaves from is added, as when planning (BUG-08)
+  const spliceSegment = (plan, from, legs) => addChangeWalks([...plan.slice(0, from), ...legs, ...plan.slice(segmentEnd(plan, from))]);
   // When the rider is at the end of a part: its last ride's arrival and the walks after it
   function arrivalBefore(plan, k) {
     let last = -1; plan.slice(0, k).forEach((l, n) => { if (l.type === 'ride') last = n; });
