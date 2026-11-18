@@ -84,7 +84,7 @@ with sync_playwright() as p:
     sc = [c for c in cs if "À pied jusqu’à Genève, Stand" in c]
     assert len(sc) == 1, cs
     assert "Direct" in sc[0] and "19:08" in sc[0], sc[0]
-    api_card = next(c for c in cs if "12" in c.split("19:08")[-1] or "›" in c)
+    api_card = next(c for c in cs if "À pied jusqu’à Genève, Stand" not in c and "12" in c)   # the API's journey (tram 12, then 14)
     assert "À pied jusqu’à" not in api_card, api_card
     n = cs.index(sc[0])
     pg.locator("#journeyList .jr").nth(n).click()
