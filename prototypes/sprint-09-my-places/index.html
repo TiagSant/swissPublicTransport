@@ -3412,8 +3412,13 @@
     const kind = votes >= 2 || motion.kind == null ? w.kind : motion.kind;   // 2 windows of 3 to change (~4 s)
     // BUG-17: in a vehicle once moving without steps at vehicle speed (GPS), and still so when it stops in traffic,
     // until steps again
-    if (kind === 'walk') motion.walkAt = ts;
-    else if (w.kind === 'moving' && gpsFresh(Date.now()) && gps.speed > VEHICLE_MS) motion.vehicleAt = ts;
+    if (kind === 'walk') {
+      motion.walkAt = ts;
+      // BUG-23: the bouts of steps (start, end), to tell a few steps to the doors from walking off
+      const runs = motion.runs || (motion.runs = []), run = runs[runs.length - 1];
+      if (run && ts - run[1] <= MOTION_STEP_MS + 1000) run[1] = ts;
+      else { runs.push([motion.kind === 'walk' ? motion.since : ts - MOTION_STEP_MS, ts]); if (runs.length > 30) runs.shift(); }
+    } else if (w.kind === 'moving' && gpsFresh(Date.now()) && gps.speed > VEHICLE_MS) motion.vehicleAt = ts;
     if (kind !== motion.kind) {
       // US-69: a stop of the vehicle (still between 8 s and 90 s, then moving again): a stop served, most likely
       if (motion.kind === 'still' && kind === 'moving' && motion.vehicleAt > (motion.walkAt || 0)) {
@@ -3423,6 +3428,7 @@
       const was = motion.kind; motion.kind = kind; motion.since = ts - (votes >= 2 ? MOTION_STEP_MS : 0);
       if (was !== kind && !$('alarmCard').hidden) renderAlarms();
     }
+    watchOff(Date.now());
   }
   const motionOn = () => getSettings().motionSensors !== false;
   const tripOver = (a, now) => { const end = a.plan && tripArrival(a.plan); return end != null && now > end + 10 * 60000; };
@@ -3439,7 +3445,7 @@
     // refusal of the permission API alone switched the sensors off for good)
     const need = motionOn() && getAlarms().some(a => a.plan && !tripOver(a, Date.now()));
     if (need && !motion.listening && 'DeviceMotionEvent' in window) { window.addEventListener('devicemotion', onMotion); motion.listening = true; }
-    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null, vehicleAt: 0, walkAt: 0, dwells: [] }); }
+    else if (!need && motion.listening) { window.removeEventListener('devicemotion', onMotion); Object.assign(motion, { listening: false, buf: [], wins: [], kind: null, vehicleAt: 0, walkAt: 0, dwells: [], runs: [] }); }
   }
   // iOS asks once, on a tap ("Follow"); Android does not ask
   function askMotionPermission() {
@@ -3535,6 +3541,7 @@
     checkGpsAlights();
     checkGpsStart();
     checkGpsStays();
+    watchOff(tNow);
     if (first) renderAlarms();
   }
   function checkGpsAlights() {
@@ -4025,6 +4032,57 @@
     if (byGps != null || byMotion > 0) viaProgress.set(key, seen);
     const upTo = byGps != null ? seen : Math.max(byTime, seen);
     return { upTo, next: upTo < l.via.length ? upTo : -1 };
+  }
+
+  // ---------- BUG-23: off the vehicle at the get-off stop, before the arrival time announced ----------
+  // The PO (18.11.2026): waiting for bus 2 at Jonction, the followed journey still said "on board tram 14" — a ride
+  // was on board until its arrival time announced (09:11 live), and the tram came earlier. Now a ride is also over
+  // once the rider is seen off it at its get-off stop:
+  //  - only once the stop before the get-off one is left (BUG-19: by the GPS, the sensors or the times);
+  //  - with the GPS: at the get-off stop (or at the next ride's stop), slow, then steps for 15 s (out and along the
+  //    platform), or still there 30 s (staying on board, the vehicle leaves: the GPS moves on, and it starts again);
+  //  - without a fresh GPS: steps for 25 s in a row since the stop before was left.
+  // (Steps are measured over 4-s windows: a few seconds of them read about 3 s longer.)
+  // Moving inside the vehicle is not getting off (PO): a few steps to the doors (well under 15 s), steps between stops or
+  // away from the get-off stop do not count. The times still end the ride as before, whatever the sensors say.
+  const OFF_WALK_MS = 15000, OFF_STAY_MS = 30000, OFF_WALK_BLIND_MS = 25000, OFF_SLOW_MS = 2.5;   // m/s
+  const offSeen = new Map();   // `${alarm id}#${line}#${planned departure}` → { atSince, off }
+  const rideKey = (a, l) => `${a.id}#${l.label}#${l.dep}`;
+  const rideOff = (a, l) => { const s = offSeen.get(rideKey(a, l)); return !!(s && s.off); };
+  const rideOver = (a, l, now) => arrOf(l) < now - 30000 || rideOff(a, l);
+  // steps since t: in all, or the longest bout
+  const stepsSince = (t, now) => (motion.runs || []).reduce((x, [s, e]) => x + Math.max(0, Math.min(e, now) - Math.max(s, t)), 0);
+  const longestSteps = (t, now) => (motion.runs || []).reduce((x, [s, e]) => s >= t ? Math.max(x, Math.min(e, now) - s) : x, 0);
+  function watchOff(now) {
+    let seen = false;
+    for (const a of getAlarms()) {
+      if (!a.plan || a.late) continue;
+      const k = a.plan.findIndex(l => l.type === 'ride' && depOf(l) + 60000 <= now && arrOf(l) > now);   // on board by the times
+      if (k < 0) continue;
+      const l = a.plan[k], key = rideKey(a, l), s = offSeen.get(key) || {};
+      if (s.off || l.missing || !l.toStop) continue;
+      if (rideProgress(a, l, now).upTo < l.via.length) continue;   // the stop before the get-off one not left yet
+      if (gpsFresh(now)) {
+        // the get-off stop, its platform, and the next ride's (the rider may have walked there already)
+        const next = a.plan.slice(k + 1), r = next.find(x => x.type === 'ride'), stop = next.indexOf(r);
+        const qs = Object.keys(QALL).length ? QALL : (window.QUAYS && window.QUAYS.stops) || {};
+        const spots = [l.toStop.coord, platformPos(qs, l.toStop.id, l.toStop.coord, l.arrPlatformLive || l.arrPlatform),
+          ...next.slice(0, stop < 0 ? next.length : stop).map(x => x.type === 'walk' && x.end && x.end.coord),
+          r && r.from && r.from.coord, r && r.from && platformPos(qs, r.from.id, r.from.coord, r.platformLive || r.platform)].filter(Boolean);
+        const there = spots.some(c => distanceM(gps.fix.p, c) <= NEAR_M) && !(gps.speed > OFF_SLOW_MS);
+        if (!there) s.atSince = null;   // not there yet, or moving on with the vehicle
+        else {
+          s.atSince = s.atSince || gps.fix.t;
+          if (stepsSince(s.atSince, now) >= OFF_WALK_MS || gps.fix.t - s.atSince >= OFF_STAY_MS) s.off = now;
+        }
+      } else if (motionOn() && motionFresh(now)) {
+        const last = l.via[l.via.length - 1], left = Math.max(depOf(l), last && last.time || 0);
+        if (longestSteps(left, now) >= OFF_WALK_BLIND_MS) s.off = now;
+      }
+      offSeen.set(key, s);
+      if (s.off) seen = true;
+    }
+    if (seen && !$('alarmCard').hidden) renderAlarms();
   }
 
   // ---------- BUG-17: following what really happens (PO, 17.11.2026) ----------
@@ -4704,7 +4762,7 @@
     const rides = plan.filter(l => l.type === 'ride');
     // where am I: on board, waiting for the next ride, walking, or done
     let state;
-    const onBoard = rides.find(r => depOf(r) <= now && arrOf(r) > now);
+    const onBoard = rides.find(r => depOf(r) <= now && arrOf(r) > now && !rideOff(a, r));   // BUG-23: seen off it
     const nextRide = rides.find(r => depOf(r) > now);
     if (arrive && now > arrive) state = t('tripDone');
     else if (onBoard) state = t('tripNowRide', { line: `${modeName(onBoard.mode)} ${onBoard.label}`, stop: onBoard.toStop.name, t: hhmm(new Date(arrOf(onBoard))) });
@@ -4720,7 +4778,7 @@
     const tm = v => hhmm(new Date(v));
     const timeHtml = (planned, real) => real && Math.floor(real / 60000) !== Math.floor(planned / 60000)
       ? `<span class="was">${tm(planned)}</span><time class="late">${tm(real)}</time>` : `<time>${tm(planned)}</time>`;
-    const curIdx = plan.findIndex(l => l.type === 'ride' ? arrOf(l) > now : false);
+    const curIdx = plan.findIndex(l => l.type === 'ride' ? arrOf(l) > now && !rideOff(a, l) : false);
     // live waiting time at each change, shown on the ride taken after it
     const changes = new Map(tripConnections(plan).map(c => [c.k, c]));
     const waitHtml = k => {
@@ -4742,7 +4800,7 @@
         const to = l.edge === 'egress' ? t('walkToDest') : t('walkTo', { name: toName });
         return `<li class="tl walk"><span>🚶 ${esc(t('walkMin', { min: fmtMin(l.min) }))} — ${esc(to)}</span>${map}</li>`;
       }
-      const done = arrOf(l) < now - 30000, boarded = depOf(l) <= now && !done, isNext = k === curIdx && !boarded;
+      const done = rideOver(a, l, now), boarded = depOf(l) <= now && !done, isNext = k === curIdx && !boarded;
       const cls = done ? ' done' : boarded ? ' now' : isNext ? ' now' : '';
       const chip = done ? t('chipDone') : boarded ? t('chipOnBoard') : isNext ? t('chipNext') : '';
       // the platform is a button: tap it to see it on the map (the live one when it changed)
