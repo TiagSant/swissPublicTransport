@@ -60,7 +60,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    testImplementation(kotlin("test"))
+    // kotlin.test on JUnit 5 (the Android plugin does not pick the variant itself)
+    testImplementation(kotlin("test-junit5"))
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

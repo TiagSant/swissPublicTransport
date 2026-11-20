@@ -14,7 +14,10 @@ import kotlin.test.assertTrue
 
 /** The client sends the prototype's XML and turns HTTP and network failures into typed errors. */
 class OjpClientTest {
-    private val clock = Clock.fixed(Instant.parse("2026-11-16T06:55:25.538Z"), ZoneOffset.UTC)
+    // the recorded request of the app's light board refresh, and its times (the OJP probe refreshes it)
+    private val recorded = Fixtures.text("ojp/app_ser_esserts_light.request.xml")
+    private fun tag(name: String) = Instant.parse(Regex("<$name>([^<]+)</$name>").find(recorded)!!.groupValues[1])
+    private val clock = Clock.fixed(tag("siri:RequestTimestamp"), ZoneOffset.UTC)
     private fun client(t: OjpTransport) = OjpClient(t, OjpRequests("swissPublicTransport_prototype"), clock)
     private fun answering(status: Int, body: String = "", retryAfter: String? = null) = client { OjpHttpResponse(status, body, retryAfter) }
 
@@ -22,8 +25,8 @@ class OjpClientTest {
     fun sendsTheRequestAndReadsTheAnswer() {
         var sent = ""
         val c = client { body -> sent = body; OjpHttpResponse(200, Fixtures.text("ojp/app_ser_esserts_light.xml")) }
-        val board = c.departures("8587418", "fr", from = Instant.parse("2026-11-16T06:25:25.538Z"), limit = 150, onward = false)
-        assertEquals(Fixtures.text("ojp/app_ser_esserts_light.request.xml"), sent)
+        val board = c.departures("8587418", "fr", from = tag("DepArrTime"), limit = 150, onward = false)
+        assertEquals(recorded, sent)
         assertTrue(board.departures.isNotEmpty())
     }
 

@@ -53,9 +53,8 @@ class OjpRequestsTest {
     fun recordedRequestsAreTheAppsOwn() {
         // the oracle rebuilt them from the recorded files; check one directly against the recording
         val recorded = Fixtures.text("ojp/app_ser_esserts_light.request.xml")
-        val xml = requests.stopEvents(
-            "8587418", Instant.parse("2026-11-16T06:25:25.538Z"), "fr", Instant.parse("2026-11-16T06:55:25.538Z"), 150, onward = false,
-        )
+        fun tag(name: String) = Instant.parse(Regex("<$name>([^<]+)</$name>").find(recorded)!!.groupValues[1])
+        val xml = requests.stopEvents("8587418", tag("DepArrTime"), "fr", tag("siri:RequestTimestamp"), 150, onward = false)
         assertEquals(recorded, xml)
     }
 
