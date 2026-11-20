@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(os.environ.get("OUT", "audit-out")); OUT.mkdir(parents=True, exist_ok=True)
 TOKEN = os.environ["OJP_TOKEN"]
 TZ = ZoneInfo("Europe/Zurich")
-PAGE = "http://127.0.0.1:8765/prototypes/sprint-09-my-places/index.html"
+PAGE = "http://127.0.0.1:8765/prototype/index.html"
 SPEED = 4.8 * 1000 / 60; DETOUR = 1.3; COMFORT = 3
 
 PAIRS = [  # (from, to) by name; resolved to the first stop OJP gives
@@ -188,7 +188,7 @@ HOOK = ("  window.__audit = () => journeyBase.slice(0, 8).map(j => ({ key: j.key
         " raw: tripConnections(planOf(j)).map(c => ({ walk: c.walk, slack: c.slack, cur: c.cur, next: c.next })),"
         " fin: tripConnections(planOf(withStayOn(j))).map(c => ({ walk: c.walk, slack: c.slack, cur: c.cur, next: c.next })) }));\n")
 def add_hook():
-    p = ROOT / "prototypes/sprint-09-my-places/index.html"; s = p.read_text()
+    p = ROOT / "prototype/index.html"; s = p.read_text()
     anchor = "  // Journeys between two places (one part of the trip)"
     assert s.count(anchor) == 1
     s = s.replace(anchor, HOOK + anchor)

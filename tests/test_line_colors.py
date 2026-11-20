@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGE = (ROOT / "prototypes/sprint-09-my-places/index.html").as_uri()
+PAGE = (ROOT / "prototype/index.html").as_uri()
 TOOL = (ROOT / "tools/line-colors.html").as_uri()
 OUT = ROOT / "tests" / "out"; OUT.mkdir(exist_ok=True)
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGE = (ROOT / "prototypes/sprint-09-my-places/index.html").as_uri()
+PAGE = (ROOT / "prototype/index.html").as_uri()
 OUT = ROOT / "tests" / "out"; OUT.mkdir(exist_ok=True)
 EXPECT = {   # a few texts per language
     "en": {"tabJourney": "Journey", "searchJourney": "Search", "myPlaces": "My places", "followTitle": "Followed journeys"},

@@ -73,9 +73,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1220">
 <title>swissPublicTransport — Sprint 9 prototype</title>
-<script src="../../assets/line-colors.js"></script>
-<script src="../../assets/line-colors-ch.js"></script>
-<script src="../../assets/ojp.js"></script>
+<script src="../assets/line-colors.js"></script>
+<script src="../assets/line-colors-ch.js"></script>
+<script src="../assets/ojp.js"></script>
 <script src="i18n.js"></script>
 <style>
   :root {
@@ -630,7 +630,7 @@
 
   // ---------- Configuration ----------
   const API = 'https://transport.opendata.ch/v1';
-  const ASSETS = '../../assets';
+  const ASSETS = '../assets';
   // The API only returns journeys whose *scheduled* time is at or after `datetime`. A bus scheduled at 17:10
   // running +8 min would vanish at 17:11, so we ask from LOOKBACK_MIN minutes ago and filter on the real time.
   const LOOKBACK_MIN = 30;
