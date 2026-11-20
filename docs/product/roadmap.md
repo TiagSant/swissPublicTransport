@@ -125,7 +125,7 @@ Goal: Missed or tight changes, cancellations, late starts; sensors and GPS only 
 | [US-89](https://github.com/TiagSant/swissPublicTransport/issues/196) | When plans change while following | P1 | 8 |
 | [US-90](https://github.com/TiagSant/swissPublicTransport/issues/197) | Walking or riding from the phone's own sensors; GPS only when it helps | P1 | 8 |
 | [US-91](https://github.com/TiagSant/swissPublicTransport/issues/198) | Trains that split: which part to be in | P1 | 2 |
-| [BUG-24](https://github.com/TiagSant/swissPublicTransport/issues/208) | Earlier run boarded: the change after it is not planned again (PO to confirm) | P1 | 3 |
+| [BUG-24](https://github.com/TiagSant/swissPublicTransport/issues/208) | Earlier run boarded: only seen on the first ride, and the change after it is not planned again (PO to confirm) | P1 | 3 |
 | | **Total** | | **21** |
 
 ## Sprint 19 — Trip parts, traffic, privacy (25.01 – 29.01)
@@ -139,7 +139,8 @@ Goal: Stopovers, round trips, traffic messages; permissions explained; Lausanne 
 | [US-92](https://github.com/TiagSant/swissPublicTransport/issues/199) | Stopovers and round trips | P1 | 5 |
 | [US-93](https://github.com/TiagSant/swissPublicTransport/issues/200) | Traffic messages | P1 | 3 |
 | [TECH-19](https://github.com/TiagSant/swissPublicTransport/issues/202) | Accessibility review | P1 | 3 |
-| | **Total** | | **17** |
+| [BUG-25](https://github.com/TiagSant/swissPublicTransport/issues/210) | Round trip: leaving the stay early, I can't choose my next departure (PO to confirm) | P1 | 3 |
+| | **Total** | | **20** |
 
 ## Sprint 20 — MVP release (01.02 – 05.02)
 
