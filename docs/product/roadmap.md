@@ -158,6 +158,7 @@ Goal: Parity with the prototype checked, PO field test, v1.0.0 on GitHub and sub
 | [US-24](https://github.com/TiagSant/swissPublicTransport/issues/45) | Suggest my usual journey for the time of day | P2 | 5 |
 | [US-55](https://github.com/TiagSant/swissPublicTransport/issues/120) | Where to board: front, middle, rear or sectors, nearest to the walk or the next change | P3 | 13 |
 | [US-56](https://github.com/TiagSant/swissPublicTransport/issues/121) | Platform sectors of my class (1st or 2nd), checked again before the station | P3 | 8 |
+| [US-94](https://github.com/TiagSant/swissPublicTransport/issues/206) | Keep my place on the journey from the phone's sensors when the GPS is off (PO to confirm) | P2 | 8 |
 
 ## Decisions expected from the PO in Sprint 10
 

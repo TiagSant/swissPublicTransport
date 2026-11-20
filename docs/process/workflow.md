@@ -15,7 +15,7 @@
 ## Backlog in GitHub
 
 - **Issues** hold the stories; one **milestone** per sprint (with its Friday as due date), plus *Later (after MVP)*.
-- Title prefixes: `US-xx` user story, `TECH-xx` technical task, `BUG-xx` bug. Numbers continue those of the prototype (next free: US-94, TECH-22, BUG-24).
+- Title prefixes: `US-xx` user story, `TECH-xx` technical task, `BUG-xx` bug. Numbers continue those of the prototype (next free: US-95, TECH-22, BUG-24).
 - User story format: *As a … I want … so that …*, then acceptance criteria as checkboxes, the **prototype reference** (issues and tests) and dependencies. Templates in `.github/ISSUE_TEMPLATE/`.
 
 ### Labels
