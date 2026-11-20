@@ -55,7 +55,7 @@
 ## Branches and pull requests
 
 - `main` is always buildable; it is what GitHub Pages serves (`prototype/`, `docs/`).
-- One branch per story or bug: `us-72-stop-search`, `tech-10-android-skeleton`, `bug-24-…`. Branches are deleted after merge.
+- One branch per story or bug: `us-72-stop-search`, `tech-10-android-skeleton`, `bug-24-…`. Branches are deleted after merge (repository setting *Automatically delete head branches*; the manual workflow `repo-cleanup.yml` removes any merged branch left over, after checking its commit was merged).
 - Pull requests reference their issues and the sprint milestone; they are merged once CI passes. The PO reviews APK releases.
 - Commits and PRs in English. No rewrite of published history.
 

@@ -9,7 +9,7 @@ Nine one-week sprints of web prototypes (November 2026) validated the product wi
 ## Decision
 
 - The Sprint 9 prototype moves to [`prototype/`](../../../prototype/index.html) and stays usable on GitHub Pages. Its behaviour is frozen: only fixes that keep it running (paths, data source changes) are allowed.
-- Prototypes of Sprints 1–8 are removed from `main`; they stay available under the git tag [`prototypes-sprint-01-09`](https://github.com/TiagSant/swissPublicTransport/tree/prototypes-sprint-01-09).
+- Prototypes of Sprints 1–8 are removed from `main`; they stay available under the git tag [`prototypes-sprint-01-09`](https://github.com/TiagSant/swissPublicTransport/tree/prototypes-sprint-01-09) (commit `5b92173`, created by the `repo-cleanup.yml` workflow).
 - The prototype's Playwright tests stay in `tests/` and keep passing; each Android story ports the scenarios of its area (parity).
 
 ## Consequences
