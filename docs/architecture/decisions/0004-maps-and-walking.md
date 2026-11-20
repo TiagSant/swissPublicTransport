@@ -1,6 +1,6 @@
 # ADR-0004 — Maps with MapLibre and OSM data; walking routes through the relay
 
-**Status:** Proposed
+**Status:** Accepted (PO, 20.11.2026, TECH-13). The tile provider is still chosen in Sprint 13 (US-78).
 
 ## Context
 

@@ -163,14 +163,14 @@ Goal: Parity with the prototype checked, PO field test, v1.0.0 on GitHub and sub
 | [US-94](https://github.com/TiagSant/swissPublicTransport/issues/206) | Keep my place on the journey from the phone's sensors when the GPS is off (PO to confirm) | P2 | 8 |
 | [US-95](https://github.com/TiagSant/swissPublicTransport/issues/209) | Ask me once, in one tap, when the app is not sure which vehicle I am in (PO to confirm) | P2 | 5 |
 
-## Decisions expected from the PO in Sprint 10
+## Decisions taken by the PO in Sprint 10
 
-Tracked in [TECH-13](https://github.com/TiagSant/swissPublicTransport/issues/172):
+Taken on 20.11.2026 ([TECH-13](https://github.com/TiagSant/swissPublicTransport/issues/172)):
 
-1. **Licence** (needed for F-Droid): GPL-3.0-or-later, Apache-2.0 or MIT.
-2. **Application ID**: from a domain you own (e.g. `ch.<domain>.spt`); it cannot change after the first public release.
-3. **Relay hosting and domain** (ADR-0002): proposed a small Swiss VPS or container service (e.g. Infomaniak) running a Docker image.
-4. **Architecture** (ADR-0001 native Kotlin, ADR-0004 maps): accept or change.
+1. **Licence:** GPL-3.0-or-later ([`LICENSE`](../../LICENSE)).
+2. **Application ID:** `io.github.tiagsant.spt` (the PO's GitHub Pages domain); final once published.
+3. **Relay hosting:** Infomaniak, as a Docker image ([ADR-0002](../architecture/decisions/0002-relay-server.md)); the domain name is chosen with TECH-08 in Sprint 11.
+4. **Architecture:** native Kotlin and Jetpack Compose ([ADR-0001](../architecture/decisions/0001-native-android-kotlin.md)), MapLibre maps with OSM data ([ADR-0004](../architecture/decisions/0004-maps-and-walking.md)): accepted.
 
 ## Dependencies
 

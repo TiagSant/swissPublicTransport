@@ -1,6 +1,6 @@
 # ADR-0002 — A relay holds the OJP key, caches data and computes change places
 
-**Status:** Accepted for the relay and its scope (PO, 14.11.2026, [TECH-08 #41](https://github.com/TiagSant/swissPublicTransport/issues/41)). Proposed for the technology and hosting.
+**Status:** Accepted (PO): the relay and its scope on 14.11.2026 ([TECH-08 #41](https://github.com/TiagSant/swissPublicTransport/issues/41)); Kotlin with Ktor and hosting at Infomaniak on 20.11.2026 ([TECH-13 #172](https://github.com/TiagSant/swissPublicTransport/issues/172)). The domain name is chosen with TECH-08 (Sprint 11).
 
 ## Context
 
@@ -12,8 +12,8 @@
 
 1. A **relay** holds the key and is the app's only data source. It caches boards (per stop, ≈ 20–30 s), runs (a day), journeys and walking routes; rounds request times so identical requests share the cache; limits each app instance and answers `429` with a clear message.
 2. The relay **computes the change places** (stay on, get off earlier, board earlier, finish or start on foot) with the prototype's rules and the ATLAS platform positions, and returns journeys already improved.
-3. *Proposed:* written in **Kotlin with Ktor**, sharing the `:core` module with the app (one implementation of the rules, tested once).
-4. *Proposed:* hosted in Switzerland on a small VPS or container service (e.g. Infomaniak), deployed as a Docker image by GitHub Actions. *PO decision:* hosting provider and domain name.
+3. Written in **Kotlin with Ktor**, sharing the `:core` module with the app (one implementation of the rules, tested once).
+4. Hosted in Switzerland at **Infomaniak** (PO, 20.11.2026), deployed as a Docker image by GitHub Actions. The domain name is chosen in Sprint 11 (TECH-08).
 
 ## Consequences
 

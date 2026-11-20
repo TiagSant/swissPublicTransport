@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- three sliders -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M3,5h10v2h-10zM17,5h4v2h-4zM13,3h4v6h-4zM3,11h4v2h-4zM11,11h10v2h-10zM7,9h4v6h-4zM3,17h12v2h-12zM19,17h2v2h-2zM15,15h4v6h-4z" />
+</vector>

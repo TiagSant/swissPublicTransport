@@ -1,0 +1,3 @@
+stop|8501008|Genève Cornavin|46.21021,6.14246|-|-|-
+stop|8587057|Genève, gare Cornavin|46.20973,6.14244|-|-|-
+error|-

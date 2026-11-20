@@ -1,0 +1,2 @@
+stop|8592900|Genève, Rue du Lac|46.20384,6.15801|bus
+error|-

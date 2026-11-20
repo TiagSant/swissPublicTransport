@@ -1,6 +1,6 @@
 # ADR-0001 — Native Android app in Kotlin and Jetpack Compose
 
-**Status:** Proposed (PO decision expected in Sprint 10, TECH-13)
+**Status:** Accepted (PO, 20.11.2026, [TECH-13 #172](https://github.com/TiagSant/swissPublicTransport/issues/172))
 
 ## Context
 
@@ -13,6 +13,10 @@ TECH-03 (#12) left the choice open: wrap the web prototype (Capacitor, or a PWA 
 ## Decision
 
 Build a native app in **Kotlin** with **Jetpack Compose**. The domain rules are rewritten in a pure Kotlin module (`:core`) shared with the relay, and checked against the prototype's scenarios and the recorded OJP answers.
+
+## Baseline (Sprint 10, TECH-10)
+
+Kotlin 2.4, Jetpack Compose (BOM 2026.08) with Material 3, Android Gradle plugin 9.4 (Kotlin built in) on Gradle 9.6, minSdk 26 (Android 8.0), compileSdk and targetSdk 37. Application ID `io.github.tiagsant.spt` (TECH-13: from the PO's GitHub Pages domain, final once published).
 
 ## Consequences
 

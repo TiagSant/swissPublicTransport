@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- a stop sign on its post: a board with two departure lines -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,34h40a4,4 0,0 1,4 4v22a4,4 0,0 1,-4 4h-17v12h-6v-12h-17a4,4 0,0 1,-4 -4v-22a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#D7192D"
+        android:pathData="M38,41h8v6h-8zM50,42h20v4h-20zM38,51h8v6h-8zM50,52h20v4h-20z" />
+</vector>

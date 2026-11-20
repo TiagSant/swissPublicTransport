@@ -29,12 +29,17 @@ jobs:
         env:
           OJP_TOKEN: ${{ secrets.OJP_TOKEN }}
         run: node scripts/ojp_probe.mjs tests/fixtures/ojp
+      - name: Rebuild the prototype's outputs for the Kotlin parity tests (TECH-12)
+        if: always()
+        run: |
+          npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/jsenv" jsdom@25
+          NODE_PATH="$RUNNER_TEMP/jsenv/node_modules" node scripts/ojp_kotlin_parity.mjs
       - name: Commit the fixtures
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/fixtures/ojp
+          git add tests/fixtures/ojp tests/fixtures/ojp-kotlin
           if git diff --cached --quiet; then echo "No change"; else
             git commit -m "OJP probe: real answers for Geneva ($(date -u +%F))"
             git pull --rebase

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window theme before Compose draws; the colours come from ui/Theme.kt -->
+    <style name="Theme.SwissPublicTransport" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

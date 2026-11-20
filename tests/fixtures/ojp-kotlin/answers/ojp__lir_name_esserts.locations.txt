@@ -1,0 +1,12 @@
+stop|8577795|Lovens, Les Esserts|46.77403,7.02451|bus
+stop|8596121|Bouloz, Les Esserts|46.61201,6.88149|bus
+stop|8511447|Verbier, Esserts Bas|46.10418,7.23532|bus
+stop|8557017|Verbier, Les Esserts|46.10421,7.23274|bus
+stop|8510479|Boécourt, Les Esserts|47.34481,7.22119|bus
+stop|8588850|Mex VD, Les Esserts|46.57648,6.56624|bus
+stop|8511448|Verbier, Esserts Haut|46.10388,7.23889|bus
+stop|8511620|Vessy, Grands-Esserts|46.17603,6.16216|bus
+stop|8501154|Les Esserts-de-Rive|46.63198,6.26037|train
+stop|8511449|Verbier, Esserts Milieu|46.10457,7.23641|bus
+stop|8511130|Champoussin, Les Esserts|46.20996,6.86722|bus
+error|-

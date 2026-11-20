@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_departures">Partenze</string>
+    <string name="tab_journey">Itinerario</string>
+    <string name="settings">Impostazioni</string>
+    <string name="back">Indietro</string>
+    <string name="departures_placeholder">Cerca una fermata e vedi le prossime partenze. Previsto nello sprint 12.</string>
+    <string name="journey_placeholder">Pianifica un itinerario, il più rapido o con meno strada a piedi. Previsto nello sprint 13.</string>
+    <string name="settings_placeholder">Lingua, velocità di marcia, tempo di preparazione… Previsto nello sprint 14.</string>
+</resources>
