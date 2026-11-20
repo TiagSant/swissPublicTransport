@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 FX = ROOT / "tests/fixtures/ojp"
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROME_PATH")); pg = b.new_page()
-    pg.goto((ROOT / "prototypes/sprint-09-my-places/index.html").as_uri())
+    pg.goto((ROOT / "prototype/index.html").as_uri())
     r = pg.evaluate("""([full, light]) => {
       const pat = new Map();
       const a = OJP_ADAPTER.toStationboard(full, '8587418', pat), l = OJP_ADAPTER.toStationboard(light, '8587418', pat);

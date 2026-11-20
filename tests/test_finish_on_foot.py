@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGE = (ROOT / "prototypes/sprint-09-my-places/index.html").as_uri()
+PAGE = (ROOT / "prototype/index.html").as_uri()
 OUT = ROOT / "tests" / "out"; OUT.mkdir(exist_ok=True)
 tz = ZoneInfo("Europe/Zurich")
 NOW = dt.datetime(2026, 11, 12, 7, 30, tzinfo=tz)

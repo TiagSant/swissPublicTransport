@@ -1,0 +1,59 @@
+# Target architecture (Android MVP)
+
+> Status: **proposed** — the choices marked *Proposed* in the [decision records](decisions/) wait for the PO's approval in Sprint 10 ([TECH-13](../product/roadmap.md)).
+
+```mermaid
+flowchart LR
+  subgraph Phone["Android app (Kotlin, Jetpack Compose)"]
+    UI[Screens: Departures, Journey, Follow, Settings]
+    Core1[":core — domain model and rules"]
+    Store[(On-device storage: settings, stops, places, habits)]
+    Sys[Android: AlarmManager, foreground service, LocationManager, SensorManager]
+    UI --> Core1
+    UI --> Store
+    UI --> Sys
+  end
+  subgraph Relay["Relay (Kotlin, Ktor)"]
+    API[Small HTTP API for the app]
+    Core2[":core — same module"]
+    Cache[(Cache: boards, runs, journeys, walks)]
+    API --> Core2
+    API --> Cache
+  end
+  OJP[opentransportdata.swiss — OJP 2.0]
+  OSRM[OSM foot routing]
+  Phone -- HTTPS, no key --> API
+  API -- key, under the plan's limits --> OJP
+  API --> OSRM
+```
+
+## Modules
+
+| Module | Role | Notes |
+|---|---|---|
+| `android/app` | UI (Compose), navigation, Android services (alarms, following, sensors, location), storage. | No Google dependency (ADR-0003). |
+| `android/core` *(or `core/`)* | Pure Kotlin (JVM): domain model (stop, line, departure, journey, ride, walk, place), OJP 2.0 requests and parser, habit scores, journey rules (priorities, de-duplication, change places, alarms). | Shared by the app and the relay, unit-tested on the JVM with the recorded OJP answers. |
+| `relay/` | Holds the OJP key, caches answers, keeps requests under the key's limits, computes change places and returns journeys already improved. | ADR-0002. Its code lives in this repository so the network part is FLOSS (F-Droid). |
+| `assets/` | Shared static data: line colours, platform positions (ATLAS), SBB pictograms. | Rebuilt by the existing workflows; bundled into the app at build time. |
+| `prototype/` | The web prototype, frozen: the functional reference. | ADR-0005. |
+
+## Data flow
+
+1. **Departures**: app → relay `GET /stops/{id}/departures` → relay cache (≈ 20–30 s per stop) → OJP `StopEventRequest`. Run patterns (next stops) cached for a day.
+2. **Journeys**: app → relay `POST /journeys` → OJP `TripRequest` + boards and runs needed for the change places → `:core` rules → improved journeys back to the app.
+3. **Following**: the app polls the relay every 60 s while a journey is followed (foreground service); alarms are scheduled on the phone with `AlarmManager.setAlarmClock()` and moved when the data changes.
+4. **Habits, places, settings, positions** stay on the phone. The relay receives only what a request needs (stop ids, coordinates of the start and end of a search) and keeps no history per rider.
+
+## Proposed technical baseline
+
+| Topic | Choice |
+|---|---|
+| Language / UI | Kotlin, Jetpack Compose, Material 3 |
+| Min / target SDK | 26 (Android 8.0) / latest stable |
+| Storage | DataStore (settings) and Room (stops, places, habits) |
+| Network | OkHttp; XML parsing in `:core` |
+| Maps | MapLibre Native Android, OSM-based tiles from a provider allowing app use (ADR-0004) |
+| Location / motion | `LocationManager` (GPS, network), `SensorManager` (accelerometer, step detector) |
+| Alarms | `AlarmManager.setAlarmClock()`, full-screen intent, alarm audio channel, `BOOT_COMPLETED` |
+| Build / CI | Gradle (Kotlin DSL), GitHub Actions: build, unit tests, lint, dependency check (no Google libraries) |
+| Relay | Ktor (JVM), in-memory cache (+ optional disk), Docker image |

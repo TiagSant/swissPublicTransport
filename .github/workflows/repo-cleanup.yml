@@ -1,0 +1,57 @@
+name: Repository cleanup (manual)
+
+# Run by hand: Actions → "Repository cleanup (manual)" → Run workflow.
+# 1. Tags the archive points: the web prototypes of Sprints 1–9 (main before 20.11.2026) and the branches with
+#    commits that were never merged (probes, OJP fixture refreshes pushed after merge): archive/<branch>.
+# 2. Deletes every branch whose pull request was merged, but only if the branch still points at the commit that was
+#    merged, and the archived probe branches once their tag exists. `main` is never touched.
+# Safe to run again: existing tags are kept, branches already gone are skipped.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would be done"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DRY: ${{ inputs.dry_run }}
+      ARCHIVED: "audit-changes debug-probe-jonction debug-probe-split debug-probe-ste-clotilde cancelled-runs fix-ojp-probe-keep-fixtures split-trains us-67-traffic-info"
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Archive tags
+        run: |
+          set -eu
+          run() { if [ "$DRY" = "true" ]; then echo "would run: $*"; else "$@"; fi; }
+          tag() {
+            if git rev-parse -q --verify "refs/tags/$1" >/dev/null; then echo "tag $1 exists"; return; fi
+            run git tag "$1" "$2"; run git push origin "refs/tags/$1"; echo "tag $1 -> $2"
+          }
+          tag prototypes-sprint-01-09 5b9217373843a7f8cbe84a703ab6c2d49a44ee87
+          for b in $ARCHIVED; do
+            if git rev-parse -q --verify "refs/remotes/origin/$b" >/dev/null; then tag "archive/$b" "origin/$b"; fi
+          done
+      - name: Delete merged and archived branches
+        run: |
+          set -eu
+          gh api "repos/${{ github.repository }}/pulls?state=closed&per_page=100" --paginate \
+            -q '.[] | select(.merged_at != null) | "\(.head.ref) \(.head.sha)"' > merged.txt
+          for b in $(git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin); do
+            [ "$b" = "main" ] || [ "$b" = "HEAD" ] && continue
+            head=$(git rev-parse "refs/remotes/origin/$b")
+            reason=""
+            if grep -Fqx "$b $head" merged.txt; then reason="merged"
+            elif echo " $ARCHIVED " | grep -q " $b " && [ "$(git rev-parse -q --verify "refs/tags/archive/$b" || true)" = "$head" ]; then reason="archived"
+            fi
+            if [ -z "$reason" ]; then echo "keep   $b"; continue; fi
+            if [ "$DRY" = "true" ]; then echo "delete $b ($reason) [dry run]"; else git push origin --delete "$b"; echo "delete $b ($reason)"; fi
+          done
