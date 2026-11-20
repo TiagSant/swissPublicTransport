@@ -125,7 +125,8 @@ Goal: Missed or tight changes, cancellations, late starts; sensors and GPS only 
 | [US-89](https://github.com/TiagSant/swissPublicTransport/issues/196) | When plans change while following | P1 | 8 |
 | [US-90](https://github.com/TiagSant/swissPublicTransport/issues/197) | Walking or riding from the phone's own sensors; GPS only when it helps | P1 | 8 |
 | [US-91](https://github.com/TiagSant/swissPublicTransport/issues/198) | Trains that split: which part to be in | P1 | 2 |
-| | **Total** | | **18** |
+| [BUG-24](https://github.com/TiagSant/swissPublicTransport/issues/208) | Earlier run boarded: only seen on the first ride, and the change after it is not planned again (PO to confirm) | P1 | 3 |
+| | **Total** | | **21** |
 
 ## Sprint 19 — Trip parts, traffic, privacy (25.01 – 29.01)
 
@@ -138,7 +139,8 @@ Goal: Stopovers, round trips, traffic messages; permissions explained; Lausanne 
 | [US-92](https://github.com/TiagSant/swissPublicTransport/issues/199) | Stopovers and round trips | P1 | 5 |
 | [US-93](https://github.com/TiagSant/swissPublicTransport/issues/200) | Traffic messages | P1 | 3 |
 | [TECH-19](https://github.com/TiagSant/swissPublicTransport/issues/202) | Accessibility review | P1 | 3 |
-| | **Total** | | **17** |
+| [BUG-25](https://github.com/TiagSant/swissPublicTransport/issues/210) | Round trip: leaving the stay early, I can't choose my next departure (PO to confirm) | P1 | 3 |
+| | **Total** | | **20** |
 
 ## Sprint 20 — MVP release (01.02 – 05.02)
 
@@ -158,6 +160,8 @@ Goal: Parity with the prototype checked, PO field test, v1.0.0 on GitHub and sub
 | [US-24](https://github.com/TiagSant/swissPublicTransport/issues/45) | Suggest my usual journey for the time of day | P2 | 5 |
 | [US-55](https://github.com/TiagSant/swissPublicTransport/issues/120) | Where to board: front, middle, rear or sectors, nearest to the walk or the next change | P3 | 13 |
 | [US-56](https://github.com/TiagSant/swissPublicTransport/issues/121) | Platform sectors of my class (1st or 2nd), checked again before the station | P3 | 8 |
+| [US-94](https://github.com/TiagSant/swissPublicTransport/issues/206) | Keep my place on the journey from the phone's sensors when the GPS is off (PO to confirm) | P2 | 8 |
+| [US-95](https://github.com/TiagSant/swissPublicTransport/issues/209) | Ask me once, in one tap, when the app is not sure which vehicle I am in (PO to confirm) | P2 | 5 |
 
 ## Decisions expected from the PO in Sprint 10
 
