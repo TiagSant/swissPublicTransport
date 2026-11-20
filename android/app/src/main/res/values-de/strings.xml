@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_departures">Abfahrten</string>
+    <string name="tab_journey">Verbindung</string>
+    <string name="settings">Einstellungen</string>
+    <string name="back">Zurück</string>
+    <string name="departures_placeholder">Haltestelle suchen und die nächsten Abfahrten sehen. Folgt in Sprint 12.</string>
+    <string name="journey_placeholder">Eine Verbindung planen, die schnellste oder mit dem kürzesten Fussweg. Folgt in Sprint 13.</string>
+    <string name="settings_placeholder">Sprache, Gehgeschwindigkeit, Vorbereitungszeit… Folgt in Sprint 14.</string>
+</resources>

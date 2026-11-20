@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_departures">Partenzas</string>
+    <string name="tab_journey">Viadi</string>
+    <string name="settings">Parameters</string>
+    <string name="back">Enavos</string>
+    <string name="departures_placeholder">Tschertgai ina fermada e vesai las proximas partenzas. Previs en il sprint 12.</string>
+    <string name="journey_placeholder">Planisai in viadi, il pli svelt u cun il pli pauc ir a pe. Previs en il sprint 13.</string>
+    <string name="settings_placeholder">Lingua, sveltezza dad ir a pe, temp da preparaziun… Previs en il sprint 14.</string>
+</resources>

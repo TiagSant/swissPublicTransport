@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">swissPublicTransport</string>
+    <string name="tab_departures">Departures</string>
+    <string name="tab_journey">Journey</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="departures_placeholder">Find a stop and see its next departures. Coming in Sprint 12.</string>
+    <string name="journey_placeholder">Plan a journey, fastest or with the least walking. Coming in Sprint 13.</string>
+    <string name="settings_placeholder">Language, walking speed, time to get ready… Coming in Sprint 14.</string>
+</resources>

@@ -1,0 +1,90 @@
+name: Android
+
+# Builds the Android app and checks it on every pull request (TECH-10): debug APK, unit tests (with the parity
+# checks against the prototype), Android lint, and the refusal of Google service dependencies (ADR-0003).
+on:
+  pull_request:
+    paths:
+      - android/**
+      - tests/fixtures/**
+      - assets/ojp.js
+      - scripts/ojp_kotlin_parity.mjs
+      - .github/workflows/android.yml
+  push:
+    branches: [main]
+    paths:
+      - android/**
+      - tests/fixtures/**
+      - assets/ojp.js
+      - scripts/ojp_kotlin_parity.mjs
+      - .github/workflows/android.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Kotlin core is checked against what the prototype's assets/ojp.js builds and reads
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Prototype outputs are up to date
+        working-directory: .
+        run: |
+          npm install --no-save --no-package-lock --prefix "$RUNNER_TEMP/jsenv" jsdom@25
+          NODE_PATH="$RUNNER_TEMP/jsenv/node_modules" node scripts/ojp_kotlin_parity.mjs
+          if [ -n "$(git status --porcelain -- tests/fixtures/ojp-kotlin)" ]; then
+            git status --short -- tests/fixtures/ojp-kotlin | head -20
+            echo "::error::tests/fixtures/ojp-kotlin is out of date: run scripts/ojp_kotlin_parity.mjs and commit the result"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, test, lint
+        run: ./gradlew --stacktrace assembleDebug :core:test :app:testDebugUnitTest :app:lintDebug
+
+      - name: The build refuses Google services (ADR-0003)
+        run: |
+          if ./gradlew --no-configuration-cache :core:compileKotlin -PnoGoogleSelfTest > guard.log 2>&1; then
+            cat guard.log
+            echo "::error::a com.google.android.gms dependency was accepted"
+            exit 1
+          fi
+          grep -q "ADR-0003" guard.log || { cat guard.log; echo "::error::the build failed for another reason"; exit 1; }
+          echo "Refused as expected."
+
+      - name: Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: swissPublicTransport-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            android/*/build/reports/
+            android/*/build/test-results/
+            android/guard.log
+          if-no-files-found: ignore
