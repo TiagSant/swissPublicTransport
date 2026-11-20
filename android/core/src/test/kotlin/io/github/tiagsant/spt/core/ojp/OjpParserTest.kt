@@ -170,7 +170,7 @@ class OjpParserTest {
         for (d in rebuilt) {
             assertTrue(d.nextStops.size <= 8)
             assertEquals(d.line.key + ">" + d.nextStops.first().stop.id, d.directionKey)
-            assertTrue(d.nextStops.all { it.arrival == null || it.arrival!! >= d.time.time })
+            assertTrue(d.nextStops.all { s -> s.arrival.let { it == null || it >= d.time.time } })
         }
         // without known patterns a light refresh cannot tell the next stops
         val alone = OjpParser.board(Fixtures.text("ojp/app_ser_esserts_light.xml"), "8587418", RunPatterns(), "fr")
