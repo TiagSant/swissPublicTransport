@@ -1,14 +1,14 @@
 stopId|8501238
 station|8501238|Genève-Pâquis (lac)|46.20946,6.15122
 unknownPatterns|0
-dep|BAT|M2|M2|Mouettes genevoises|199|Genève-Quai Gustave Ador (lac)|false|2026-11-20T17:20:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530700~Genève-Quai Gustave Ador (lac)~2026-11-20T17:23:00.000Z~2~46.20531,6.15511
-dep|BAT|M1|M1|Mouettes genevoises|199|Genève-Molard (lac)|false|2026-11-20T17:25:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530699~Genève-Molard (lac)~2026-11-20T17:28:00.000Z~1~46.20467,6.14864
-dep|BAT|M2|M2|Mouettes genevoises|199|Genève-Quai Gustave Ador (lac)|false|2026-11-20T17:30:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530700~Genève-Quai Gustave Ador (lac)~2026-11-20T17:33:00.000Z~2~46.20531,6.15511
-dep|BAT|M3|M3|Mouettes genevoises|199|Genève-Port Noir (lac)|false|2026-11-20T17:30:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8588813~Genève-Port Noir (lac)~2026-11-20T17:40:00.000Z~3~46.21149,6.17051
 dep|BAT|M1|M1|Mouettes genevoises|199|Genève-Molard (lac)|false|2026-11-20T17:35:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530699~Genève-Molard (lac)~2026-11-20T17:38:00.000Z~1~46.20467,6.14864
 dep|BAT|M2|M2|Mouettes genevoises|199|Genève-Quai Gustave Ador (lac)|false|2026-11-20T17:40:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530700~Genève-Quai Gustave Ador (lac)~2026-11-20T17:43:00.000Z~2~46.20531,6.15511
 dep|BAT|M1|M1|Mouettes genevoises|199|Genève-Molard (lac)|false|2026-11-20T17:45:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530699~Genève-Molard (lac)~2026-11-20T17:48:00.000Z~1~46.20467,6.14864
 dep|BAT|M2|M2|Mouettes genevoises|199|Genève-Quai Gustave Ador (lac)|false|2026-11-20T17:50:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530700~Genève-Quai Gustave Ador (lac)~2026-11-20T17:53:00.000Z~2~46.20531,6.15511
 dep|BAT|M1|M1|Mouettes genevoises|199|Genève-Molard (lac)|false|2026-11-20T17:55:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530699~Genève-Molard (lac)~2026-11-20T17:58:00.000Z~1~46.20467,6.14864
 dep|BAT|M2|M2|Mouettes genevoises|199|Genève-Quai Gustave Ador (lac)|false|2026-11-20T18:00:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530700~Genève-Quai Gustave Ador (lac)~2026-11-20T18:03:00.000Z~2~46.20531,6.15511
+dep|BAT|M3|M3|Mouettes genevoises|199|Genève-Port Noir (lac)|false|2026-11-20T18:00:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8588813~Genève-Port Noir (lac)~2026-11-20T18:10:00.000Z~3~46.21149,6.17051
+dep|BAT|M1|M1|Mouettes genevoises|199|Genève-Molard (lac)|false|2026-11-20T18:05:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530699~Genève-Molard (lac)~2026-11-20T18:08:00.000Z~1~46.20467,6.14864
+dep|BAT|M2|M2|Mouettes genevoises|199|Genève-Quai Gustave Ador (lac)|false|2026-11-20T18:10:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530700~Genève-Quai Gustave Ador (lac)~2026-11-20T18:13:00.000Z~2~46.20531,6.15511
+dep|BAT|M1|M1|Mouettes genevoises|199|Genève-Molard (lac)|false|2026-11-20T18:15:00.000Z|-|-|-|8501238~Genève-Pâquis (lac)|-|8530699~Genève-Molard (lac)~2026-11-20T18:18:00.000Z~1~46.20467,6.14864
 error|-
