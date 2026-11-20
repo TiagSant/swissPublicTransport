@@ -1,0 +1,6 @@
+stop|8587418|Petit-Lancy, Les Esserts|46.1881,6.1131|-|-|-
+stop|8592975|Petit-Lancy, Bossons|46.19055,6.11227|-|-|-
+stop|8592993|Petit-Lancy, Pré-Monnard|46.18642,6.11641|-|-|-
+stop|8587082|Petit-Lancy, place|46.1904,6.11933|-|-|-
+stop|8592986|Petit-Lancy, Morgines|46.19256,6.10992|-|-|-
+error|-

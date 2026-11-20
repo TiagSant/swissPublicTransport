@@ -1,0 +1,12 @@
+stop|8501170|Bel-Air LEB|46.57868,6.60553|-|-|-
+stop|8510189|Marly, Bel-Air|46.77924,7.14554|-|-|-
+stop|8587387|Genève, Bel-Air|46.20473,6.14305|-|-|-
+stop|8591988|Lausanne, Bel-Air|46.52228,6.62907|-|-|-
+stop|8582962|Reconvilier, Bel-Air|47.2383,7.22855|-|-|-
+stop|8749989|Decize Café Bel-Air|46.84888,3.51164|-|-|-
+stop|8511055|Estavayer-le-Lac, Bel-Air|46.84245,6.84581|-|-|-
+stop|8573144|Airolo, Pian Secco Belvédère|46.53543,8.57462|-|-|-
+stop|8592711|Chêne-Bourg, Petit-Bel-Air|46.20364,6.20361|-|-|-
+stop|8579294|Yverdon-les-Bains, Bel-Air|46.78057,6.63696|-|-|-
+stop|8593952|La Tour-de-Peilz, Bel-Air|46.45429,6.86244|-|-|-
+error|-

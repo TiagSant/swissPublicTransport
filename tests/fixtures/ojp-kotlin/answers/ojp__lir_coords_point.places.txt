@@ -1,0 +1,2 @@
+address|-|Petit-Lancy, Route de Chancy 46|46.18907,6.11495|Route de Chancy|46|Petit-Lancy
+error|-

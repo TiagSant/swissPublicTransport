@@ -1,0 +1,2 @@
+address|-|Lancy, Avenue des Communes-Réunies 60|46.17391,6.12128|Avenue des Communes-Réunies|60|Lancy
+error|-
