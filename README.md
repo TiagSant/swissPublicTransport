@@ -22,7 +22,8 @@ The first release (MVP) covers **Geneva** (Unireso: TPG, Léman Express, Mouette
 | [`tools/`](tools/) | Line colours check page; audit of change places on real data. |
 | [`docs/`](docs/) | Product, architecture, data and process documentation. |
 | [`.github/`](.github/) | Workflows (data updates, OJP probe, audit), issue and PR templates. |
-| `android/`, `relay/` | *Coming in Sprints 10–11* — the Android app and the relay ([architecture](docs/architecture/overview.md)). |
+| [`android/`](android/) | The Android app: `:app` (Jetpack Compose) and `:core` (pure Kotlin: domain model, habits, OJP 2.0 client, shared with the relay). |
+| `relay/` | *Coming in Sprint 11* — the relay that holds the OJP key ([architecture](docs/architecture/overview.md)). |
 
 ## Documentation
 
@@ -33,6 +34,26 @@ The first release (MVP) covers **Geneva** (Unireso: TPG, Léman Express, Mouette
 - [Data sources and licences](docs/data/data-sources.md)
 - [How we work](docs/process/workflow.md)
 - [Web prototype: run and test](docs/prototype.md)
+
+## Android app: build and run
+
+Needs JDK 17 or newer and the Android SDK (Android Studio, or the command-line tools with `ANDROID_HOME` set); Gradle comes with the wrapper.
+
+```bash
+cd android
+./gradlew assembleDebug                 # APK in app/build/outputs/apk/debug/
+./gradlew installDebug                  # on a connected phone or emulator (USB debugging on)
+./gradlew :core:test :app:testDebugUnitTest :app:lintDebug   # what CI runs on every pull request
+```
+
+Every pull request also gets the debug APK as an artifact of the **Android** workflow run (Actions tab), to install without building.
+
+The core's tests compare the Kotlin OJP client with the prototype's own adapter. When `assets/ojp.js` or the recorded answers change (the OJP probe does it by itself), rebuild the prototype's outputs:
+
+```bash
+npm install --prefix /tmp/jsenv jsdom@25
+NODE_PATH=/tmp/jsenv/node_modules node scripts/ojp_kotlin_parity.mjs
+```
 
 ## Quick start (prototype)
 
@@ -45,6 +66,6 @@ Tests: see [docs/prototype.md](docs/prototype.md#tests).
 
 ## Licences
 
-No licence has been chosen yet for the code (PO decision, [TECH-13](https://github.com/TiagSant/swissPublicTransport/issues/172)). Data and pictograms keep their own terms: SBB pictograms may only be used unmodified and non-commercially ([`assets/sbb/NOTICE.md`](assets/sbb/NOTICE.md)); ATLAS data from opentransportdata.swiss; line colours © OpenStreetMap contributors (ODbL). Details in [data sources](docs/data/data-sources.md).
+The code is under the [GNU GPL v3.0 or later](LICENSE) (PO decision, [TECH-13](https://github.com/TiagSant/swissPublicTransport/issues/172)). Data and pictograms keep their own terms: SBB pictograms may only be used unmodified and non-commercially ([`assets/sbb/NOTICE.md`](assets/sbb/NOTICE.md)); ATLAS data from opentransportdata.swiss; line colours © OpenStreetMap contributors (ODbL). Details in [data sources](docs/data/data-sources.md).
 
 Everything in this repository is written in English. The app speaks English, French, German, Italian and Romansh.
