@@ -12,7 +12,7 @@ One-week sprints, about 20 points each (see [workflow](../process/workflow.md)).
 | 11 — Relay and app shell | 30.11 – 04.12.2026 | The relay serves OJP data without a key on the phone; the app has its look, languages and storage. | 22 | Relay v1 online |
 | 12 — Departures | 07.12 – 11.12.2026 | First APK: find a stop and see its departures, as in the prototype. | 21 | APK v0.12 (departures) |
 | 13 — Habits, platforms, journey planning | 14.12 – 18.12.2026 | Usual lines preselected, platforms on a map, journeys searched from anywhere. | 21 | APK v0.13 |
-| 14 — Journey results and my places | 21.12 – 25.12.2026 | Journey cards and details as in the prototype; Home, Work and places in one tap. | 19 | APK v0.14 |
+| 14 — Journey results and my places | 21.12 – 25.12.2026 | Journey cards and details as in the prototype; Home, Work and places in one tap; audit of bus platforms in OSM. | 24 | APK v0.14 |
 | 15 — Alarms | 28.12 – 01.01.2027 | Get-ready and leave alarms that ring like the alarm clock and follow live data. | 18 | APK v0.15 |
 | 16 — Following a journey | 04.01 – 08.01.2027 | A journey followed live with the screen off; reminder before getting off. | 18 | APK v0.16 |
 | 17 — Smarter changes | 11.01 – 15.01.2027 | The relay computes the best change places; the app shows the shorter ways. | 18 | APK v0.17, relay v2 |
@@ -20,7 +20,7 @@ One-week sprints, about 20 points each (see [workflow](../process/workflow.md)).
 | 19 — Trip parts, traffic, privacy | 25.01 – 29.01.2027 | Stopovers, round trips, traffic messages; permissions explained; Lausanne checked. | 17 | APK v0.19 (release candidate) |
 | 20 — MVP release | 01.02 – 05.02.2027 | Parity with the prototype checked, PO field test, v1.0.0 on GitHub and submitted to F-Droid. | 16 | **v1.0.0**, F-Droid submission |
 
-MVP total: **207 points** over 11 sprints. The weeks of 21.12 and 28.12 depend on the PO's availability for the reviews; a sprint can move by a week without changing the order.
+MVP total: **212 points** over 11 sprints. The weeks of 21.12 and 28.12 depend on the PO's availability for the reviews; a sprint can move by a week without changing the order.
 
 ## Sprint 10 — Foundations (23.11 – 27.11)
 
@@ -74,7 +74,7 @@ Goal: Usual lines preselected, platforms on a map, journeys searched from anywhe
 
 ## Sprint 14 — Journey results and my places (21.12 – 25.12)
 
-Goal: Journey cards and details as in the prototype; Home, Work and places in one tap.
+Goal: Journey cards and details as in the prototype; Home, Work and places in one tap; audit of bus platforms in OSM (Geneva, then Switzerland).
 
 | Item | Title | Priority | Points |
 |---|---|---|---|
@@ -82,7 +82,8 @@ Goal: Journey cards and details as in the prototype; Home, Work and places in on
 | [US-81](https://github.com/TiagSant/swissPublicTransport/issues/186) | Journey results and details | P0 | 8 |
 | [US-82](https://github.com/TiagSant/swissPublicTransport/issues/187) | My places: Home, Work and named places | P0 | 5 |
 | [US-83](https://github.com/TiagSant/swissPublicTransport/issues/188) | Settings | P0 | 3 |
-| | **Total** | | **19** |
+| [TECH-22](https://github.com/TiagSant/swissPublicTransport/issues/212) | Bus platforms walkable in OSM (`highway=platform` + `footway=sidewalk`): audit, Geneva first, then Switzerland | P1 | 5 |
+| | **Total** | | **24** |
 
 ## Sprint 15 — Alarms (28.12 – 01.01)
 
