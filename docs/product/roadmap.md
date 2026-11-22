@@ -104,8 +104,8 @@ Goal: A journey followed live with the screen off; reminder before getting off.
 |---|---|---|---|
 | [US-85](https://github.com/TiagSant/swissPublicTransport/issues/191) | Follow my journey live | P0 | 8 |
 | [US-86](https://github.com/TiagSant/swissPublicTransport/issues/192) | Reminder one stop before I get off | P0 | 5 |
+| [US-96](https://github.com/TiagSant/swissPublicTransport/issues/214) | Start following a journey planned in advance only shortly before getting ready | P0 | 3 |
 | [US-87](https://github.com/TiagSant/swissPublicTransport/issues/193) | Walks along the streets and my real walking speed | P1 | 5 |
-| [US-96](https://github.com/TiagSant/swissPublicTransport/issues/214) | Start following a journey planned in advance only shortly before getting ready | P1 | 3 |
 | | **Total** | | **21** |
 
 ## Sprint 17 — Smarter changes (11.01 – 15.01)
