@@ -77,13 +77,14 @@ Computed **on the relay** in the app (PO decision of 14.11.2026, [TECH-08](https
 | Missed connection → alternatives (next run, another route, finish on foot); an alternative keeps the walk between platforms. | US-38 #70, BUG-22 #165 |
 | Cancelled vehicle replaced in one tap; late start or first ride missed → other departures from where the rider is, alarms moved. | US-61 #131, US-62 #133 |
 | Keeps up with what really happens: earlier run boarded, on board after all, stopped in traffic, a faster vehicle, a vehicle outside the plan, off at the change before the announced time. | US-63 #135, BUG-17 #153, BUG-23 #167 |
+| **Android:** a journey followed in advance is only scheduled: following (GPS, sensors, live refresh) starts at the get-ready time, or N min before leaving (setting); alarms are set at once; one network check 15 min before. | US-96 #214 |
 | The followed journey has the better change place: "Follow" waits for the check; changes ahead are checked on the way. | BUG-14 #141 |
 | Traffic messages on the ride valid now, in the app's language; a new one told once. | US-67 #149 |
 | Walking or riding from the phone's own motion sensors (no Google service, nothing sent). GPS only when it helps (boarding, approach of the get-off stop, doubts, a check every 5 min). | US-66 #147, US-69 #160 |
 
 ## 7. Settings
 
-Preparation time, walking speed (learned from measured walks, can be reset), safety margin, get-off reminder (on/off), finish on foot up to N minutes, walks along the streets (on/off), motion sensors (on/off), notifications. Reference: US-18 #27, US-19 #28. In the app, the OJP key setting disappears (the relay holds the key).
+Preparation time, walking speed (learned from measured walks, can be reset), safety margin, get-off reminder (on/off), finish on foot up to N minutes, walks along the streets (on/off), motion sensors (on/off), start following (at get-ready time, or 15 / 30 / 60 min before leaving; US-96 #214), notifications. Reference: US-18 #27, US-19 #28. In the app, the OJP key setting disappears (the relay holds the key).
 
 ## 8. Identity and languages
 
@@ -106,6 +107,7 @@ Preparation time, walking speed (learned from measured walks, can be reset), saf
 | Finish on foot offered | walking ≤ 5 min later than the vehicle; first after 3 times chosen; not offered after 6 times ignored |
 | Comfortable change | ≥ 3 min to spare |
 | Followed journey refresh | 60 s |
+| Following a journey planned in advance | from the get-ready time (default); network check 15 min before |
 | GPS: fix accuracy / freshness | ≤ 50 m / ≤ 30 s |
 | Walking speed learning | moving average (α = 0.3) of walks ≥ 150 m and ≥ 90 s, 2.5–7.5 km/h, accuracy ≤ 35 m |
 | Next stops of runs (OJP) | 40 departures asked with their stops, kept 1 day, unknown run retried every 5 min |

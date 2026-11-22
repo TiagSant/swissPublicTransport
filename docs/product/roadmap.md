@@ -14,13 +14,13 @@ One-week sprints, about 20 points each (see [workflow](../process/workflow.md)).
 | 13 — Habits, platforms, journey planning | 14.12 – 18.12.2026 | Usual lines preselected, platforms on a map, journeys searched from anywhere. | 21 | APK v0.13 |
 | 14 — Journey results and my places | 21.12 – 25.12.2026 | Journey cards and details as in the prototype; Home, Work and places in one tap; audit of bus platforms in OSM. | 24 | APK v0.14 |
 | 15 — Alarms | 28.12 – 01.01.2027 | Get-ready and leave alarms that ring like the alarm clock and follow live data. | 18 | APK v0.15 |
-| 16 — Following a journey | 04.01 – 08.01.2027 | A journey followed live with the screen off; reminder before getting off. | 18 | APK v0.16 |
+| 16 — Following a journey | 04.01 – 08.01.2027 | A journey followed live with the screen off; reminder before getting off. | 21 | APK v0.16 |
 | 17 — Smarter changes | 11.01 – 15.01.2027 | The relay computes the best change places; the app shows the shorter ways. | 18 | APK v0.17, relay v2 |
 | 18 — When plans change | 18.01 – 22.01.2027 | Missed or tight changes, cancellations, late starts; sensors and GPS only when it helps. | 18 | APK v0.18 |
 | 19 — Trip parts, traffic, privacy | 25.01 – 29.01.2027 | Stopovers, round trips, traffic messages; permissions explained; Lausanne checked. | 17 | APK v0.19 (release candidate) |
 | 20 — MVP release | 01.02 – 05.02.2027 | Parity with the prototype checked, PO field test, v1.0.0 on GitHub and submitted to F-Droid. | 16 | **v1.0.0**, F-Droid submission |
 
-MVP total: **212 points** over 11 sprints. The weeks of 21.12 and 28.12 depend on the PO's availability for the reviews; a sprint can move by a week without changing the order.
+MVP total: **215 points** over 11 sprints. The weeks of 21.12 and 28.12 depend on the PO's availability for the reviews; a sprint can move by a week without changing the order.
 
 ## Sprint 10 — Foundations (23.11 – 27.11)
 
@@ -105,7 +105,8 @@ Goal: A journey followed live with the screen off; reminder before getting off.
 | [US-85](https://github.com/TiagSant/swissPublicTransport/issues/191) | Follow my journey live | P0 | 8 |
 | [US-86](https://github.com/TiagSant/swissPublicTransport/issues/192) | Reminder one stop before I get off | P0 | 5 |
 | [US-87](https://github.com/TiagSant/swissPublicTransport/issues/193) | Walks along the streets and my real walking speed | P1 | 5 |
-| | **Total** | | **18** |
+| [US-96](https://github.com/TiagSant/swissPublicTransport/issues/214) | Start following a journey planned in advance only shortly before getting ready | P1 | 3 |
+| | **Total** | | **21** |
 
 ## Sprint 17 — Smarter changes (11.01 – 15.01)
 
