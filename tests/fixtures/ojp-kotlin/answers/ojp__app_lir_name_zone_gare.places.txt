@@ -1,0 +1,20 @@
+stop|1401729|Etrembières, mairie|46.17639,6.22365|-|-|-
+stop|1401635|Etrembières, Maison Blanche|46.17967,6.22824|-|-|-
+stop|1401916|Étrembières, Pont d'Etrembière|46.18177,6.23135|-|-|-
+stop|1401742|Gaillard, Châtelaine|46.1827,6.21533|-|-|-
+stop|1401634|Annemasse, Lycée Professionnel|46.1854,6.23045|-|-|-
+stop|1401743|Gaillard, Collège J. Prévert|46.1848,6.21568|-|-|-
+stop|1401673|Annemasse, Drague|46.18226,6.23825|-|-|-
+stop|1401696|Annemasse, Route de Bonneville|46.17933,6.24034|-|-|-
+stop|1401668|Annemasse, Brouaz HPPS|46.18719,6.22281|-|-|-
+stop|1401816|Vétraz-Monthoux, Cèdre|46.17798,6.24257|-|-|-
+stop|1401699|Annemasse, Valeury Lycée Prof.|46.18578,6.23655|-|-|-
+stop|1401750|Gaillard, mairie|46.18434,6.20945|-|-|-
+stop|1401681|Annemasse, Léman|46.18259,6.24275|-|-|-
+stop|1401918|Ambilly, Louis Lachenal|46.1905,6.22413|-|-|-
+stop|1401819|Vétraz-Monthoux, Europe|46.17995,6.24525|-|-|-
+stop|1401745|Gaillard, Feux-Follets|46.18307,6.2058|-|-|-
+stop|1400346|Annemasse, Saint-André|46.19022,6.23332|-|-|-
+stop|1401744|Gaillard, église|46.18495,6.20664|-|-|-
+stop|1401741|Gaillard, Bossonnets|46.18668,6.20805|-|-|-
+error|-

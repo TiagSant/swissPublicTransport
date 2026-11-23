@@ -1,0 +1,4 @@
+stop|8587386|Confignon, croisée|46.1787,6.08943|-|-|-
+stop|8592758|Confignon, La Dode|46.18078,6.09468|-|-|-
+stop|8592755|Bernex, Cressy|46.18229,6.08828|-|-|-
+error|-

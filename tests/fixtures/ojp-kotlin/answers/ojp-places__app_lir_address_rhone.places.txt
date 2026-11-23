@@ -1,0 +1,3 @@
+address|-|Genève, Rue du Rhône|46.20351,6.15098|Rue du Rhône|-|Genève
+stop|8592900|Genève, Rue du Lac|46.20384,6.15801|-|-|-
+error|-

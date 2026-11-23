@@ -1,0 +1,2 @@
+address|-|Genève, Rue du Rhône 60|46.20389,6.14845|Rue du Rhône|60|Genève
+error|-

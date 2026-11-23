@@ -1,0 +1,2 @@
+address|-|Confignon, Chemin de Champ-Rond 4.1|46.17964,6.09175|Chemin de Champ-Rond|4.1|Confignon
+error|-
