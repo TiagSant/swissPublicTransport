@@ -75,6 +75,7 @@ Computed **on the relay** in the app (PO decision of 14.11.2026, [TECH-08](https
 | A late vehicle's stops without live times take its delay. | BUG-15 #145 |
 | Tight connection said plainly, with options that have a comfortable margin; live waiting time at each change. | US-39 #72 |
 | Missed connection → alternatives (next run, another route, finish on foot); an alternative keeps the walk between platforms. | US-38 #70, BUG-22 #165 |
+| A missed change, a cancelled vehicle or a late start is notified only once its alternatives are found, with the best one (line, departure, arrival), so opening the app shows them at once. With none, or after 20 s without an answer, the notification goes anyway and says so; it is never sent twice. | US-89 #196 (PO, 23.11.2026) |
 | Cancelled vehicle replaced in one tap; late start or first ride missed → other departures from where the rider is, alarms moved. | US-61 #131, US-62 #133 |
 | Keeps up with what really happens: earlier run boarded, on board after all, stopped in traffic, a faster vehicle, a vehicle outside the plan, off at the change before the announced time. | US-63 #135, BUG-17 #153, BUG-23 #167 |
 | The followed journey has the better change place: "Follow" waits for the check; changes ahead are checked on the way. | BUG-14 #141 |

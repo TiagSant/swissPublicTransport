@@ -57,8 +57,11 @@ def follow(b, where):
     pg.click("#journeyList .jr-detail .set-alarms"); pg.wait_for_selector("#alarmList .trip")
     dismiss(pg)
     return ctx, pg
+NOTES = []   # trip warnings (title, text), as they rang
 def dismiss(pg):
-    while pg.is_visible("#alarmBanner"): pg.click("#abOk")
+    while pg.is_visible("#alarmBanner"):
+        if pg.get_attribute("#alarmBanner", "data-kind") == "trip": NOTES.append((pg.inner_text("#abTitle"), pg.inner_text("#abBody")))
+        pg.click("#abOk")
 def until(pg, m, where=None):
     while pg.evaluate("Date.now()") < at(m).timestamp() * 1000:
         if where: pg.context.set_geolocation({"latitude": where[0] + (pg.evaluate("Date.now()") % 7) * 1e-7, "longitude": where[1], "accuracy": 8}); pg.wait_for_timeout(120)
@@ -71,8 +74,11 @@ with sync_playwright() as p:
     # ---- A. still at home: can't make it
     ctx, pg = follow(b, HOME)
     until(pg, 38.5, HOME); pg.wait_for_timeout(1500); pg.clock.run_for(2000); pg.wait_for_timeout(1500)
-    tx = trip(pg)
+    dismiss(pg); tx = trip(pg)
     assert "You won’t make the Tram 14 at 07:43" in tx and "Not on the planned ride" in tx, tx
+    # PO 23.11.2026: warned once the other departures are found, with the best one
+    assert NOTES == [("🔔 You won’t make the Tram 14 at 07:43", "Other departures from where you are. "
+                      "Best: Tram 14 at 07:47 · leave 07:39, arrive 07:54. Other choices in the app.")], NOTES
     opts = [" ".join(x.split()) for x in pg.locator("#alarmList .trip-warn .trip-alt").all_inner_texts()]
     assert opts and not any("at 07:43" in o for o in opts) and any("Tram 14 at 07:52" in o for o in opts), opts
     pg.screenshot(path=str(OUT / "late-start.png"))
@@ -100,8 +106,9 @@ with sync_playwright() as p:
     # ---- C. at the stop, still there 2 min after the tram left
     ctx, pg = follow(b, (46.18812, 6.11312))
     until(pg, 46, (46.18812, 6.11312)); pg.wait_for_timeout(1500); pg.clock.run_for(2000); pg.wait_for_timeout(1500)
-    tx = trip(pg)
+    dismiss(pg); tx = trip(pg)
     assert "Tram 14 at 07:43 missed?" in tx, tx
+    assert NOTES[-1][0] == "🔔 Tram 14 at 07:43 missed?" and NOTES[-1][1].startswith("Other departures from where you are. Best: "), NOTES
     pg.locator("#alarmList button[data-act=late-ok]").click(); pg.wait_for_timeout(300)
     until(pg, 48, (46.18812, 6.11312)); pg.wait_for_timeout(800)
     assert "missed?" not in trip(pg) and alarm(pg).get("lateOk"), trip(pg)

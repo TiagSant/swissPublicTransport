@@ -74,8 +74,12 @@ with sync_playwright() as p:
     while pg.is_visible("#alarmBanner"): pg.click("#abOk")
     S["gone"] = True
     pg.clock.run_for(70000); pg.wait_for_timeout(1500)
+    notes = []
     while pg.is_visible("#alarmBanner"):
-        title = pg.inner_text("#abTitle"); pg.click("#abOk")
+        notes.append((pg.inner_text("#abTitle"), pg.inner_text("#abBody"))); pg.click("#abOk")
+    # PO 23.11.2026: warned once what replaces it is found, with the best way
+    assert ("🔔 Tram 14 de 07:43 supprimé ?", "Il n’apparaît plus dans les départs en direct de Petit-Lancy, Les Esserts. "
+            "Le mieux : Bus 22 à 07:40, arrivée 07:52. Autres choix dans l’app.") in notes, notes
     trip = " ".join(pg.locator("#alarmList .trip").first.inner_text().split())
     assert "Tram 14 de 07:43 : supprimé ?" in trip and "Il n’apparaît plus dans les départs en direct de Petit-Lancy, Les Esserts." in trip, trip
     opts = [" ".join(x.split()) for x in pg.locator("#alarmList .trip-warn .trip-alt").all_inner_texts()]

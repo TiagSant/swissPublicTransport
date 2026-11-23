@@ -57,6 +57,7 @@ for t in tests/test_*.py; do python "$t" || echo "FAILED: $t"; done
 | `test_fastest_and_duplicates.py` | "fastest" = shortest; one card for the same vehicles |
 | `test_alternative_change_walk.py` | missed change, another bus chosen: the walk between platforms kept |
 | `test_off_at_change.py` | off at the change before the time announced; steps inside the tram |
+| `test_warn_with_alternatives.py` | a missed change is notified once its alternatives are found, with the best one; after 20 s anyway, once |
 
 **Audit of changes on real data** (manual workflow `audit-changes.yml`, needs the `OJP_TOKEN` secret): the prototype plans real journeys in about twenty Swiss cities with both data sources, and [`tools/audit/audit_changes.py`](../tools/audit/audit_changes.py) checks each change against the best place the same two vehicles allow.
 
