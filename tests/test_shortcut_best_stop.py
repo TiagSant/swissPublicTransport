@@ -1,11 +1,11 @@
 """BUG-18: getting off earlier (US-64): the stop with the least walking kept too, and the stop the streets make best.
 
-The PO's case (17.11.2026, 18:16): Les Esserts → Rue de Saint-Jean 98. The API: tram 14 to Bel-Air, then bus 7.
+Example: Confignon, croisée → Rue de Saint-Jean. The API: tram 14 to Bel-Air, then bus 7.
 The app offered only tram 14 to Palladium (the earliest arrival); Google tram 14 to Stand (less walking).
 Now both are kept (earliest arrival, least walking); once the walks follow the streets, a beaten one goes.
 Real data (probe 17.11 19:00, street walks): Palladium 7.8 min on foot, 1 min sooner; Stand 5.9 min: both offered.
 Here the street lengths are made up to check the second rule (Palladium 1050 m: beaten by Stand).
-Stop ids / positions real (Les Esserts, Jonction, Palladium, Stand, Bel-Air); "Mercier" approximate.
+Stop ids / positions real (Confignon, croisée, Jonction, Palladium, Stand, Bel-Air); "Mercier" approximate.
 transport.opendata.ch and the street routing are mocked."""
 import os, json, math, datetime as dt
 from pathlib import Path
@@ -20,14 +20,14 @@ LEAFLET_DIR, TILE = os.environ.get("LEAFLET_DIR"), os.environ.get("TILE_PNG")
 tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 JONCTION = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
 PALLADIUM = st("8592874", "Genève, Palladium", 46.20303, 6.13391)
 STAND = st("8592906", "Genève, Stand", 46.2036, 6.14105)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.20424, 6.14206)
 MERCIER = st("8592867", "Genève, Mercier", 46.2058, 6.1394)
-STOPS = [ESSERTS, JONCTION, PALLADIUM, STAND, BELAIR, MERCIER]
-DEST = {"kind": "addr", "name": "Rue de Saint-Jean 98, Genève", "coord": [46.20628, 6.13829]}
+STOPS = [CROISEE, JONCTION, PALLADIUM, STAND, BELAIR, MERCIER]
+DEST = {"kind": "addr", "name": "Rue de Saint-Jean, Genève", "coord": [46.2055, 6.1405]}
 C = lambda s: (s["coordinate"]["x"], s["coordinate"]["y"])
 BASE = dt.datetime(2026, 11, 17, 18, 16, tzinfo=tz)
 def at(m): return BASE + dt.timedelta(minutes=m)
@@ -41,12 +41,12 @@ def ride(cat, num, to, a, b, t0, t1, p0, p1, mid=()):
             "departure": end(a, t0, "departure", p0), "arrival": end(b, t1, "arrival", p1)}
 def walk(a, b, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - t0).total_seconds())}, "departure": end(a, t0, "departure", ""), "arrival": end(b, t1, "arrival", "")}
 def connections():   # tram 14 18:19 (Jonction +7, Palladium +9, Stand +12) to Bel-Air +14, walk 1, bus 7 18:36 → Mercier 18:41
-    return [{"sections": [ride("T", "14", "Meyrin-Gravière", ESSERTS, BELAIR, at(3), at(17), "A", "D", mid=[(JONCTION, at(10)), (PALLADIUM, at(12)), (STAND, at(15))]),
+    return [{"sections": [ride("T", "14", "Meyrin-Gravière", CROISEE, BELAIR, at(3), at(17), "A", "D", mid=[(JONCTION, at(10)), (PALLADIUM, at(12)), (STAND, at(15))]),
                           walk(BELAIR, BELAIR, at(17), at(18)), ride("B", "7", "Hôpital", BELAIR, MERCIER, at(20), at(25), "E", "B")]}]
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"):
-        body = {"connections": connections() if q.get("from") == [ESSERTS["id"]] and q.get("to") == [MERCIER["id"]] else []}
+        body = {"connections": connections() if q.get("from") == [CROISEE["id"]] and q.get("to") == [MERCIER["id"]] else []}
     elif u.path.endswith("/stationboard"): body = {"station": {}, "stationboard": []}
     elif u.path.endswith("/locations") and "x" in q:
         p = (float(q["x"][0]), float(q["y"][0]))
@@ -72,7 +72,7 @@ def session(b, settings, prio="fast"):
     if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.clock.install(time=BASE.timestamp()); pg.goto(PAGE)
-    store = {"tab": "journey", "lang": "fr", "settings": settings, "prio": prio, "journey:from": STOP(ESSERTS), "journey:to": DEST}
+    store = {"tab": "journey", "lang": "fr", "settings": settings, "prio": prio, "journey:from": STOP(CROISEE), "journey:to": DEST}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
     pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr"); pg.wait_for_timeout(2500)
     return ctx, pg

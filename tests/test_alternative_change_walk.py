@@ -1,10 +1,10 @@
 """BUG-22: an alternative chosen for a missed change keeps the walk between the two platforms.
 
-The PO (18.11.2026, 09:08): tram 14 late, the change at Jonction missed; he chose bus 2 instead — the followed journey
+Example: tram 14 late, the change at Jonction missed; the rider chose bus 2 instead — the followed journey
 showed tram 14 to Jonction (quai B) then bus 2 from quai D, with no walk between (only "6 min waiting").
 An alternative found from the change stop starts with its vehicle: spliced into the plan, the walk from the platform
 where the rider gets off to the one it leaves from is now added, as when planning.
-Stop ids / positions / quays real (Les Esserts, Jonction, Musée d'ethnographie). transport.opendata.ch mocked."""
+Stop ids / positions / quays real (Confignon, croisée, Jonction, Musée d'ethnographie). transport.opendata.ch mocked."""
 import os, json, datetime as dt
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -19,7 +19,7 @@ tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def at(h, m): return dt.datetime(2026, 11, 18, h, m, tzinfo=tz)
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 JONCTION = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
 MUSEE = st("8592868", "Genève, Musée d'ethnographie", 46.19795, 6.13641)
 def prog(kind, t, d): return {kind: fmt(t + dt.timedelta(minutes=d))} if d else {}
@@ -35,7 +35,7 @@ def entry(cat, num, to, here, t0, d, nxt, plat):
             "stop": {"station": here, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()), "platform": plat, "prognosis": prog("departure", t0, d), "delay": d},
             "passList": [{"station": here}] + [{"station": s, "arrival": fmt(t), "arrivalTimestamp": int(t.timestamp()), "prognosis": prog("arrival", t, d)} for s, t in nxt]}
 def board(stop_id):
-    if stop_id == ESSERTS["id"]: return [entry("T", "14", "Meyrin-Gravière", ESSERTS, at(8, 58), S["late"], [(JONCTION, at(9, 5))], "A")]
+    if stop_id == CROISEE["id"]: return [entry("T", "14", "Meyrin-Gravière", CROISEE, at(8, 58), S["late"], [(JONCTION, at(9, 5))], "A")]
     if stop_id == JONCTION["id"]: return [entry("B", "19", "Vernier", JONCTION, at(9, 7), 0, [(MUSEE, at(9, 10))], "D"),
                                           entry("B", "2", "Genève-Plage", JONCTION, at(9, 11), 4, [(MUSEE, at(9, 14))], "D"),
                                           entry("B", "19", "Vernier", JONCTION, at(9, 22), 0, [(MUSEE, at(9, 25))], "D")]
@@ -44,7 +44,7 @@ def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"):
         f = q.get("from", [""])[0]
-        if f == ESSERTS["id"]: body = [{"sections": [ride("T", "14", "Meyrin-Gravière", ESSERTS, JONCTION, at(8, 58), at(9, 5), "A", "B"),
+        if f == CROISEE["id"]: body = [{"sections": [ride("T", "14", "Meyrin-Gravière", CROISEE, JONCTION, at(8, 58), at(9, 5), "A", "B"),
                                                      walk(JONCTION, JONCTION, at(9, 5), at(9, 6)), ride("B", "19", "Vernier", JONCTION, MUSEE, at(9, 7), at(9, 10), "D", "K")]}]
         elif f == JONCTION["id"]: body = [{"sections": [ride("B", "2", "Genève-Plage", JONCTION, MUSEE, at(9, 11), at(9, 14), "D", "K", d=4)]}]
         else: body = []
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.clock.install(time=at(8, 50).timestamp()); pg.goto(PAGE)
-    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False, "motionSensors": False}, "journey:from": STOP(ESSERTS), "journey:to": STOP(MUSEE)}
+    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False, "motionSensors": False}, "journey:from": STOP(CROISEE), "journey:to": STOP(MUSEE)}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
     pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")
     pg.locator("#journeyList .jr").first.click(); pg.click("#journeyList .jr-detail .set-alarms"); pg.wait_for_selector("#alarmList .trip")

@@ -47,7 +47,7 @@ class OjpParserTest {
     private val boardXml = ojp(
         "<OJPStopEventDelivery><StopEventResponseContext>$situation</StopEventResponseContext>" +
             "<StopEventResult><StopEvent><ThisCall><CallAtStop>$here" +
-            "<StopPointName><Text xml:lang=\"fr\">Petit-Lancy, Les Esserts</Text></StopPointName>" +
+            "<StopPointName><Text xml:lang=\"fr\">Confignon, croisée</Text></StopPointName>" +
             "<PlannedQuay><Text xml:lang=\"fr\">A</Text></PlannedQuay><EstimatedQuay><Text xml:lang=\"fr\">B</Text></EstimatedQuay>" +
             call("ServiceDeparture", "2026-11-16T06:24:00Z", "2026-11-16T06:25:12Z") + "</CallAtStop></ThisCall>" +
             service("<SituationFullRefs><SituationFullRef><siri:ParticipantRef>x</siri:ParticipantRef><siri:SituationNumber>sit-1</siri:SituationNumber></SituationFullRef></SituationFullRefs>") +
@@ -61,7 +61,7 @@ class OjpParserTest {
 
     @Test
     fun aDepartureInSwissTimeWithItsDelayPlatformAndMessage() {
-        val board = OjpParser.board(boardXml, "8587418", lang = "fr")
+        val board = OjpParser.board(boardXml, "8587386", lang = "fr")
         val dep = board.departures.single()
         assertEquals("07:24", SwissTime.hhmm(dep.time.scheduled))        // 06:24 UTC in November
         assertEquals("07:25", SwissTime.hhmm(dep.time.time))
@@ -73,25 +73,25 @@ class OjpParserTest {
         assertEquals("TPG", dep.line.operator?.name)
         assertEquals("Meyrin-Gravière", dep.destination)
         assertEquals("tram|14>to:Meyrin-Gravière", dep.directionKey)     // next stops unknown: the terminus
-        assertEquals("Petit-Lancy, Les Esserts", board.stop.name)
+        assertEquals("Confignon, croisée", board.stop.name)
     }
 
     @Test
     fun trafficMessagesInTheAppsLanguageFromTheGeneralPerspective() {
-        val fr = OjpParser.board(boardXml, "8587418", lang = "fr").departures.single().messages.single()
+        val fr = OjpParser.board(boardXml, "8587386", lang = "fr").departures.single().messages.single()
         assertEquals("Travaux", fr.summary)              // the general perspective, in French
         assertEquals("Umleitung", fr.description)        // no French text: the first one
         assertEquals("slight", fr.severity)
         assertTrue(fr.planned)
         assertTrue(fr.isValidAt(Instant.parse("2026-11-16T06:24:00Z")))
         assertFalse(fr.isValidAt(Instant.parse("2026-11-16T09:00:00Z")))
-        assertEquals("Bauarbeiten", OjpParser.board(boardXml, "8587418", lang = "de").departures.single().messages.single().summary)
+        assertEquals("Bauarbeiten", OjpParser.board(boardXml, "8587386", lang = "de").departures.single().messages.single().summary)
     }
 
     @Test
     fun aCancelledRideStaysInTheJourneyMarkedCancelled() {
         fun leg(cancelled: String) = "<Leg><TimedLeg><LegBoard>$here" +
-            "<StopPointName><Text xml:lang=\"fr\">Petit-Lancy, Les Esserts</Text></StopPointName>${call("ServiceDeparture", "2026-11-16T07:16:00Z")}</LegBoard>" +
+            "<StopPointName><Text xml:lang=\"fr\">Confignon, croisée</Text></StopPointName>${call("ServiceDeparture", "2026-11-16T07:16:00Z")}</LegBoard>" +
             "<LegAlight><siri:StopPointRef>ch:1:sloid:87057:0:1</siri:StopPointRef><StopPointName><Text xml:lang=\"fr\">Genève, gare Cornavin</Text></StopPointName>" +
             "${call("ServiceArrival", "2026-11-16T07:34:00Z")}$cancelled</LegAlight>${service()}</TimedLeg></Leg>"
         val xml = ojp(
@@ -152,19 +152,19 @@ class OjpParserTest {
         val palexpo = OjpParser.places(Fixtures.text("ojp-places/app_lir_poi_palexpo.xml")).places
         assertTrue(palexpo.any { it is Place.PointOfInterest || it is Place.StopPlace })
         // building entrances ("60.1") are dropped when the main number is in the answer
-        val lancy = OjpParser.places(Fixtures.text("ojp-places/app_lir_address_lancy.xml")).places.filterIsInstance<Place.Address>()
-        assertTrue(lancy.none { '.' in it.houseNumber && lancy.any { m -> m.houseNumber == it.houseNumber.substringBefore('.') } })
+        val entrances = OjpParser.places(Fixtures.text("ojp-places/app_lir_address_entrances.xml")).places.filterIsInstance<Place.Address>()
+        assertTrue(entrances.none { '.' in it.houseNumber && entrances.any { m -> m.houseNumber == it.houseNumber.substringBefore('.') } })
     }
 
     @Test
     fun fullBoardThenLightRefreshKeepsTheNextStops() {
         val patterns = RunPatterns()
-        val full = OjpParser.board(Fixtures.text("ojp/app_ser_esserts_full.xml"), "8587418", patterns, "fr")
+        val full = OjpParser.board(Fixtures.text("ojp/app_ser_croisee_full.xml"), "8587386", patterns, "fr")
         assertTrue(full.departures.isNotEmpty())
         assertTrue(full.departures.count { it.nextStops.isNotEmpty() } >= full.departures.size * 9 / 10)
         assertTrue(patterns.size > 0)
 
-        val light = OjpParser.board(Fixtures.text("ojp/app_ser_esserts_light.xml"), "8587418", patterns, "fr")
+        val light = OjpParser.board(Fixtures.text("ojp/app_ser_croisee_light.xml"), "8587386", patterns, "fr")
         val rebuilt = light.departures.filter { it.nextStops.isNotEmpty() }
         assertTrue(rebuilt.size >= light.departures.size / 2, "next stops rebuilt for ${rebuilt.size} of ${light.departures.size}")
         for (d in rebuilt) {
@@ -173,7 +173,7 @@ class OjpParserTest {
             assertTrue(d.nextStops.all { s -> s.arrival.let { it == null || it >= d.time.time } })
         }
         // without known patterns a light refresh cannot tell the next stops
-        val alone = OjpParser.board(Fixtures.text("ojp/app_ser_esserts_light.xml"), "8587418", RunPatterns(), "fr")
+        val alone = OjpParser.board(Fixtures.text("ojp/app_ser_croisee_light.xml"), "8587386", RunPatterns(), "fr")
         assertEquals(alone.departures.size, alone.unknownPatterns)
     }
 
@@ -182,7 +182,7 @@ class OjpParserTest {
         val r = OjpParser.trips(Fixtures.text("ojp/app_tr_depart.xml"), "fr")
         assertTrue(r.journeys.isNotEmpty())
         for (j in r.journeys) {
-            assertEquals("8587418", j.rides.first().board.stop.id)            // from Petit-Lancy, Les Esserts
+            assertEquals("8587386", j.rides.first().board.stop.id)            // from Confignon, croisée
             assertNotNull(j.rides.first().departure)
             assertTrue(j.rides.zipWithNext().all { (a, b) -> a.arrival!!.scheduled <= b.departure!!.scheduled })
         }

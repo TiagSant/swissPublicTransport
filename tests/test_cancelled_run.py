@@ -1,6 +1,6 @@
 """US-61: a cancelled vehicle — not suggested when planning, replaced in one tap when following.
 
-The PO's case (16.11.2026): tram 14 to Meyrin at 07:43 from Petit-Lancy, Les Esserts disappeared from the live
+Example: tram 14 to Meyrin at 07:43 from Confignon, croisée disappeared from the live
 departures (07:39, then 07:47) while the journey search still offered it for a few minutes.
 Planning (07:26): the 07:43 is left out; the 07:47 and the bus 22 are shown.
 Following (planned the evening before with the 07:43): once it is gone from the departures, the journey says so and
@@ -17,7 +17,7 @@ OUT = ROOT / "tests" / "out"; OUT.mkdir(exist_ok=True)
 tz = ZoneInfo("Europe/Zurich"); DAY = dt.datetime(2026, 11, 16, 7, 0, tzinfo=tz)
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z"); at = lambda m: DAY + dt.timedelta(minutes=m)
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+ESS = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 JON = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
 def end(s, m, kind, plat=""): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
 def ride(cat, num, to, m0, m1, plat):
@@ -77,7 +77,7 @@ with sync_playwright() as p:
     while pg.is_visible("#alarmBanner"):
         title = pg.inner_text("#abTitle"); pg.click("#abOk")
     trip = " ".join(pg.locator("#alarmList .trip").first.inner_text().split())
-    assert "Tram 14 de 07:43 : supprimé ?" in trip and "Il n’apparaît plus dans les départs en direct de Petit-Lancy, Les Esserts." in trip, trip
+    assert "Tram 14 de 07:43 : supprimé ?" in trip and "Il n’apparaît plus dans les départs en direct de Confignon, croisée." in trip, trip
     opts = [" ".join(x.split()) for x in pg.locator("#alarmList .trip-warn .trip-alt").all_inner_texts()]
     assert opts and not any("07:43" in o for o in opts), opts                         # the 07:43 is not offered back
     assert any("Tram 14 à 07:47" in o and "(4 min plus tard)" in o for o in opts) and any("Bus 22 à 07:40" in o for o in opts), opts

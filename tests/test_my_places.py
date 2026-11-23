@@ -18,12 +18,12 @@ fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 at = lambda m: NOW + dt.timedelta(minutes=m)
 
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188100, 6.113100)
-COMMUNES = st("8592887", "Lancy, Communes-Réunies", 46.174500, 6.121900)
+CROISEE = st("8587386", "Confignon, croisée", 46.178815, 6.089812)
+RIVE = st("8587061", "Genève, Rive", 46.201680, 6.152720)
 CORNAVIN = st("8587057", "Genève, gare Cornavin", 46.209733, 6.142437)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
-ADDRESS = {"id": None, "name": "Lancy, Avenue des Communes-Réunies 60", "coordinate": {"type": "WGS84", "x": 46.17391, "y": 6.12128}}
-HOME_AT = (46.17391, 6.12128)
+ADDRESS = {"id": None, "name": "Genève, Rue du Rhône 60", "coordinate": {"type": "WGS84", "x": 46.20109, "y": 6.15210}}
+HOME_AT = (46.20109, 6.15210)
 
 def end(s, m, kind, plat=""):
     return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
@@ -39,23 +39,23 @@ def api(route):
     if u.path.endswith("/locations"):
         if "x" in q:
             x, y = float(q["x"][0]), float(q["y"][0])
-            near = [s for s in (COMMUNES, ESSERTS, CORNAVIN, BELAIR) if abs(s["coordinate"]["x"] - x) < 0.01 and abs(s["coordinate"]["y"] - y) < 0.01]
+            near = [s for s in (RIVE, CROISEE, CORNAVIN, BELAIR) if abs(s["coordinate"]["x"] - x) < 0.01 and abs(s["coordinate"]["y"] - y) < 0.01]
             body = {"stations": near}
         else:
             name = q["query"][0].lower()
-            pool = [ADDRESS, COMMUNES, ESSERTS, CORNAVIN, BELAIR]
+            pool = [ADDRESS, RIVE, CROISEE, CORNAVIN, BELAIR]
             body = {"stations": [dict(s, icon="tram") if s["id"] else s for s in pool
                                  if any(w in s["name"].lower() for w in name.replace("genève ", "").split() if len(w) > 3)]}
     elif u.path.endswith("/connections"):
         a, b = q["from"][0], q["to"][0]
-        stops = {s["id"]: s for s in (COMMUNES, ESSERTS, CORNAVIN, BELAIR)}
+        stops = {s["id"]: s for s in (RIVE, CROISEE, CORNAVIN, BELAIR)}
         # the tram leaves 16 min after the asked time (07:46 when asked at 07:30)
         asked = dt.datetime.strptime(q["date"][0] + " " + q["time"][0], "%Y-%m-%d %H:%M").replace(tzinfo=tz)
         off = (asked - NOW).total_seconds() / 60
         body = {"connections": [{"sections": [ride(stops[a], stops[b], off + 16, off + 34)]}]} if a in stops and b in stops else {"connections": []}
     else:   # the stop asked (it always answered Bel-Air: the name shown changed with the timing of the answer)
         sid = (q.get("id") or q.get("station") or [""])[0]
-        body = {"station": next((s for s in (COMMUNES, ESSERTS, CORNAVIN, BELAIR) if s["id"] == sid), BELAIR), "stationboard": []}
+        body = {"station": next((s for s in (RIVE, CROISEE, CORNAVIN, BELAIR) if s["id"] == sid), BELAIR), "stationboard": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 
 def new_page(b, when):
@@ -85,12 +85,12 @@ with sync_playwright() as p:
     # US-21 + US-23: Home from an address search
     pg.click("#addPlace")
     assert pg.get_attribute("#placeKind button[data-kind=home]", "aria-pressed") == "true" and pg.input_value("#placeName") == "Home"
-    typing(pg, "#placeQ", "Communes-Réunies 60")
+    typing(pg, "#placeQ", "Rhône 60")
     pg.wait_for_selector("#placeResults button[data-addr]")
     row = pg.locator("#placeResults li").first.inner_text()
-    assert "Address" in row and "Avenue des Communes-Réunies 60" in row, row
+    assert "Address" in row and "Rue du Rhône 60" in row, row
     pg.click("#placeResults button[data-addr]")
-    assert "Avenue des Communes-Réunies 60" in pg.inner_text("#placeChosenText")
+    assert "Rue du Rhône 60" in pg.inner_text("#placeChosenText")
     pg.click("#placeSave")
     assert chips(pg) == ["🏠 Home"], chips(pg)
     print("home        →", chips(pg))
@@ -200,7 +200,7 @@ with sync_playwright() as p:
       const now = Date.now();
       localStorage.setItem('tpp:stops', JSON.stringify({
         '8587387': { id: '8587387', name: 'Genève, Bel-Air', mode: 'tram', count: 5, last: now },
-        '8587418': { id: '8587418', name: 'Petit-Lancy, Les Esserts', mode: 'bus', count: 3, last: now - 1000 },
+        '8587386': { id: '8587386', name: 'Confignon, croisée', mode: 'bus', count: 3, last: now - 1000 },
         '8587057': { id: '8587057', name: 'Genève, gare Cornavin', mode: 'train', count: 1, last: now - 2000 } }));
       localStorage.setItem('tpp:lastStop', '"8587387"'); localStorage.setItem('tpp:tab', '"departures"'); }""")
     pg.reload()
@@ -209,10 +209,10 @@ with sync_playwright() as p:
     assert pg.inner_text("#stationName") == "Genève, Bel-Air"
     pg.click("#toastUndo")
     pg.locator("#recent .stop-chip", has_text="Bel-Air").locator(".stop-del").click()
-    assert pg.inner_text("#stationName") == "Petit-Lancy, Les Esserts", pg.inner_text("#stationName")
+    assert pg.inner_text("#stationName") == "Confignon, croisée", pg.inner_text("#stationName")
     stops = json.loads(pg.evaluate("localStorage.getItem('tpp:stops')"))
-    assert stops["8587418"]["count"] == 3, "showing the next stop is not a visit"
-    assert json.loads(pg.evaluate("localStorage.getItem('tpp:lastStop')")) == "8587418"
+    assert stops["8587386"]["count"] == 3, "showing the next stop is not a visit"
+    assert json.loads(pg.evaluate("localStorage.getItem('tpp:lastStop')")) == "8587386"
     print("US-27       → removed Bel-Air, now showing", pg.inner_text("#stationName"))
     pg.click("#toastUndo")
     assert pg.inner_text("#stationName") == "Genève, Bel-Air" and "Bel-Air" in pg.inner_text("#recent")
@@ -222,12 +222,12 @@ with sync_playwright() as p:
     assert pg.is_visible("#board") and pg.inner_text("#stationName") == "Genève, Bel-Air"
     pg.context.close()
 
-    # ---------- US-33: alarms set late. Journey Communes-Réunies → Cornavin leaving 07:46 (16 min after 07:30);
+    # ---------- US-33: alarms set late. Journey Rive → Cornavin leaving 07:46 (16 min after 07:30);
     # from a stop: walk 0 → leave = 07:46 − 0 − 1 min margin = 07:45, get ready = 07:35 (10 min).
     def alarm_at(minute):
         page = new_page(b, at(minute))
         page.evaluate("""() => {
-          localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8592887', name: 'Lancy, Communes-Réunies', coord: [46.1745, 6.1219] }));
+          localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8587061', name: 'Genève, Rive', coord: [46.2017, 6.1527] }));
           localStorage.setItem('tpp:journey:to', JSON.stringify({ kind: 'stop', id: '8587057', name: 'Genève, gare Cornavin', coord: [46.209733, 6.142437] }));
           localStorage.setItem('tpp:tab', '"journey"'); }""")
         page.reload()
@@ -248,7 +248,7 @@ with sync_playwright() as p:
     print("late ready  →", body)
     pg.context.close()
 
-    pg = alarm_at(0)   # set at 07:45:30, past the leave time: leaving now (BUG-17, PO 17.11.2026: nothing rings)
+    pg = alarm_at(0)   # set at 07:45:30, past the leave time: leaving now (BUG-17, nothing rings)
     pg.click("#searchJourney"); pg.locator("#journeyList .jr").first.click()
     pg.clock.run_for(15 * 60000 + 30000)
     pg.click(".set-alarms"); pg.wait_for_selector("#alarmList .alarm")
@@ -274,13 +274,13 @@ with sync_playwright() as p:
 
     # ---------- OJP: addresses and places of interest
     pg = b.new_page(); pg.goto("about:blank"); pg.add_script_tag(path=str(ROOT / "assets/ojp.js"))
-    lancy = pg.evaluate("x => OJP_ADAPTER.toPlaces(x).places", (FX / "app_lir_address_lancy.xml").read_text())
-    assert [(x["type"], x["name"]) for x in lancy] == [("address", "Lancy, Avenue des Communes-Réunies 60")], lancy
+    entrances = pg.evaluate("x => OJP_ADAPTER.toPlaces(x).places", (FX / "app_lir_address_entrances.xml").read_text())
+    assert [(x["type"], x["name"]) for x in entrances] == [("address", "Genève, Rue du Rhône 60")], entrances
     rhone = pg.evaluate("x => OJP_ADAPTER.toPlaces(x).places.map(p => [p.type, p.id, p.name])", (FX / "app_lir_address_rhone.xml").read_text())
     assert rhone[0][0] == "address" and rhone[1] == ["stop", "8592900", "Genève, Rue du Lac"], rhone
     req = pg.evaluate("OJP_ADAPTER.locationsByName('x', { types: ['stop', 'address', 'poi'] })")
     assert "<Type>stop</Type><Type>address</Type><Type>poi</Type>" in req
-    print("OJP         →", lancy[0]["name"], "| entrances 60.1…60.5 dropped")
+    print("OJP         →", entrances[0]["name"], "| entrances 60.1…60.5 dropped")
     b.close()
 
 print("errors:", errors); assert not errors

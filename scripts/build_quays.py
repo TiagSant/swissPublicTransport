@@ -186,7 +186,7 @@ def main():
     stops, kept, types, everywhere = build(text)
     print(f"element types: {types}")
     print(f"kept {kept} platforms at {len(stops)} stops in the Unireso area")
-    for sid in ("8587387", "8587057", "8587418", "8501008", "8516155"):  # Bel-Air, Cornavin, Les Esserts, Genève, Pont-Rouge
+    for sid in ("8587387", "8587057", "8587386", "8501008", "8516155"):  # Bel-Air, Cornavin, Confignon, croisée, Genève, Pont-Rouge
         print(f"  {sid}: {stops.get(sid)}")
     if len(stops) < 50:
         raise SystemExit("Too few stops — refusing to overwrite the data file")

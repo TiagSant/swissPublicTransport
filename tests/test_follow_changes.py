@@ -1,6 +1,6 @@
-"""US-63: the followed journey keeps up with what the rider actually does (the PO's case, 16.11.2026).
+"""US-63: the followed journey keeps up with what the rider actually does (example).
 
-Planned: from home, tram 14 09:12 Les Esserts → Jonction 09:19, bus 2 09:22 → Musée d'ethnographie 09:25, walk.
+Planned: from home, tram 14 09:12 Confignon, croisée → Jonction 09:19, bus 2 09:22 → Musée d'ethnographie 09:25, walk.
 1. At the stop early (alarms silenced), the rider boards the 09:07 tram: once the position is on its line, the
    journey follows the 09:07 (times, stops) and says so.
 2. At Jonction at 09:14, the buses just left: "Finish on foot from Genève, Jonction" is offered (no later than the
@@ -19,12 +19,12 @@ tz = ZoneInfo("Europe/Zurich"); DAY = dt.datetime(2026, 11, 16, 9, 0, tzinfo=tz)
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z"); at = lambda m: DAY + dt.timedelta(minutes=m)
 hm = lambda ms: dt.datetime.fromtimestamp(ms / 1000, tz).strftime("%H:%M")
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+ESS = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 PLACE = st("8587420", "Petit-Lancy, place", 46.190500, 6.118500)
 QUID = st("8587421", "Petit-Lancy, Quidort", 46.194500, 6.124000)
 JON = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
 MUSEE = st("8587063", "Genève, Musée d'ethnographie", 46.198600, 6.135000)
-HOME = (46.1868, 6.1125); DEST = (46.198300, 6.135600)
+HOME = (46.1775, 6.0892); DEST = (46.198300, 6.135600)
 def end(s, m, kind, plat=""): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
 def call(s, m, first=False, last=False):
     c = {"station": s}
@@ -86,13 +86,13 @@ with sync_playwright() as p:
 
     # 1. at the stop early, then on the 09:07
     be(pg, (ESS["coordinate"]["x"], ESS["coordinate"]["y"]), 6)        # at the stop from 09:00 (the 09:02 is not theirs: it is the 09:07)
-    assert "Vous êtes à Petit-Lancy, Les Esserts" in trip(pg), trip(pg)
+    assert "Vous êtes à Confignon, croisée" in trip(pg), trip(pg)
     be(pg, (ESS["coordinate"]["x"], ESS["coordinate"]["y"]), 7.3)
     be(pg, (PLACE["coordinate"]["x"] + 0.0003, PLACE["coordinate"]["y"]), 9.5)
     r0 = next(l for l in plan(pg) if l["type"] == "ride")
     assert hm(r0["dep"]) == "09:07" and hm(r0["arr"]) == "09:14", (hm(r0["dep"]), hm(r0["arr"]))
     tx = trip(pg)
-    assert "09:07 Petit-Lancy, Les Esserts" in tx and "09:14 Genève, Jonction" in tx, tx
+    assert "09:07 Confignon, croisée" in tx and "09:14 Genève, Jonction" in tx, tx
     print("1 earlier   → on the line before 09:12: following the 09:07 (arrival Jonction 09:14)")
 
     # 2. at Jonction at 09:14:30, waiting: finish on foot offered

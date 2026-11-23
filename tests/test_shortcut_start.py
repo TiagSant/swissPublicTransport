@@ -1,6 +1,6 @@
 """US-65: walk to a stop a later ride passes and board it there — a journey of its own.
 
-The PO's case (16.11.2026): rue De-Candolle 6 → Les Esserts. The API walks to Place de Neuve, takes tram 12 to
+Example: Place de Neuve 3 → Confignon, croisée. The API walks to Place de Neuve, takes tram 12 to
 Bel-Air, then tram 14. Walking, Stand (a stop tram 14 passes after Bel-Air) is about as close, and the tram leaves
 there 2 min later: walk to Stand, no tram 12. The US-36 offer (walk to Bel-Air) stays on the API's journey.
 transport.opendata.ch is mocked; stop ids and positions are real."""
@@ -17,13 +17,13 @@ LEAFLET_DIR, TILE = os.environ.get("LEAFLET_DIR"), os.environ.get("TILE_PNG")
 tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-HOME = [46.19995, 6.14455]   # rue De-Candolle 6 (approx.)
+HOME = [46.2000, 6.1446]   # Place de Neuve 3 (approx.)
 NEUVE = st("8592885", "Genève, Place de Neuve", 46.20069, 6.1433)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.20424, 6.14206)
 STAND = st("8592906", "Genève, Stand", 46.2036, 6.14105)
 PALLADIUM = st("8592874", "Genève, Palladium", 46.20303, 6.13391)
 JONCTION = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 S = {"base": None}
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 def end(s, t, kind, plat): return {"station": s, kind: fmt(t), kind + "Timestamp": int(t.timestamp()), "platform": plat, "prognosis": {}, "delay": None}
@@ -32,9 +32,9 @@ def ride(cat, num, to, a, b, t0, t1, p0, p1, mid=()):
     return {"journey": {"category": cat, "number": num, "to": to, "operator": "TPG", "passList": calls}, "walk": None,
             "departure": end(a, t0, "departure", p0), "arrival": end(b, t1, "arrival", p1)}
 def walk(a, b, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - t0).total_seconds())}, "departure": end(a, t0, "departure", ""), "arrival": end(b, t1, "arrival", "")}
-def tram14(t0, a=BELAIR):   # tram 14 from Bel-Air: Stand +2, Palladium +4, Jonction +6, Les Esserts +12
+def tram14(t0, a=BELAIR):   # tram 14 from Bel-Air: Stand +2, Palladium +4, Jonction +6, Confignon, croisée +12
     mid = [(STAND, at(t0 + 2)), (PALLADIUM, at(t0 + 4)), (JONCTION, at(t0 + 6))]
-    return ride("T", "14", "Bernex-Vailly", a, ESSERTS, at(t0), at(t0 + 12), "D", "B", mid=mid)
+    return ride("T", "14", "Bernex-Vailly", a, CROISEE, at(t0), at(t0 + 12), "D", "B", mid=mid)
 def late(r, d):   # BUG-15: live times at departure and arrival only, none for the stops in between (as seen 16.11, 19:05)
     for k, kind in (("departure", "departure"), ("arrival", "arrival")):
         t = dt.datetime.strptime(r[k][kind], "%Y-%m-%dT%H:%M:%S%z") + dt.timedelta(minutes=d)
@@ -54,7 +54,7 @@ def api(route):
     else: body = {"stations": [near(NEUVE, 130), near(STAND, 480), near(BELAIR, 510)]}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 STOP = lambda s: {"kind": "stop", "id": s["id"], "name": s["name"], "coord": [s["coordinate"]["x"], s["coordinate"]["y"]]}
-ADDR = {"kind": "addr", "name": "Rue De-Candolle 6, Genève", "coord": HOME}
+ADDR = {"kind": "addr", "name": "Place de Neuve 3, Genève", "coord": HOME}
 norm = lambda s: " ".join(s.split())
 
 errors = []
@@ -68,7 +68,7 @@ def session(b, settings):
     if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.clock.install(time=S["base"].timestamp()); pg.goto(PAGE)
-    store = {"tab": "journey", "lang": "fr", "settings": settings, "prio": "fast", "journey:from": ADDR, "journey:to": STOP(ESSERTS)}
+    store = {"tab": "journey", "lang": "fr", "settings": settings, "prio": "fast", "journey:from": ADDR, "journey:to": STOP(CROISEE)}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
     pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr"); pg.wait_for_timeout(800)
     return ctx, pg

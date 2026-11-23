@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 /** The client sends the prototype's XML and turns HTTP and network failures into typed errors. */
 class OjpClientTest {
     // the recorded request of the app's light board refresh, and its times (the OJP probe refreshes it)
-    private val recorded = Fixtures.text("ojp/app_ser_esserts_light.request.xml")
+    private val recorded = Fixtures.text("ojp/app_ser_croisee_light.request.xml")
     private fun tag(name: String) = Instant.parse(Regex("<$name>([^<]+)</$name>").find(recorded)!!.groupValues[1])
     private val clock = Clock.fixed(tag("siri:RequestTimestamp"), ZoneOffset.UTC)
     private fun client(t: OjpTransport) = OjpClient(t, OjpRequests("swissPublicTransport_prototype"), clock)
@@ -24,8 +24,8 @@ class OjpClientTest {
     @Test
     fun sendsTheRequestAndReadsTheAnswer() {
         var sent = ""
-        val c = client { body -> sent = body; OjpHttpResponse(200, Fixtures.text("ojp/app_ser_esserts_light.xml")) }
-        val board = c.departures("8587418", "fr", from = tag("DepArrTime"), limit = 150, onward = false)
+        val c = client { body -> sent = body; OjpHttpResponse(200, Fixtures.text("ojp/app_ser_croisee_light.xml")) }
+        val board = c.departures("8587386", "fr", from = tag("DepArrTime"), limit = 150, onward = false)
         assertEquals(recorded, sent)
         assertTrue(board.departures.isNotEmpty())
     }
@@ -50,8 +50,8 @@ class OjpClientTest {
 
     @Test
     fun otherHttpErrorsAndMalformedAnswers() {
-        assertEquals(503, assertFailsWith<OjpException.Http> { answering(503, "down").journeys("8587418", "8587057", "fr") }.status)
-        assertFailsWith<OjpException.Malformed> { answering(200, "{\"json\": true}").journeys("8587418", "8587057", "fr") }
+        assertEquals(503, assertFailsWith<OjpException.Http> { answering(503, "down").journeys("8587386", "8587057", "fr") }.status)
+        assertFailsWith<OjpException.Malformed> { answering(200, "{\"json\": true}").journeys("8587386", "8587057", "fr") }
         assertFailsWith<OjpException.Malformed> { answering(200, "<OJP><broken").stopsByName("x", "fr") }
     }
 }

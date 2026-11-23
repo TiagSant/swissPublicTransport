@@ -1,6 +1,6 @@
 # Real-data validation — transport.opendata.ch (survey of 10 Nov 2026)
 
-TECH-01 (#10), run from a browser against 12 stops: Bel-Air, Cornavin, Molard, Eaux-Vives (tram and station), Petit-Lancy Les Esserts, Genève-Aéroport, Nyon, Lancy-Pont-Rouge, Champel, Annemasse, and the Pâquis and Jardin-Anglais piers.
+TECH-01 (#10), run from a browser against 12 stops: Bel-Air, Cornavin, Molard, Eaux-Vives (tram and station), Confignon croisée, Genève-Aéroport, Nyon, Lancy-Pont-Rouge, Champel, Annemasse, and the Pâquis and Jardin-Anglais piers.
 
 ## Observed categories → mode in the app
 

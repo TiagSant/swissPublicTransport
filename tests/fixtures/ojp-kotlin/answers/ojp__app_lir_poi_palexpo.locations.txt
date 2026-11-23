@@ -1,4 +1,0 @@
-stop|8580994|Locarno, Palexpo|46.16445,8.78832|bus
-stop|8592950|Grand-Saconnex, Palexpo|46.23338,6.11859|bus
-stop|8592937|Grand-Saconnex,Palexpo-Halle 7|46.23588,6.11588|bus
-error|-

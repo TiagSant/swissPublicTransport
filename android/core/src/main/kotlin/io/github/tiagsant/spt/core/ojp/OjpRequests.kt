@@ -120,7 +120,7 @@ class OjpRequests(private val requestor: String = REQUESTOR) {
             }
         }
 
-        /** A number as JavaScript prints it: `46.0` → `46`, `6.1066` → `6.1066`, never in exponent form. */
+        /** A number as JavaScript prints it: `46.0` → `46`, `6.0833` → `6.0833`, never in exponent form. */
         fun num(d: Double): String {
             require(d.isFinite()) { "not a number: $d" }
             val plain = BigDecimal.valueOf(d).stripTrailingZeros().toPlainString()

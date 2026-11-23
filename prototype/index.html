@@ -21,7 +21,7 @@
   - BUG-19: stops passed on a followed ride: the GPS placed along the line (wins over the times when fresh), a stop it
            saw passed stays so; by time without GPS.
   - BUG-18: getting off earlier (US-64): the earliest and the least-walking stops kept; once the walks follow the
-           streets, a beaten one is left out (Les Esserts → Saint-Jean: Palladium sooner, Stand less walking).
+           streets, a beaten one is left out (Confignon, croisée → Saint-Jean: Palladium sooner, Stand less walking).
   - BUG-17: following what really happens: leaving now (no alarm); on board after all (the run where the rider is);
            in a vehicle when stopped in traffic; a vehicle faster than the last walk; a vehicle taken outside the plan.
   - US-67: traffic messages (OJP, SIRI SX situations) on departures, journeys and followed rides; a new one told once.
@@ -2270,7 +2270,7 @@
   function rankJourneys(list, prio, mode) {
     const byTime = (x, y) => mode === 'arrive' ? (y.leaveAt - x.leaveAt) : (x.arriveAt - y.arriveAt);
     const byWalk = (x, y) => Math.round(x.walkMin) - Math.round(y.walkMin);
-    // BUG-20: the fastest is the one that lasts the least (PO, 17.11.2026: 22:15 → 22:45, 29 min, was "fastest"
+    // BUG-20: the fastest is the one that lasts the least (22:15 → 22:45, 29 min, was "fastest"
     // before 22:34 → 22:52, 18 min); arriving earlier then breaks a tie
     const byDuration = (x, y) => Math.round(x.durationMin) - Math.round(y.durationMin);
     return list.slice().sort(prio === 'walk' ? (x, y) => byWalk(x, y) || byTime(x, y)
@@ -2839,7 +2839,7 @@
   // fewer changes, arriving no later. Added to the list (ranked by the rider's priority like any other journey);
   // the journey with the change stays. The stops looked at: those the ride passes before the change (the change
   // stop itself only when it is not the last change: walking from there is the US-36 offer).
-  // US-65: the same at the start (rue De-Candolle → Les Esserts: tram 12 from Place de Neuve to Bel-Air, then tram 14;
+  // US-65: the same at the start (Place de Neuve → Confignon, croisée: tram 12 from Place de Neuve to Bel-Air, then tram 14;
   // walking, Stand — a stop tram 14 passes after Bel-Air — is as close, and its tram leaves later): walk to a stop a
   // later ride passes, board it there. Same arrival, fewer rides; kept when it leaves later than walking to where that
   // ride starts (the US-36 offer) or walks less. notBefore: leaving before it is too late (searching for now).
@@ -3664,7 +3664,7 @@
     // US-33: set after the first vehicle left → already on board: no departure alarms, only get-off reminders.
     // Set after the leave time → only "Leave" rings (at once). Set after the get-ready time → "Get ready" rings at once.
     // BUG-17: followed when it is time to leave (2 min or less before, or after): the rider is leaving now — neither
-    // "Get ready" nor "Leave" rings (PO, 17.11.2026: "1 min to leave" rang while he was already on his way)
+    // "Get ready" nor "Leave" rings ("1 min to leave" rang while the rider was already on the way)
     const tm0 = alarmTimes(alarm), now0 = Date.now();
     if (now0 >= tm0.dep) { alarm.onBoard = true; alarm.fired.ready = alarm.fired.leave = now0; }
     else if (now0 >= tm0.leave - LEAVING_NOW_MS) { alarm.fired.ready = alarm.fired.leave = now0; alarm.leavingNow = true; }
@@ -3778,7 +3778,7 @@
   }
 
   // BUG-07: the run we follow, on a live departure board. The same line also leaves from the same stop in the other
-  // direction (tram 14 at Les Esserts: Meyrin from platform A, Bernex from B, often in the same minute), so the
+  // direction (tram 14 at Confignon, croisée: Meyrin from platform A, Bernex from B, often in the same minute), so the
   // direction must match too: the get-off stop among its next stops, else its terminus. The closest time wins.
   const nameWords = s => new Set(String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
   function sameTerminus(x, y) {
@@ -3928,7 +3928,7 @@
   // US-44: left early / at the first stop early → earlier ways to the end of the first part
   const EARLY_MIN = 3;          // at least 3 min to wait at the stop: worth looking for earlier options
   // US-61: what replaces a cancelled first ride: journeys from its stop, from when the rider can be there, without
-  // that run (journey planners may still list it for a while: seen on 16.11.2026, tram 14 at Les Esserts)
+  // that run (journey planners may still list it for a while: seen once, tram 14 at Confignon, croisée)
   async function findReplacement(a, idx) {
     const r = a.plan[idx], dest = destAfter(a, idx);
     if (!r.from.id || !dest) return [];
@@ -4035,7 +4035,7 @@
   }
 
   // ---------- BUG-23: off the vehicle at the get-off stop, before the arrival time announced ----------
-  // The PO (18.11.2026): waiting for bus 2 at Jonction, the followed journey still said "on board tram 14" — a ride
+  // Example: waiting for bus 2 at Jonction, the followed journey still said "on board tram 14" — a ride
   // was on board until its arrival time announced (09:11 live), and the tram came earlier. Now a ride is also over
   // once the rider is seen off it at its get-off stop:
   //  - only once the stop before the get-off one is left (BUG-19: by the GPS, the sensors or the times);
@@ -5198,7 +5198,7 @@
     const p = placeFromRow(b); if (!p) return;
     const name = p.kind === 'saved' ? p.name : p.name;
     Object.assign(placeDraft, { coord: p.coord, where: name, confirmReplace: false });
-    // "Lancy, Avenue des Communes-Réunies 60" → suggested name "Avenue des Communes-Réunies 60"
+    // "Genève, Rue du Rhône 60" → suggested name "Rue du Rhône 60"
     placeDraft.autoName = name.replace(/^[^,]+,\s*/, '');
     if (placeDraft.kind === 'other' && !placeDraft.touched) placeDraft.name = placeDraft.autoName;
     else placeDraft.name = $('placeName').value;

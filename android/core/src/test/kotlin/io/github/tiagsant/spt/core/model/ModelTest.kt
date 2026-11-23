@@ -116,12 +116,12 @@ class TimeTest {
 class ZoneTest {
     @Test
     fun zoneAroundAPoint() {
-        val esserts = GeoPoint(46.18818, 6.11347)
-        val z = Zone.around(esserts, 500.0)
-        assertTrue(esserts in z)
-        assertEquals(0.00449, z.latMax - esserts.lat, 0.00001)
-        assertTrue(z.lonMax - esserts.lon > z.latMax - esserts.lat)   // a degree of longitude is shorter
-        assertFalse(GeoPoint(46.2, 6.11347) in z)
+        val croisee = GeoPoint(46.17890, 6.09018)
+        val z = Zone.around(croisee, 500.0)
+        assertTrue(croisee in z)
+        assertEquals(0.00449, z.latMax - croisee.lat, 0.00001)
+        assertTrue(z.lonMax - croisee.lon > z.latMax - croisee.lat)   // a degree of longitude is shorter
+        assertFalse(GeoPoint(46.2, 6.09018) in z)
         assertFailsWith<IllegalArgumentException> { Zone(47.0, 46.0, 6.0, 7.0) }
     }
 }
@@ -154,7 +154,7 @@ class JourneyTest {
     fun waitsBetweenRidesOnceTheWalkIsDone() {
         val j = Journey(
             listOf(
-                ride("8587418", "07:00", "8587387", "07:10"),
+                ride("8587386", "07:00", "8587387", "07:10"),
                 Walk(Place.StopPlace(stop("8587387")), Place.StopPlace(stop("8587388")), Duration.ofMinutes(3)),
                 ride("8587388", "07:20", "8587057", "07:30"),
             ),

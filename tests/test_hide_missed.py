@@ -1,6 +1,6 @@
 """US-57: a journey whose change is missed at the current times is not suggested.
 
-The PO's case (14.11.2026): bus 1 delayed by 8 min reaches the change after the train has left ("Correspondance :
+Example: bus 1 delayed by 8 min reaches the change after the train has left ("Correspondance :
 manquée aux horaires actuels"); that journey must not be offered.
 A: bus 1 +8 min → Bel-Air 07:48 live, bus 3 leaves 07:46: missed → hidden. B: the next one, fine → shown.
 All missed: the app looks once more from just after them and shows what it finds; if still nothing, it says so."""

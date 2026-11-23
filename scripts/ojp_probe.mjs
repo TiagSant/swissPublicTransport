@@ -50,21 +50,21 @@ async function post(name, body, extraHeaders = {}) {
   return text;
 }
 
-// 1. Stop search by name, and stops around a point (Petit-Lancy, near Les Esserts)
+// 1. Stop search by name, and stops around a point (Confignon, on tram 14)
 await post('lir_name_belair', xml(R.LocationInformationRequest.initWithLocationName('Bel-Air', ['stop'], 10)));
-await post('lir_name_esserts', xml(R.LocationInformationRequest.initWithLocationName('Esserts', ['stop'], 10)));
-await post('lir_coords_point', xml(R.LocationInformationRequest.initWithPlaceRef('46.1890,6.1150', 10)));
-await post('lir_bbox_point', xml(R.LocationInformationRequest.initWithBBOX([6.1100, 46.1860, 6.1200, 46.1920], ['stop'], 10)));
+await post('lir_name_croisee', xml(R.LocationInformationRequest.initWithLocationName('Confignon', ['stop'], 10)));
+await post('lir_coords_point', xml(R.LocationInformationRequest.initWithPlaceRef('46.1797,6.0917', 10)));
+await post('lir_bbox_point', xml(R.LocationInformationRequest.initWithBBOX([6.0867, 46.1767, 6.0967, 46.1827], ['stop'], 10)));
 
-// 2. Departures: TPG tram/bus stop, main railway station, Mouettes pier, the PO's stop
+// 2. Departures: TPG tram/bus stop, main railway station, Mouettes pier, a tram stop outside the centre
 const ser = {};
-for (const [name, id] of [['ser_belair', '8587387'], ['ser_geneve_gare', '8501008'], ['ser_paquis_lac', '8501238'], ['ser_esserts', '8587418']]) {
+for (const [name, id] of [['ser_belair', '8587387'], ['ser_geneve_gare', '8501008'], ['ser_paquis_lac', '8501238'], ['ser_croisee', '8587386']]) {
   ser[name] = await post(name, xml(R.StopEventRequest.initWithPlaceRefAndDate(id, new Date())));
 }
 
 // 3. Journeys: stop to stop, and map point to map point (no nearest-stop workaround needed with OJP)
-await post('tr_stops', xml(R.TripRequest.initWithPlaceRefsOrCoords('8587418', '8587057')));
-await post('tr_coords', xml(R.TripRequest.initWithPlaceRefsOrCoords('46.1890,6.1150', '46.2100,6.1425')));
+await post('tr_stops', xml(R.TripRequest.initWithPlaceRefsOrCoords('8587386', '8587057')));
+await post('tr_coords', xml(R.TripRequest.initWithPlaceRefsOrCoords('46.1797,6.0917', '46.2100,6.1425')));
 
 // 4. Details of one vehicle run taken from the Bel-Air departures (next stops)
 const m = ser.ser_belair.match(/<JourneyRef>([^<]+)<\/JourneyRef>[\s\S]*?<OperatingDayRef>([^<]+)<\/OperatingDayRef>/);
@@ -76,15 +76,15 @@ const ZONE = { latMin: 45.85, latMax: 46.50, lonMin: 5.80, lonMax: 6.65 };   // 
 const ago = min => new Date(Date.now() - min * 60000);
 await post('app_lir_name_zone_belair', APP.locationsByName('Bel-Air', { zone: ZONE, limit: 20 }));
 await post('app_lir_name_zone_gare', APP.locationsByName('Gare', { zone: ZONE, limit: 20 }));
-await post('app_lir_zone_esserts', APP.locationsInZone({ latMin: 46.1836, latMax: 46.1926, lonMin: 6.1066, lonMax: 6.1196 }, { limit: 20 }));
-await post('app_ser_esserts_full', APP.stopEvents('8587418', { from: ago(30), limit: 150 }));
-await post('app_ser_esserts_light', APP.stopEvents('8587418', { from: ago(30), limit: 150, onward: false }));
+await post('app_lir_zone_croisee', APP.locationsInZone({ latMin: 46.1743, latMax: 46.1833, lonMin: 6.0833, lonMax: 6.0963 }, { limit: 20 }));
+await post('app_ser_croisee_full', APP.stopEvents('8587386', { from: ago(30), limit: 150 }));
+await post('app_ser_croisee_light', APP.stopEvents('8587386', { from: ago(30), limit: 150, onward: false }));
 await post('app_ser_belair_light', APP.stopEvents('8587387', { from: ago(30), limit: 150, onward: false }));
 await post('app_lir_address_rhone', APP.locationsByName('Rue du Rhône 10 Genève', { types: ['stop', 'address', 'poi'], limit: 10 }));
 await post('app_lir_poi_palexpo', APP.locationsByName('Palexpo', { types: ['stop', 'address', 'poi'], limit: 10 }));
-await post('app_lir_address_lancy', APP.locationsByName('Avenue des Communes-Réunies 60 Lancy', { types: ['address'], limit: 5 }));
-await post('app_tr_depart', APP.trip('8587418', '8587057', { at: new Date() }));
-await post('app_tr_arrive', APP.trip('8587418', '8587057', { at: new Date(Date.now() + 3600000), arrive: true }));
+await post('app_lir_address_entrances', APP.locationsByName('Rue du Rhône 60 Genève', { types: ['address'], limit: 5 }));
+await post('app_tr_depart', APP.trip('8587386', '8587057', { at: new Date() }));
+await post('app_tr_arrive', APP.trip('8587386', '8587057', { at: new Date(Date.now() + 3600000), arrive: true }));
 
 // 6. Can a browser page on GitHub Pages call the API directly? (CORS preflight + a real POST with an Origin)
 const pre = await fetch(URL_OJP, { method: 'OPTIONS', headers: { Origin: ORIGIN, 'Access-Control-Request-Method': 'POST',

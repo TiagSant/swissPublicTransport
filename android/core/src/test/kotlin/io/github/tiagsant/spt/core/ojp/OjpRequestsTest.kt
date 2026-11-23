@@ -52,16 +52,16 @@ class OjpRequestsTest {
     @Test
     fun recordedRequestsAreTheAppsOwn() {
         // the oracle rebuilt them from the recorded files; check one directly against the recording
-        val recorded = Fixtures.text("ojp/app_ser_esserts_light.request.xml")
+        val recorded = Fixtures.text("ojp/app_ser_croisee_light.request.xml")
         fun tag(name: String) = Instant.parse(Regex("<$name>([^<]+)</$name>").find(recorded)!!.groupValues[1])
-        val xml = requests.stopEvents("8587418", tag("DepArrTime"), "fr", tag("siri:RequestTimestamp"), 150, onward = false)
+        val xml = requests.stopEvents("8587386", tag("DepArrTime"), "fr", tag("siri:RequestTimestamp"), 150, onward = false)
         assertEquals(recorded, xml)
     }
 
     @Test
     fun numbersAndEscaping() {
         assertEquals("46", OjpRequests.num(46.0))
-        assertEquals("6.1066", OjpRequests.num(6.1066))
+        assertEquals("6.0833", OjpRequests.num(6.0833))
         assertEquals("0.0001", OjpRequests.num(0.0001))
         assertEquals("-0.5", OjpRequests.num(-0.5))
         assertEquals("a &lt;b&gt; &amp; &apos;c&apos; &quot;d&quot;", OjpRequests.esc("a <b> & 'c' \"d\""))

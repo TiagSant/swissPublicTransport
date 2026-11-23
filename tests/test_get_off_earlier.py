@@ -1,6 +1,6 @@
 """BUG-11: get off earlier, at a stop the first vehicle passes before the planned one, when it is closer to the next one.
 
-The PO's case (14.11.2026): tram 14 to Meyrin from Les Esserts, the API gets off at Lyon (quai N), one stop after
+Example: tram 14 to Meyrin from Confignon, croisée, the API gets off at Lyon (quai N), one stop after
 Gare Cornavin, and walks 4 min back to the train at Genève voie 5. The 14 stops at Gare Cornavin (quai H, under the
 tracks) just before: get off there, about 1 min from the train. Same train, same arrival.
 Real stop order of the 14 (OJP, recorded): ... Coutance → gare Cornavin → Lyon → Poterie ...
@@ -19,7 +19,7 @@ tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
 # real ids and positions (transport.opendata.ch stops, ATLAS quays)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.20412, 6.14272)
 COUTANCE = st("8592812", "Genève, Coutance", 46.20761, 6.14229)
 CORNAVIN = st("8587057", "Genève, gare Cornavin", 46.209652, 6.14233)
@@ -43,12 +43,12 @@ def at(m): return S["base"] + dt.timedelta(minutes=m)
 
 def connections(frm, to):
     if S["case"] == "cut":   # 07:30 tram 14 → Lyon 07:43 (via Cornavin 07:42), walk 4 min, IR Genève 07:55 voie 5
-        return [{"sections": [ride("T", "14", "Meyrin-Gravière", ESSERTS, LYON, at(30), at(43), "B", "N",
+        return [{"sections": [ride("T", "14", "Meyrin-Gravière", CROISEE, LYON, at(30), at(43), "B", "N",
                                    mid=[(BELAIR, at(38)), (COUTANCE, at(40)), (CORNAVIN, at(42))]),
                               walk(LYON, at(43), at(47)),
                               ride("IR", "90", "Brig", GENEVE, LAUSANNE, at(55), at(90), "5", "3")]}]
     # control: the earlier stops are all farther from the train than the planned one
-    return [{"sections": [ride("T", "14", "Meyrin-Gravière", ESSERTS, CORNAVIN, at(30), at(42), "B", "H", mid=[(BELAIR, at(38)), (COUTANCE, at(40))]),
+    return [{"sections": [ride("T", "14", "Meyrin-Gravière", CROISEE, CORNAVIN, at(30), at(42), "B", "H", mid=[(BELAIR, at(38)), (COUTANCE, at(40))]),
                           walk(CORNAVIN, at(42), at(46)),
                           ride("IR", "90", "Brig", GENEVE, LAUSANNE, at(55), at(90), "5", "3")]}]
 def board(stop_id):
@@ -65,7 +65,7 @@ def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"): body = {"connections": connections(q["from"][0], q["to"][0])}
     elif u.path.endswith("/stationboard"): body = {"station": {"id": q["id"][0]}, "stationboard": board(q["id"][0])}
-    elif "x" in q: body = {"stations": [dict(ESSERTS, distance=100)]}
+    elif "x" in q: body = {"stations": [dict(CROISEE, distance=100)]}
     else: body = {"stations": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 def osrm(route):
@@ -95,7 +95,7 @@ def session(b, case, base, store, routing=True):
 
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROME_PATH"))
-    store = {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(ESSERTS), "journey:to": STOP(LAUSANNE)}
+    store = {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(CROISEE), "journey:to": STOP(LAUSANNE)}
     base = dt.datetime(2026, 11, 14, 7, 0, tzinfo=tz)
 
     ctx, pg = session(b, "cut", base, store)

@@ -1,6 +1,6 @@
 """US-64: get off earlier and finish on foot — a journey of its own, as other apps suggest.
 
-The PO's case (16.11.2026, 10:38): Musée d'ethnographie → Bovy-Lysberg. The API takes bus 2 to Bel-Air and a second
+Example: Musée d'ethnographie → Bovy-Lysberg. The API takes bus 2 to Bel-Air and a second
 bus back to Bovy-Lysberg. Bus 2 passes Théâtre just before, about 100 m from Bovy-Lysberg: get off there and walk.
 The journey with the change stays in the list; the rider's priority orders them.
 transport.opendata.ch is mocked; stop ids and positions are the real ones."""

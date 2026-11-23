@@ -8,7 +8,7 @@ A tram followed with the sensors on: the GPS is switched on and off (recorded by
 - the stops served sensed by the sensors (still 20 s, then moving): a delay reported afterwards does not put a stop
   served back to come.
 Without sensor data: on all the ride, as before.
-Synthetic line (stops 2 ... 7 on a straight 6 km line from Les Esserts, real); transport.opendata.ch mocked."""
+Synthetic line (stops 2 ... 7 on a straight 6 km line from Confignon, croisée, real); transport.opendata.ch mocked."""
 import os, json, datetime as dt
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -22,10 +22,10 @@ LEAFLET_DIR, TILE = os.environ.get("LEAFLET_DIR"), os.environ.get("TILE_PNG")
 tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def at(h, m, s=0): return dt.datetime(2026, 11, 17, h, m, s, tzinfo=tz)
-A, Z = (46.188095, 6.113098), (46.2261, 6.1681)
+A, Z = (46.178810, 6.089810), (46.2168, 6.1448)
 def on_line(f): return (A[0] + (Z[0] - A[0]) * f, A[1] + (Z[1] - A[1]) * f)
 def st(id_, name, f): p = on_line(f); return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": p[0], "y": p[1]}}
-FIRST = {"id": "8587418", "name": "Petit-Lancy, Les Esserts", "coordinate": {"type": "WGS84", "x": A[0], "y": A[1]}}
+FIRST = {"id": "8587386", "name": "Confignon, croisée", "coordinate": {"type": "WGS84", "x": A[0], "y": A[1]}}
 STOPS = [(st("9000002", "Arrêt 2", .15), at(8, 32)), (st("9000003", "Arrêt 3", .30), at(8, 34)), (st("9000004", "Arrêt 4", .50), at(8, 36)),
          (st("9000005", "Arrêt 5", .70), at(8, 38)), (st("9000006", "Arrêt 6", .85), at(8, 40))]
 LAST = (st("9000007", "Arrêt 7", 1.0), at(8, 42))

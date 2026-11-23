@@ -1,6 +1,6 @@
 """US-62: late start or first ride missed — other departures offered, alarms moved.
 
-Journey followed: from home (about 500 m from Petit-Lancy, Les Esserts) → tram 14 at 07:43 → Genève, Jonction.
+Journey followed: from home (about 500 m from Confignon, croisée) → tram 14 at 07:43 → Genève, Jonction.
 A. Position: still at home at 07:38 — the 07:43 can no longer be reached on foot: "You won't make the Tram 14 at
    07:43", departures from where the rider is (not the 07:43). Taking the 07:52: "Leave" rings again at its new time.
 B. No position: "I'm leaving later" → departures from home; the one chosen moves the alarms.
@@ -18,9 +18,9 @@ tz = ZoneInfo("Europe/Zurich"); DAY = dt.datetime(2026, 11, 16, 7, 0, tzinfo=tz)
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z"); at = lambda m: DAY + dt.timedelta(minutes=m)
 hm = lambda ms: dt.datetime.fromtimestamp(ms / 1000, tz).strftime("%H:%M")
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+ESS = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 JON = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
-HOME = (46.1918, 6.1150)                       # ~460 m from the stop
+HOME = (46.1825, 6.0917)                       # ~460 m from the stop
 def end(s, m, kind, plat=""): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
 def ride(m0): return {"journey": {"category": "T", "number": "14", "to": "Meyrin, Gravière", "operator": "TPG",
                                   "passList": [{"station": ESS, "departure": fmt(at(m0))}, {"station": JON, "arrival": fmt(at(m0 + 7))}]},
@@ -98,12 +98,12 @@ with sync_playwright() as p:
     ctx.close()
 
     # ---- C. at the stop, still there 2 min after the tram left
-    ctx, pg = follow(b, (46.18812, 6.11312))
-    until(pg, 46, (46.18812, 6.11312)); pg.wait_for_timeout(1500); pg.clock.run_for(2000); pg.wait_for_timeout(1500)
+    ctx, pg = follow(b, (46.17883, 6.08983))
+    until(pg, 46, (46.17883, 6.08983)); pg.wait_for_timeout(1500); pg.clock.run_for(2000); pg.wait_for_timeout(1500)
     tx = trip(pg)
     assert "Tram 14 at 07:43 missed?" in tx, tx
     pg.locator("#alarmList button[data-act=late-ok]").click(); pg.wait_for_timeout(300)
-    until(pg, 48, (46.18812, 6.11312)); pg.wait_for_timeout(800)
+    until(pg, 48, (46.17883, 6.08983)); pg.wait_for_timeout(800)
     assert "missed?" not in trip(pg) and alarm(pg).get("lateOk"), trip(pg)
     print("C position  → “Tram 14 at 07:43 missed?”; “I’m on board after all” dismisses it for good")
     ctx.close()

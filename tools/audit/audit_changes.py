@@ -26,7 +26,7 @@ PAGE = "http://127.0.0.1:8765/prototype/index.html"
 SPEED = 4.8 * 1000 / 60; DETOUR = 1.3; COMFORT = 3
 
 PAIRS = [  # (from, to) by name; resolved to the first stop OJP gives
-    ("Petit-Lancy, Les Esserts", "Lausanne"), ("Genève, Jonction", "Genève, Nations"),
+    ("Confignon, croisée", "Lausanne"), ("Genève, Jonction", "Genève, Nations"),
     ("Onex, Bandol", "Genève-Aéroport"), ("Vernier, Blandonnet", "Genève, Plainpalais"),
     ("Thônex, Moillesulaz", "Genève, Servette"), ("Carouge GE, Rondeau", "Meyrin, Gravière"),
     ("Lausanne, Ouchy-Olympique", "Ecublens VD, EPFL"), ("Prilly, Galicien", "Lausanne, CHUV"),

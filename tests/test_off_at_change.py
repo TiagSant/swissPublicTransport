@@ -1,16 +1,16 @@
 """BUG-23: off the vehicle at the get-off stop, before the arrival time announced.
 
-The PO (18.11.2026, ~09:10): tram 14 Les Esserts → Jonction (quai B), then bus 2 from quai D. Waiting for the bus, the
+Example: tram 14 Confignon, croisée → Jonction (quai B), then bus 2 from quai D. Waiting for the bus, the
 followed journey still said "on board tram 14": the ride lasted until its live arrival announced (09:11), and the tram
 came earlier (here 09:09). Now the ride is over once the rider is seen off it at the get-off stop — and moving inside
 the vehicle is not getting off (PO):
-1. GPS + sensors (his case): steps inside the tram between stops, then to the doors while it comes in: still on board;
+1. GPS + sensors (the example): steps inside the tram between stops, then to the doors while it comes in: still on board;
    off at quai B and walking to quai D: "done", "Next: Bus 2", well before 09:11.
 2. staying on board (the tram stops 20 s at Jonction, a few steps to the doors, then goes on): still on board — the
    times end the ride, as before.
 3. off, a step or two, then standing at the stop (same platform): "done" after 30 s there.
 4. without GPS, sensors only: 10 s of steps in the tram: still on board; 40 s walking off: "done".
-Positions of the stops and platforms real (Les Esserts, Jonction A/B/D); the line between them synthetic.
+Positions of the stops and platforms real (Confignon, croisée, Jonction A/B/D); the line between them synthetic.
 transport.opendata.ch mocked."""
 import os, json, datetime as dt
 from pathlib import Path
@@ -25,22 +25,22 @@ LEAFLET_DIR, TILE = os.environ.get("LEAFLET_DIR"), os.environ.get("TILE_PNG")
 tz = ZoneInfo("Europe/Zurich")
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 def at(h, m, s=0): return dt.datetime(2026, 11, 18, h, m, s, tzinfo=tz)
-A = (46.188095, 6.113098)                              # Petit-Lancy, Les Esserts (quai A)
+A = (46.178810, 6.089810)                              # Confignon, croisée (quai A)
 J, QB, QD = (46.200687, 6.129467), (46.201018, 6.13003), (46.200297, 6.129444)   # Jonction: stop, quai B, quai D
 def on_line(f): return (A[0] + (QB[0] - A[0]) * f, A[1] + (QB[1] - A[1]) * f)   # the tram's way, quai B at 1.0
 def mix(p, q, f): return (p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f)
 def st(id_, name, p): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": p[0], "y": p[1]}}
-ESSERTS, PLACE, QUIDORT = st("8587418", "Petit-Lancy, Les Esserts", A), st("8587419", "Petit-Lancy, place", on_line(.35)), st("8587420", "Petit-Lancy, Quidort", on_line(.65))
+CROISEE, PLACE, QUIDORT = st("8587386", "Confignon, croisée", A), st("8587419", "Petit-Lancy, place", on_line(.35)), st("8587420", "Petit-Lancy, Quidort", on_line(.65))
 JONCTION, MUSEE = st("8587062", "Genève, Jonction", J), st("8592868", "Genève, Musée d'ethnographie", (46.19795, 6.13641))
 # timetable 08:58 → 09:05; live +6 (Jonction announced 09:11). Bus 2 09:11 +3 from quai D.
-TRAM = [(ESSERTS, at(8, 58)), (PLACE, at(9, 0)), (QUIDORT, at(9, 1)), (JONCTION, at(9, 5))]
+TRAM = [(CROISEE, at(8, 58)), (PLACE, at(9, 0)), (QUIDORT, at(9, 1)), (JONCTION, at(9, 5))]
 LATE = 6
 def prog(kind, t, d): return {kind: fmt(t + dt.timedelta(minutes=d))} if d else {}
 def end(s, t, kind, plat, d=0): return {"station": s, kind: fmt(t), kind + "Timestamp": int(t.timestamp()), "platform": plat, "prognosis": prog(kind, t, d), "delay": d or None}
 def connection():
-    pl = [{"station": ESSERTS, "departure": fmt(TRAM[0][1])}] + [{"station": s, "arrival": fmt(t), "departure": fmt(t)} for s, t in TRAM[1:-1]] + [{"station": JONCTION, "arrival": fmt(TRAM[-1][1])}]
+    pl = [{"station": CROISEE, "departure": fmt(TRAM[0][1])}] + [{"station": s, "arrival": fmt(t), "departure": fmt(t)} for s, t in TRAM[1:-1]] + [{"station": JONCTION, "arrival": fmt(TRAM[-1][1])}]
     tram = {"journey": {"category": "T", "number": "14", "to": "Meyrin-Gravière", "operator": "TPG", "passList": pl}, "walk": None,
-            "departure": end(ESSERTS, TRAM[0][1], "departure", "A", LATE), "arrival": end(JONCTION, TRAM[-1][1], "arrival", "B", LATE)}
+            "departure": end(CROISEE, TRAM[0][1], "departure", "A", LATE), "arrival": end(JONCTION, TRAM[-1][1], "arrival", "B", LATE)}
     walk = {"journey": None, "walk": {"duration": 60}, "departure": end(JONCTION, at(9, 5), "departure", ""), "arrival": end(JONCTION, at(9, 6), "arrival", "")}
     bus = {"journey": {"category": "B", "number": "2", "to": "Genève-Plage", "operator": "TPG",
                        "passList": [{"station": JONCTION, "departure": fmt(at(9, 11))}, {"station": MUSEE, "arrival": fmt(at(9, 14))}]}, "walk": None,
@@ -51,12 +51,12 @@ def entry(cat, num, to, here, t0, d, nxt, plat):
             "stop": {"station": here, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()), "platform": plat, "prognosis": prog("departure", t0, d), "delay": d},
             "passList": [{"station": here}] + [{"station": s, "arrival": fmt(t), "arrivalTimestamp": int(t.timestamp()), "prognosis": prog("arrival", t, d)} for s, t in nxt]}
 def board(stop_id):
-    if stop_id == ESSERTS["id"]: return [entry("T", "14", "Meyrin-Gravière", ESSERTS, TRAM[0][1], LATE, TRAM[1:], "A")]
+    if stop_id == CROISEE["id"]: return [entry("T", "14", "Meyrin-Gravière", CROISEE, TRAM[0][1], LATE, TRAM[1:], "A")]
     if stop_id == JONCTION["id"]: return [entry("B", "2", "Genève-Plage", JONCTION, at(9, 11), 3, [(MUSEE, at(9, 14))], "D")]
     return []
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
-    if u.path.endswith("/connections"): body = {"connections": [connection()] if q.get("from", [""])[0] == ESSERTS["id"] else []}
+    if u.path.endswith("/connections"): body = {"connections": [connection()] if q.get("from", [""])[0] == CROISEE["id"] else []}
     elif u.path.endswith("/stationboard"): body = {"station": {}, "stationboard": board(q.get("id", [""])[0])}
     else: body = {"stations": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
@@ -85,7 +85,7 @@ def session(b, gps=True):
     if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.clock.install(time=at(8, 50).timestamp()); pg.goto(PAGE)
-    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False, "motionSensors": True}, "journey:from": STOP(ESSERTS), "journey:to": STOP(MUSEE)}
+    store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False, "motionSensors": True}, "journey:from": STOP(CROISEE), "journey:to": STOP(MUSEE)}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
     pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")
     pg.locator("#journeyList .jr").first.click(); pg.click("#journeyList .jr-detail .set-alarms"); pg.wait_for_selector("#alarmList .trip")
@@ -117,7 +117,7 @@ def riding(walks=(), off=None, stay=None):
         kind = "walk" if any(s <= t < e for s, e in walks) else "still" if stopped else "ride"
         return on_line(f), kind
     return rider
-def coarse(pg, ctx, gps=True):   # 08:50 → 09:03:30, waiting at Les Esserts
+def coarse(pg, ctx, gps=True):   # 08:50 → 09:03:30, waiting at Confignon, croisée
     while now(pg) < at(9, 3, 30):
         if gps: ctx.set_geolocation({"latitude": A[0], "longitude": A[1], "accuracy": 10})
         pg.evaluate(FEED, ["still", 4]); pg.clock.run_for(30000); pg.wait_for_timeout(60)
@@ -130,7 +130,7 @@ def check(cond, msg):
 
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROME_PATH"))
-    # 1. the PO's case
+    # 1. Example
     print("1. GPS + sensors: off at quai B, walking to quai D")
     ctx, pg = session(b); coarse(pg, ctx)
     rider = riding(walks=[(S(9, 5, 30), S(9, 5, 40)), (S(9, 8, 50), S(9, 8, 55))], off=(S(9, 9, 10), S(9, 9, 55)))

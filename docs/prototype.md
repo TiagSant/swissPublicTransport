@@ -51,7 +51,7 @@ for t in tests/test_*.py; do python "$t" || echo "FAILED: $t"; done
 | `test_follow_best_change.py` | the followed journey has the better change place |
 | `test_walking_sensors.py` | walking or riding from the motion sensors |
 | `test_traffic_info.py` | traffic messages: on the ride valid now, in the app's language |
-| `test_follow_real_events.py` | the PO's trip of 17.11.2026 replayed |
+| `test_follow_real_events.py` | a recorded trip replayed |
 | `test_passed_stops.py` | stops passed: GPS along the line, by time without GPS |
 | `test_gps_when_needed.py` | GPS only when it helps; stops served sensed by the motion sensors |
 | `test_fastest_and_duplicates.py` | "fastest" = shortest; one card for the same vehicles |

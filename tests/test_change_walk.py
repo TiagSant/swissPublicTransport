@@ -15,7 +15,7 @@ fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z"); at = lambda m: NOW + dt.timed
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
 UNIMAIL = st("8592858", "Genève, Uni-Mail", 46.1953, 6.1398)
 LPR = st("8516155", "Lancy-Pont-Rouge, gare", 46.1867, 6.1257)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 S = {"p42": "C"}
 def end(s, m, kind, plat): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
 def ride(cat, num, to, a, b, m0, m1, p0, p1):
@@ -25,8 +25,8 @@ def api(route):
     u = urlparse(route.request.url)
     if u.path.endswith("/connections"):
         body = {"connections": [{"sections": [ride("T", "17", "Lancy-Pont-Rouge, gare", UNIMAIL, LPR, 8, 15, "O", "A"),     # no walk section
-                                              ride("B", "42", "Avusy-Village", LPR, ESSERTS, 20, 24, S["p42"], "B")]}]}
-    else: body = {"stations": [ESSERTS]} if u.path.endswith("/locations") else {"stationboard": []}
+                                              ride("B", "42", "Avusy-Village", LPR, CROISEE, 20, 24, S["p42"], "B")]}]}
+    else: body = {"stations": [CROISEE]} if u.path.endswith("/locations") else {"stationboard": []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 STOP = lambda s: {"kind": "stop", "id": s["id"], "name": s["name"], "coord": [s["coordinate"]["x"], s["coordinate"]["y"]]}
 errors = []
@@ -40,7 +40,7 @@ with sync_playwright() as p:
         pg.evaluate("s => { for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", dict({"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False}}, **store))
         pg.reload(); pg.wait_for_function("!!window.QUAYS", timeout=10000)
         return ctx, pg
-    base = {"journey:from": STOP(UNIMAIL), "journey:to": STOP(ESSERTS)}
+    base = {"journey:from": STOP(UNIMAIL), "journey:to": STOP(CROISEE)}
 
     ctx, pg = session(base)
     pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")

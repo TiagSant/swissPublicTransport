@@ -22,7 +22,7 @@ def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type":
 MUSEE = st("8592868", "Genève, Musée d'ethnographie", 46.197808, 6.136266)
 STECLO = st("8592908", "Genève, Sainte-Clotilde", 46.19981, 6.132825)
 JONCTION = st("8587062", "Genève, Jonction", 46.200787, 6.12969)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 VOIRIE = st("8587014", "Genève, Voirie", 46.20300, 6.12800)
 PALLADIUM = st("8587019", "Genève, Palladium", 46.20400, 6.12900)
 PLAIN = st("8587391", "Genève, Plainpalais", 46.19830, 6.14160)
@@ -46,12 +46,12 @@ def board_entry(cat, num, to, here, t0, nxt, no_coord=False, plat=""):
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 
 def connections(frm, to):
-    if S["case"] == "C":   # the PO's case, 13.11.2026 17:37: tram 14 to Jonction, walk 4 min to Sainte-Clotilde, bus 19
-        return [{"sections": [ride("T", "14", "Meyrin-Gravière", ESSERTS, JONCTION, at(9), at(16), "A", "B"), walk(JONCTION, at(16), at(20)),
+    if S["case"] == "C":   # an example: tram 14 to Jonction, walk 4 min to Sainte-Clotilde, bus 19
+        return [{"sections": [ride("T", "14", "Meyrin-Gravière", CROISEE, JONCTION, at(9), at(16), "A", "B"), walk(JONCTION, at(16), at(20)),
                               ride("B", "19", "Vernier-Village", STECLO, MUSEE, at(22), at(23), "H", "K")]}]
     if S["case"] == "A":
         return [{"sections": [ride("B", "19", "Onex, cité", MUSEE, STECLO, at(7), at(9), "J", "G"), walk(STECLO, at(9), at(13)),
-                              ride("T", "14", "Bernex, Vailly", JONCTION, ESSERTS, at(15), at(20), "A", "B")]}]
+                              ride("T", "14", "Bernex, Vailly", JONCTION, CROISEE, at(15), at(20), "A", "B")]}]
     return [{"sections": [ride("B", "1", "Genève, Rond-Point de Plainpalais", PLAIN, CIRQUE, at(5), at(10), "A", "C"), walk(CIRQUE, at(10), at(12)),
                           ride("B", "2", "Genève, Musée d'ethnographie", CIRQUE, MUSEE, at(14), at(20), "D", "J")]}]
 def board(stop_id):
@@ -109,7 +109,7 @@ with sync_playwright() as p:
 
     # ---- A: stay on the 19 to Jonction
     ctx, pg = session(b, "A", dt.datetime(2026, 11, 13, 16, 50, tzinfo=tz),
-                      {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(MUSEE), "journey:to": STOP(ESSERTS)})
+                      {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(MUSEE), "journey:to": STOP(CROISEE)})
     pg.wait_for_function("document.querySelector('#journeyList .jr .jw') && ![...document.querySelectorAll('#journeyList .jr .jw')].some(e => e.textContent.includes('4'))", timeout=10000)
     jr = pg.locator("#journeyList .jr").first
     meta = jr.locator(".jr-meta").inner_text()
@@ -133,7 +133,7 @@ with sync_playwright() as p:
 
     # ---- C: board the 19 earlier, at Jonction, instead of walking to Sainte-Clotilde
     ctx, pg = session(b, "C", dt.datetime(2026, 11, 13, 17, 30, tzinfo=tz),
-                      {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(ESSERTS), "journey:to": STOP(MUSEE)})
+                      {"settings": {"footMaxMin": 0, "realWalk": False}, "journey:from": STOP(CROISEE), "journey:to": STOP(MUSEE)})
     pg.wait_for_function("[...document.querySelectorAll('#journeyList .jr .jw')].length && ![...document.querySelectorAll('#journeyList .jr .jw')].some(e => e.textContent.includes('4'))", timeout=10000)
     pg.locator("#journeyList .jr").first.click(); det = pg.locator("#journeyList .jr-detail").first
     r19 = " ".join(det.locator(".leg.ride").nth(1).inner_text().split())

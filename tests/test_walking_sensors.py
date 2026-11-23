@@ -1,6 +1,6 @@
 """US-66: walking or riding, from the phone's own motion sensors (no Google service, nothing sent).
 
-The PO's case (16.11.2026, 19:05): following tram 17 Plainpalais → Bel-Air then tram 14 to Les Esserts, he walked
+Example: following tram 17 Plainpalais → Bel-Air then tram 14 to Confignon, croisée, the rider walked
 instead. Nothing noticed it. Now: still walking a minute after tram 17 left → "You're on foot: tram 17 left without
 you", with other ways from there — walking to Stand for tram 14 among them (US-65). Riding (no steps) or the setting
 off: nothing of the kind. The sensors' reading is shown on the followed journey.
@@ -23,7 +23,7 @@ PLAINPALAIS = st("8587907", "Genève, Plainpalais", 46.19809, 6.14305)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.20424, 6.14206)
 STAND = st("8592906", "Genève, Stand", 46.2036, 6.14105)
 JONCTION = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 S = {"base": None}
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 def end(s, t, kind, plat): return {"station": s, kind: fmt(t), kind + "Timestamp": int(t.timestamp()), "platform": plat, "prognosis": {}, "delay": None}
@@ -32,9 +32,9 @@ def ride(cat, num, to, a, b, t0, t1, p0, p1, mid=()):
     return {"journey": {"category": cat, "number": num, "to": to, "operator": "TPG", "passList": calls}, "walk": None,
             "departure": end(a, t0, "departure", p0), "arrival": end(b, t1, "arrival", p1)}
 def walk(a, b, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - t0).total_seconds())}, "departure": end(a, t0, "departure", ""), "arrival": end(b, t1, "arrival", "")}
-def trip(m):   # tram 17 at m (Plainpalais → Bel-Air +4), walk 2, tram 14 at m+8 (Stand +2, Jonction +5, Les Esserts +12)
+def trip(m):   # tram 17 at m (Plainpalais → Bel-Air +4), walk 2, tram 14 at m+8 (Stand +2, Jonction +5, Confignon, croisée +12)
     return {"sections": [ride("T", "17", "Annemasse, Perrier-Aubrac", PLAINPALAIS, BELAIR, at(m), at(m + 4), "C", "F"), walk(BELAIR, BELAIR, at(m + 4), at(m + 6)),
-                         ride("T", "14", "Bernex-Vailly", BELAIR, ESSERTS, at(m + 8), at(m + 20), "B", "B", mid=[(STAND, at(m + 10)), (JONCTION, at(m + 13))])]}
+                         ride("T", "14", "Bernex-Vailly", BELAIR, CROISEE, at(m + 8), at(m + 20), "B", "B", mid=[(STAND, at(m + 10)), (JONCTION, at(m + 13))])]}
 def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"):
@@ -62,7 +62,7 @@ def session(b, settings):
     if TILE: ctx.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(path=TILE, content_type="image/png"))
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.clock.install(time=S["base"].timestamp()); pg.goto(PAGE)
-    store = {"tab": "journey", "lang": "fr", "settings": settings, "journey:from": STOP(PLAINPALAIS), "journey:to": STOP(ESSERTS)}
+    store = {"tab": "journey", "lang": "fr", "settings": settings, "journey:from": STOP(PLAINPALAIS), "journey:to": STOP(CROISEE)}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
     pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr"); pg.wait_for_timeout(500)
     cards = pg.locator("#journeyList .jr")

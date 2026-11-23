@@ -1,7 +1,7 @@
 """US-35: get-off reminders follow the live time of each ride (departure board of the stop before the get-off
 stop) and, while the page is open, the rider's position. transport.opendata.ch is mocked; the clock is frozen.
 
-Journey: Lancy, Communes-Réunies 07:46 → tram 15 → Genève, gare Cornavin 08:01; the stop before Cornavin is
+Journey: Genève, Rive 07:46 → tram 15 → Genève, gare Cornavin 08:01; the stop before Cornavin is
 Bel-Air, planned 07:58. Its live board says 08:01 (+3 min)."""
 import os, json, datetime as dt
 from pathlib import Path
@@ -18,23 +18,23 @@ at = lambda m: NOW + dt.timedelta(minutes=m)
 ms = lambda m: int(m * 60000)
 
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-COMMUNES = st("8592887", "Lancy, Communes-Réunies", 46.174500, 6.121900)
+RIVE = st("8587061", "Genève, Rive", 46.201680, 6.152720)
 ACACIAS = st("8587385", "Genève, Acacias", 46.194600, 6.134300)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 CORNAVIN = st("8587057", "Genève, gare Cornavin", 46.209733, 6.142437)
-HOME = (46.1700, 6.1150)
+HOME = (46.1972, 6.1458)
 AT_BELAIR = (46.204800, 6.143000)                  # ~10 m from the Bel-Air stop
-AT_COMMUNES = (46.174560, 6.121950)                # at the first stop before the tram (US-62: at home after it left = missed)
+AT_RIVE = (46.201740, 6.152770)                # at the first stop before the tram (US-62: at home after it left = missed)
 PAST_BELAIR = (46.206100, 6.142800)                # ~150 m further, towards Cornavin
 
 def end(s, m, kind, plat=""):
     return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
 TRAM = {"journey": {"category": "T", "number": "15", "to": "Genève, Nations", "operator": "TPG", "passList": [
-            {"station": COMMUNES, "departure": fmt(at(16))},
+            {"station": RIVE, "departure": fmt(at(16))},
             {"station": ACACIAS, "arrival": fmt(at(22)), "departure": fmt(at(22))},
             {"station": BELAIR, "arrival": fmt(at(28)), "departure": fmt(at(28))},
             {"station": CORNAVIN, "arrival": fmt(at(31))}]},
-        "walk": None, "departure": end(COMMUNES, 16, "departure", "A"), "arrival": end(CORNAVIN, 31, "arrival")}
+        "walk": None, "departure": end(RIVE, 16, "departure", "A"), "arrival": end(CORNAVIN, 31, "arrival")}
 BELAIR_BOARD = {"station": BELAIR, "stationboard": [
     {"category": "T", "number": "15", "to": "Genève, Nations", "operator": "TPG",
      "stop": {"station": BELAIR, "departure": fmt(at(28)), "departureTimestamp": int(at(28).timestamp()),
@@ -47,8 +47,8 @@ def api(route):
     if u.path.endswith("/connections"): body = {"connections": [{"sections": [TRAM]}]}
     elif u.path.endswith("/stationboard"):
         board_calls.append(q["id"][0])
-        body = BELAIR_BOARD if q["id"][0] == BELAIR["id"] else {"station": COMMUNES, "stationboard": []}
-    else: body = {"stations": [COMMUNES]}
+        body = BELAIR_BOARD if q["id"][0] == BELAIR["id"] else {"station": RIVE, "stationboard": []}
+    else: body = {"stations": [RIVE]}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 
 errors = []
@@ -60,7 +60,7 @@ def session(b, gps):
     pg.clock.install(time=NOW.timestamp())
     pg.goto(PAGE)
     pg.evaluate("""() => {
-      localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8592887', name: 'Lancy, Communes-Réunies', coord: [46.1745, 6.1219] }));
+      localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8587061', name: 'Genève, Rive', coord: [46.2017, 6.1527] }));
       localStorage.setItem('tpp:journey:to', JSON.stringify({ kind: 'stop', id: '8587057', name: 'Genève, gare Cornavin', coord: [46.209733, 6.142437] }));
       localStorage.setItem('tpp:tab', '"journey"'); }""")
     pg.reload()
@@ -117,7 +117,7 @@ with sync_playwright() as p:
     ctx, pg = session(b, gps=True)
     go(pg, 14, AT_BELAIR); move(pg, PAST_BELAIR)
     assert banner(pg) in (None, "ready", "leave"), "near Bel-Air before boarding: no get-off reminder"
-    go(pg, 16.5, AT_COMMUNES)
+    go(pg, 16.5, AT_RIVE)
     go(pg, 29.5, AT_BELAIR)
     assert banner(pg) is None
     assert "Following your position" in pg.inner_text("#alarmList"), pg.inner_text("#alarmList")
@@ -131,7 +131,7 @@ with sync_playwright() as p:
 
     # 3. Position holds the reminder back while the tram is still at Bel-Air after the live time
     ctx, pg = session(b, gps=True)
-    go(pg, 16.5, AT_COMMUNES); dismiss_departure_alarms(pg)
+    go(pg, 16.5, AT_RIVE); dismiss_departure_alarms(pg)
     go(pg, 33, AT_BELAIR); dismiss_departure_alarms(pg)
     assert banner(pg) is None, "still at Bel-Air at 08:03: no reminder yet"
     move(pg, PAST_BELAIR)
@@ -141,7 +141,7 @@ with sync_playwright() as p:
 
     # 4. No fresh position (tunnel): the live time decides again
     ctx, pg = session(b, gps=True)
-    go(pg, 16.5, AT_COMMUNES); dismiss_departure_alarms(pg)
+    go(pg, 16.5, AT_RIVE); dismiss_departure_alarms(pg)
     go(pg, 25, AT_BELAIR); dismiss_departure_alarms(pg)            # last fix at 07:55, then nothing
     go(pg, 31.2); dismiss_departure_alarms(pg)
     assert banner(pg) == "alight", banner(pg)

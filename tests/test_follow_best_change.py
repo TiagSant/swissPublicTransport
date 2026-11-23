@@ -1,6 +1,6 @@
 """BUG-14: the journey followed has the better change place, as shown in the list.
 
-The PO's case (16.11.2026, 11:26): Musée d'ethnographie → Les Esserts. The official data (OJP) gets off bus 2 at
+Example: Musée d'ethnographie → Confignon, croisée. The official data (OJP) gets off bus 2 at
 Sainte-Clotilde and walks 4 min to tram 14 at Jonction (quai A). The bus goes on to Jonction (quai C, 35 m from A):
 the planner finds it a few seconds after the list is shown, but "Follow" tapped meanwhile followed the API's journey,
 and nothing improved it afterwards.
@@ -25,7 +25,7 @@ CLOTILDE = st("8592908", "Genève, Sainte-Clotilde", 46.199879, 6.132626)
 JONCTION = st("8587062", "Genève, Jonction", 46.200687, 6.129467)
 CLAIREVUE = st("8592980", "Petit-Lancy, Claire-Vue", 46.1930, 6.1240)
 QUIDORT = st("8592905", "Petit-Lancy, Quidort", 46.1915, 6.1205)
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.188095, 6.113098)
+CROISEE = st("8587386", "Confignon, croisée", 46.178810, 6.089810)
 S = {"base": None, "hold": False, "held": [], "fail": False}
 def at(m): return S["base"] + dt.timedelta(minutes=m)
 def end(s, t, kind, plat): return {"station": s, kind: fmt(t), kind + "Timestamp": int(t.timestamp()), "platform": plat, "prognosis": {}, "delay": None}
@@ -34,10 +34,10 @@ def ride(cat, num, to, a, b, t0, t1, p0, p1, mid=()):
     return {"journey": {"category": cat, "number": num, "to": to, "operator": "TPG", "passList": calls}, "walk": None,
             "departure": end(a, t0, "departure", p0), "arrival": end(b, t1, "arrival", p1)}
 def walk(a, b, t0, t1): return {"journey": None, "walk": {"duration": int((t1 - t0).total_seconds())}, "departure": end(a, t0, "departure", ""), "arrival": end(b, t1, "arrival", "")}
-def connections():   # bus 2 11:27 → Sainte-Clotilde 11:29, walk 4 min, tram 14 Jonction 11:35 (quai A) → Les Esserts 11:41
+def connections():   # bus 2 11:27 → Sainte-Clotilde 11:29, walk 4 min, tram 14 Jonction 11:35 (quai A) → Confignon, croisée 11:41
     return [{"sections": [ride("B", "2", "Bernex, Cressy", MUSEE, CLOTILDE, at(12), at(14), "J", "G"),
                           walk(CLOTILDE, JONCTION, at(14), at(18)),
-                          ride("T", "14", "Bernex-Vailly", JONCTION, ESSERTS, at(20), at(26), "A", "B", mid=[(QUIDORT, at(23))])]}]
+                          ride("T", "14", "Bernex-Vailly", JONCTION, CROISEE, at(20), at(26), "A", "B", mid=[(QUIDORT, at(23))])]}]
 def entry(cat, num, to, here, t0, nxt, plat):
     return {"category": cat, "number": num, "to": to, "operator": "TPG",
             "stop": {"station": here, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()), "prognosis": {}, "platform": plat, "delay": 0},
@@ -46,7 +46,7 @@ def board(stop_id):
     if stop_id == MUSEE["id"]: return [entry("B", "2", "Bernex, Cressy", MUSEE, at(12), [(CLOTILDE, at(14)), (JONCTION, at(16)), (CLAIREVUE, at(19))], "J")]
     if stop_id == CLOTILDE["id"]: return [entry("B", "2", "Bernex, Cressy", CLOTILDE, at(14), [(JONCTION, at(16)), (CLAIREVUE, at(19))], "G")]
     if stop_id == JONCTION["id"]: return [entry("B", "2", "Bernex, Cressy", JONCTION, at(16), [(CLAIREVUE, at(19))], "C"),
-                                          entry("T", "14", "Bernex-Vailly", JONCTION, at(20), [(QUIDORT, at(23)), (ESSERTS, at(26))], "A")]
+                                          entry("T", "14", "Bernex-Vailly", JONCTION, at(20), [(QUIDORT, at(23)), (CROISEE, at(26))], "A")]
     return []
 def answer(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
@@ -73,7 +73,7 @@ def session(b):
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.clock.install(time=S["base"].timestamp()); pg.goto(PAGE)
     store = {"tab": "journey", "lang": "fr", "settings": {"footMaxMin": 0, "realWalk": False, "alightReminder": False},
-             "journey:from": STOP(MUSEE), "journey:to": STOP(ESSERTS)}
+             "journey:from": STOP(MUSEE), "journey:to": STOP(CROISEE)}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)
     pg.reload(); pg.click("#searchJourney"); pg.wait_for_selector("#journeyList .jr")
     return ctx, pg

@@ -1,5 +1,5 @@
 """US-58: journeys the rider would see as the same are shown once — same route, times and walks, and the same
-alternative offered (bus or on foot). Seen by the PO (15.11.2026): two identical "Départ à pied" cards.
+alternative offered (bus or on foot). Seen once: two identical "Départ à pied" cards.
 
 Learned "finish on foot" from Plainpalais (3 times): every journey changing at Plainpalais ends on foot there.
 A: bus 21 → Plainpalais, tram 12 07:58 → Bel-Air 08:03.   A': the same with tram 12 08:00 → 08:03.
@@ -20,7 +20,7 @@ OUT = ROOT / "tests" / "out"; OUT.mkdir(exist_ok=True)
 tz = ZoneInfo("Europe/Zurich"); NOW = dt.datetime(2026, 11, 16, 7, 30, tzinfo=tz)
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z"); at = lambda m: NOW + dt.timedelta(minutes=m)
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-COMMUNES = st("8592887", "Lancy, Communes-Réunies", 46.174500, 6.121900)
+RIVE = st("8587061", "Genève, Rive", 46.201680, 6.152720)
 PLAIN = st("8587391", "Genève, Plainpalais", 46.198300, 6.141600)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 DEST = (46.2047, 6.1470)
@@ -28,9 +28,9 @@ def end(s, m, kind): return {"station": s, kind: fmt(at(m)), kind + "Timestamp":
 def ride(cat, num, a, b, ma, mb): return {"journey": {"category": cat, "number": num, "to": b["name"], "operator": "TPG",
     "passList": [{"station": a, "departure": fmt(at(ma))}, {"station": b, "arrival": fmt(at(mb))}]}, "walk": None,
     "departure": end(a, ma, "departure"), "arrival": end(b, mb, "arrival")}
-def conn(cat, num, m0): return {"sections": [ride("B", "21", COMMUNES, PLAIN, 10, 22), ride(cat, num, PLAIN, BELAIR, m0, 33)]}
+def conn(cat, num, m0): return {"sections": [ride("B", "21", RIVE, PLAIN, 10, 22), ride(cat, num, PLAIN, BELAIR, m0, 33)]}
 CONNS = [conn("T", "12", 28), conn("T", "12", 30), conn("T", "15", 29)]
-# Start on foot (the PO's case): from a point near Plainpalais, two buses 21 three minutes apart to the same tram 12
+# Start on foot (Example): from a point near Plainpalais, two buses 21 three minutes apart to the same tram 12
 UNIMAIL = st("8592999", "Genève, Uni-Mail", 46.195300, 6.139800)
 START = (46.1965, 6.1395)
 def conn_start(m0, m1): return {"sections": [ride("B", "21", UNIMAIL, PLAIN, m0, m1), ride("T", "12", PLAIN, BELAIR, 28, 33)]}
@@ -59,7 +59,7 @@ def cards(b, learned):
     pg.clock.install(time=NOW.timestamp()); pg.goto(PAGE)
     key = f"start:{START[0]:.3f},{START[1]:.3f}>{PLAIN['id']}" if (S["start"] or S["same"]) else f"{PLAIN['id']}>{DEST[0]:.3f},{DEST[1]:.3f}"
     store = {"tab": "journey", "lang": "en", "settings": {"realWalk": False},
-             "journey:from": {"kind": "point", "coord": list(START), "near": None} if (S["start"] or S["same"]) else {"kind": "stop", "id": COMMUNES["id"], "name": COMMUNES["name"], "coord": [46.1745, 6.1219]},
+             "journey:from": {"kind": "point", "coord": list(START), "near": None} if (S["start"] or S["same"]) else {"kind": "stop", "id": RIVE["id"], "name": RIVE["name"], "coord": [46.2017, 6.1527]},
              "journey:to": {"kind": "point", "coord": list(DEST), "near": None}}
     if learned: store["foot"] = {key: {"foot": 3, "bus": 0, "shown": 0, "t": 0}}
     pg.evaluate("s => { localStorage.clear(); for (const [k, v] of Object.entries(s)) localStorage.setItem('tpp:' + k, JSON.stringify(v)); }", store)

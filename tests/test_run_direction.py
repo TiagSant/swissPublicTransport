@@ -1,6 +1,6 @@
-"""BUG-07: a followed ride is matched on the live board by line AND direction. At Petit-Lancy, Les Esserts the tram 14
+"""BUG-07: a followed ride is matched on the live board by line AND direction. At Confignon, croisée the tram 14
 to Meyrin leaves from platform A and the tram 14 to Bernex from platform B, often in the same minute (real OJP data,
-tests/fixtures/ojp/ser_esserts.xml): the Bernex tram's platform and delay must not be taken for ours.
+tests/fixtures/ojp/ser_croisee.xml): the Bernex tram's platform and delay must not be taken for ours.
 A platform change is only what the board announces (its live platform differs from its own planned one)."""
 import os, json, datetime as dt
 from pathlib import Path
@@ -17,7 +17,7 @@ fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 at = lambda m: NOW + dt.timedelta(minutes=m)
 
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-ESSERTS = st("8587418", "Petit-Lancy, Les Esserts", 46.1886, 6.1153)
+CROISEE = st("8587386", "Confignon, croisée", 46.1793, 6.0920)
 BACHET = st("8587340", "Lancy, Pont-Rouge", 46.1900, 6.1260)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 ONEX = st("8587380", "Onex, Bandol", 46.1840, 6.1000)
@@ -27,16 +27,16 @@ def end(s, m, kind, plat=""):
     return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": plat, "prognosis": {}, "delay": None}
 def call(s, arr=None, dep=None): return {"station": s, "arrival": fmt(at(arr)) if arr is not None else None, "departure": fmt(at(dep)) if dep is not None else None}
 PLAN = {"sections": [{"journey": {"category": "T", "number": "14", "to": "Meyrin, Gravière", "operator": "TPG",
-                                  "passList": [call(ESSERTS, dep=14), call(BACHET, 16, 16), call(BELAIR, arr=27)]}, "walk": None,
-                      "departure": end(ESSERTS, 14, "departure", "A"), "arrival": end(BELAIR, 27, "arrival", "A")}]}
+                                  "passList": [call(CROISEE, dep=14), call(BACHET, 16, 16), call(BELAIR, arr=27)]}, "walk": None,
+                      "departure": end(CROISEE, 14, "departure", "A"), "arrival": end(BELAIR, 27, "arrival", "A")}]}
 
 S = {"with_stops": True, "meyrin": True, "meyrin_live": "A"}
 def run(to, m, plan_plat, live_plat, delay, nxt):
     t0 = at(m)
     e = {"category": "T", "number": "14", "to": to, "operator": "TPG",
-         "stop": {"station": ESSERTS, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()),
+         "stop": {"station": CROISEE, "departure": fmt(t0), "departureTimestamp": int(t0.timestamp()),
                   "prognosis": {"departure": fmt(t0 + dt.timedelta(minutes=delay)), "platform": live_plat}, "platform": plan_plat, "delay": delay},
-         "passList": [{"station": ESSERTS}]}
+         "passList": [{"station": CROISEE}]}
     if S["with_stops"]:
         e["passList"] += [{"station": x, "arrival": fmt(at(mm + delay)), "prognosis": {"arrival": fmt(at(mm + delay))}} for x, mm in nxt]
     return e
@@ -50,7 +50,7 @@ def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"): body = {"connections": [PLAN]}
     elif u.path.endswith("/locations"): body = {"stations": [BELAIR]}
-    else: body = {"station": {"id": q["id"][0]}, "stationboard": board() if q["id"][0] == ESSERTS["id"] else []}
+    else: body = {"station": {"id": q["id"][0]}, "stationboard": board() if q["id"][0] == CROISEE["id"] else []}
     route.fulfill(status=200, content_type="application/json", body=json.dumps(body), headers={"Access-Control-Allow-Origin": "*"})
 
 errors = []
@@ -62,7 +62,7 @@ with sync_playwright() as p:
     pg.clock.install(time=NOW.timestamp())
     pg.goto(PAGE)
     pg.evaluate("""() => {
-      localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8587418', name: 'Petit-Lancy, Les Esserts', coord: [46.1886, 6.1153] }));
+      localStorage.setItem('tpp:journey:from', JSON.stringify({ kind: 'stop', id: '8587386', name: 'Confignon, croisée', coord: [46.1793, 6.0920] }));
       localStorage.setItem('tpp:journey:to', JSON.stringify({ kind: 'stop', id: '8587387', name: 'Genève, Bel-Air', coord: [46.204728, 6.143048] }));
       localStorage.setItem('tpp:settings', JSON.stringify({ footMaxMin: 0 }));
       localStorage.setItem('tpp:tab', '"journey"'); }""")

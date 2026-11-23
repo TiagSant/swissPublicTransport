@@ -2,7 +2,7 @@
 the same line, another route, finishing on foot). transport.opendata.ch is mocked with live boards that change during
 the test; the clock is frozen.
 
-Plan (asked at 07:30): Lancy, Communes-Réunies 07:40 bus 21 → Genève, Plainpalais 07:52, walk 1 min,
+Plan (asked at 07:30): Genève, Rive 07:40 bus 21 → Genève, Plainpalais 07:52, walk 1 min,
 tram 12 07:58 (platform C) → Genève, Bel-Air 08:03, walk ~5 min to a point near Bel-Air."""
 import os, json, re, datetime as dt
 from pathlib import Path
@@ -20,7 +20,7 @@ fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 at = lambda m: NOW + dt.timedelta(minutes=m)
 
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-COMMUNES = st("8592887", "Lancy, Communes-Réunies", 46.174500, 6.121900)
+RIVE = st("8587061", "Genève, Rive", 46.201680, 6.152720)
 ACACIAS = st("8587385", "Genève, Acacias", 46.194600, 6.134300)
 PLAINPALAIS = st("8587391", "Genève, Plainpalais", 46.198300, 6.141600)
 MOLARD = st("8587389", "Genève, Molard", 46.203500, 6.145500)
@@ -38,7 +38,7 @@ def section(cat, num, to, calls, a, b, ma, mb, plat=""):
 def walk(a, b, ma, mb): return {"journey": None, "walk": {"duration": (mb - ma) * 60}, "departure": end(a, ma, "departure"), "arrival": end(b, mb, "arrival")}
 
 PLAN = {"sections": [
-    section("B", "21", "Genève, Plainpalais", [call(COMMUNES, dep=10), call(ACACIAS, 16, 16), call(PLAINPALAIS, arr=22)], COMMUNES, PLAINPALAIS, 10, 22, "A"),
+    section("B", "21", "Genève, Plainpalais", [call(RIVE, dep=10), call(ACACIAS, 16, 16), call(PLAINPALAIS, arr=22)], RIVE, PLAINPALAIS, 10, 22, "A"),
     walk(PLAINPALAIS, PLAINPALAIS, 22, 23),
     section("T", "12", "Genève, Bel-Air", [call(PLAINPALAIS, dep=28), call(MOLARD, 31, 31), call(BELAIR, arr=33)], PLAINPALAIS, BELAIR, 28, 33, "C")]}
 REPLAN = {"sections": [section("B", "3", "Genève, Bel-Air", [call(PLAINPALAIS, dep=34), call(BELAIR, arr=39)], PLAINPALAIS, BELAIR, 34, 39, "F")]}
@@ -52,9 +52,9 @@ def board_entry(cat, num, to, s, m, delay, plat, nxt):
 
 def boards(stop_id):
     d = LIVE["bus_delay"]
-    if stop_id == COMMUNES["id"]:
-        return [board_entry("B", "21", "Genève, Plainpalais", COMMUNES, 5, 0, "A", [(ACACIAS, 11), (PLAINPALAIS, 17)]),   # an earlier run
-                board_entry("B", "21", "Genève, Plainpalais", COMMUNES, 10, d, "A", [(ACACIAS, 16), (PLAINPALAIS, 22)])]
+    if stop_id == RIVE["id"]:
+        return [board_entry("B", "21", "Genève, Plainpalais", RIVE, 5, 0, "A", [(ACACIAS, 11), (PLAINPALAIS, 17)]),   # an earlier run
+                board_entry("B", "21", "Genève, Plainpalais", RIVE, 10, d, "A", [(ACACIAS, 16), (PLAINPALAIS, 22)])]
     if stop_id == ACACIAS["id"]:
         return [board_entry("B", "21", "Genève, Plainpalais", ACACIAS, 16, d, "", [(PLAINPALAIS, 22)])]
     if stop_id == PLAINPALAIS["id"]:
@@ -85,7 +85,7 @@ def session(b):
     pg.clock.install(time=NOW.timestamp())
     pg.goto(PAGE)
     pg.evaluate(f"""() => {{
-      localStorage.setItem('tpp:journey:from', JSON.stringify({{ kind: 'stop', id: '8592887', name: 'Lancy, Communes-Réunies', coord: [46.1745, 6.1219] }}));
+      localStorage.setItem('tpp:journey:from', JSON.stringify({{ kind: 'stop', id: '8587061', name: 'Genève, Rive', coord: [46.2017, 6.1527] }}));
       localStorage.setItem('tpp:journey:to', JSON.stringify({{ kind: 'point', coord: [{DEST[0]}, {DEST[1]}], near: null }}));
       localStorage.setItem('tpp:settings', JSON.stringify({{ footMaxMin: 0 }}));
       localStorage.setItem('tpp:tab', '"journey"'); }}""")
@@ -110,7 +110,7 @@ with sync_playwright() as p:
     assert pg.inner_text("#alarmCard .section-title").lower() == "followed journeys", pg.inner_text("#alarmCard .section-title")
     legs = trip(pg).locator(".trip-legs > li")
     assert legs.count() == 4, legs.all_inner_texts()        # bus, walk, tram, walk: the whole journey
-    assert "Next: Bus 21 at 07:40 from Lancy, Communes-Réunies (Platform A)" in trip(pg).inner_text(), trip(pg).inner_text()
+    assert "Next: Bus 21 at 07:40 from Genève, Rive (Platform A)" in trip(pg).inner_text(), trip(pg).inner_text()
     arrive0 = re.search(r"Arrive (\d\d:\d\d)", trip(pg).inner_text()).group(1)
     # Stops and time on board, unfoldable, as when planning
     tog = legs.nth(0).locator(".via-toggle")

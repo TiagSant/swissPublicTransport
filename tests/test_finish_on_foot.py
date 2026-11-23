@@ -2,7 +2,7 @@
 walks only, learned per place, and the bus always stays one tap away. transport.opendata.ch is mocked; the clock
 is frozen.
 
-Journey: Lancy, Communes-Réunies → bus 21 → Plainpalais (arr. +22) → tram 12 (+28) → Bel-Air (+33) → walk ~5 min
+Journey: Genève, Rive → bus 21 → Plainpalais (arr. +22) → tram 12 (+28) → Bel-Air (+33) → walk ~5 min
 to a point 300 m from Bel-Air. Walking from Plainpalais instead: ~770 m straight, ~12.5 min → a few minutes sooner."""
 import os, json, datetime as dt
 from pathlib import Path
@@ -18,7 +18,7 @@ NOW = dt.datetime(2026, 11, 12, 7, 30, tzinfo=tz)
 fmt = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 def st(id_, name, x, y): return {"id": id_, "name": name, "coordinate": {"type": "WGS84", "x": x, "y": y}}
-COMMUNES = st("8592887", "Lancy, Communes-Réunies", 46.174500, 6.121900)
+RIVE = st("8587061", "Genève, Rive", 46.201680, 6.152720)
 PLAINPALAIS = st("8587391", "Genève, Plainpalais", 46.198300, 6.141600)
 BELAIR = st("8587387", "Genève, Bel-Air", 46.204728, 6.143048)
 DEST = (46.2047, 6.1470)                     # ~300 m east of Bel-Air
@@ -26,7 +26,7 @@ START = (46.1965, 6.1395)                    # ~250 m from Plainpalais
 UNIMAIL = st("8592999", "Genève, Uni-Mail", 46.195300, 6.139800)   # ~140 m from START
 
 FAST_TRAM = {"on": False}     # tram 12 leaving at once: walking becomes slower than the bus
-def connection(base, origin=COMMUNES):
+def connection(base, origin=RIVE):
     at = lambda m: base + dt.timedelta(minutes=m)
     def end(s, m, kind): return {"station": s, kind: fmt(at(m)), kind + "Timestamp": int(at(m).timestamp()), "platform": "", "prognosis": {}, "delay": None}
     def ride(cat, num, a, b, ma, mb): return {"journey": {"category": cat, "number": num, "to": b["name"], "operator": "TPG",
@@ -38,7 +38,7 @@ def api(route):
     u = urlparse(route.request.url); q = parse_qs(u.query)
     if u.path.endswith("/connections"):
         asked = dt.datetime.strptime(q["date"][0] + " " + q["time"][0], "%Y-%m-%d %H:%M").replace(tzinfo=tz)
-        body = {"connections": [connection(asked, UNIMAIL if q["from"][0] == UNIMAIL["id"] else COMMUNES)]}
+        body = {"connections": [connection(asked, UNIMAIL if q["from"][0] == UNIMAIL["id"] else RIVE)]}
     elif u.path.endswith("/locations"):
         near_start = "x" in q and abs(float(q["x"][0]) - START[0]) < 0.002
         body = {"stations": [dict(UNIMAIL, distance=140)] if near_start else [dict(BELAIR, distance=300)]}
@@ -55,7 +55,7 @@ with sync_playwright() as p:
     pg.clock.install(time=NOW.timestamp())
     pg.goto(PAGE)
     pg.evaluate(f"""() => {{
-      localStorage.setItem('tpp:journey:from', JSON.stringify({{ kind: 'stop', id: '8592887', name: 'Lancy, Communes-Réunies', coord: [46.1745, 6.1219] }}));
+      localStorage.setItem('tpp:journey:from', JSON.stringify({{ kind: 'stop', id: '8587061', name: 'Genève, Rive', coord: [46.2017, 6.1527] }}));
       localStorage.setItem('tpp:journey:to', JSON.stringify({{ kind: 'point', coord: [{DEST[0]}, {DEST[1]}], near: null }}));
       localStorage.setItem('tpp:tab', '"journey"'); }}""")
     pg.reload()
