@@ -11,7 +11,7 @@ on:
       - scripts/ojp_kotlin_parity.mjs
       - .github/workflows/android.yml
   push:
-    branches: [main]
+    branches: [main, privacy-cleanup]
     paths:
       - android/**
       - tests/fixtures/**
