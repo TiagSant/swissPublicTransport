@@ -31,6 +31,8 @@
            checked on the way (a journey followed before the check, or an alternative found on the way).
   - US-38: a followed journey shows every step live (delays, platforms, progress); a missed connection is detected
            and alternatives are offered: the next run of the same line, another route, or finishing on foot.
+  - US-89 (PO, 23.11.2026, exception to ADR-0005): a missed change, a cancelled vehicle or a late start is announced
+           once its alternatives are found, with the best one; after 20 s without them, the warning goes anyway.
   - US-39: a tight connection says it plainly (walk vs time between the rides) and offers options with a comfortable
            margin: an earlier first bus, a later run, another route; the waiting time at each change, live.
   - US-40: German, Italian and Romansh, in addition to English and French.
@@ -728,13 +730,13 @@
       earlyOnWay: 'On your way: at {stop} around {t}, {n} min before the {line}.', earlyOptions: 'Earlier options:', altEarly: '{lines} at {dep}', altEarlyDetail: 'arrive {t} ({n} min sooner)',
       waitNoneWalk: 'Change: {walk} min walk, no time to spare', waitNone: 'Change: no time to spare', waitMissed: 'Change: missed at the current times',
       allGone: 'The journeys found are no longer possible (a vehicle cancelled or a change missed). Try a later departure.',
-      cancelNotify: '{line} at {dep} cancelled?', cancelNotifyBody: 'No longer in the live departures of {stop}. Open the app for what replaces it.',
+      cancelNotify: '{line} at {dep} cancelled?', cancelNotifyBody: 'No longer in the live departures of {stop}.',
       cancelTitle: '{line} at {dep}: cancelled?', cancelBody: 'It is no longer in the live departures of {stop}.', cancelOptions: 'Instead:',
       cancelSame: 'arrive {t}, as planned', cancelLater: 'arrive {t} ({n} min later)',
       walkingTitle: 'You’re on foot: the {line} at {dep} left without you', walkingNotify: 'On foot: the {line} at {dep} left without you',
       motionSetting: 'Tell walking from riding (the phone’s motion sensors; nothing is sent)', motionNow: 'Sensors: {state}', motionWalk: '🚶 walking', motionStill: 'still', motionVehicle: '🚋 in a vehicle', motionMoving: 'moving, no steps', gpsResting: 'GPS resting',
       trafficInfo: 'Traffic info', sitNotify: 'Traffic info: {line}',
-      lateNotify: 'You won’t make the {line} at {dep}', missedRideNotify: '{line} at {dep} missed?', lateNotifyBody: 'Open the app: other departures from where you are.',
+      lateNotify: 'You won’t make the {line} at {dep}', missedRideNotify: '{line} at {dep} missed?', lateNotifyBody: 'Other departures from where you are.',
       lateTitle: 'You won’t make the {line} at {dep}', missedRideTitle: '{line} at {dep} missed?', laterTitle: 'Leaving later: other departures', missedSaidTitle: '{line} at {dep} missed: other departures',
       lateOption: '{lines} at {dep} · leave {leave}', lateOnBoard: 'I’m on board after all', lateState: 'Not on the planned ride: choose another departure, or cancel.',
       leaveLater: 'I’m leaving later', missedIt: 'I missed the {line}',
@@ -745,7 +747,8 @@
       altNext: '{line} next run at {dep}', altReplan: 'Other route: {lines} at {dep}', altFoot: '🚶 Finish on foot from {stop}',
       altArrive: 'arrive {t}', altBest: ' · earliest', altLoading: 'Looking for alternatives…', altNone: 'No alternative found yet.',
       altApplied: 'Journey updated: {what}.', platformNotify: 'Platform change', platformBody: '{line} now leaves from {p} at {stop}.',
-      missedNotify: 'Connection missed', missedNotifyBody: 'At {stop}: {line} leaves at {dep}, you arrive at {arr}. Alternatives in the app.',
+      missedNotify: 'Connection missed', missedNotifyBody: 'At {stop}: {line} leaves at {dep}, you arrive at {arr}.',
+      notifyBest: 'Best: {what}, arrive {t}.', notifyMore: 'Other choices in the app.',
       liveShort: 'live', gpsOn: '📍 Following your position: the reminder rings when you leave the stop before.',
       gpsWaiting: '📍 Waiting for a precise position… until then the live time decides.',
       gpsDenied: 'Position not allowed: reminders follow the live time only.',
@@ -863,13 +866,13 @@
       earlyOnWay: 'En route : à {stop} vers {t}, {n} min avant le {line}.', earlyOptions: 'Options plus tôt :', altEarly: '{lines} à {dep}', altEarlyDetail: 'arrivée {t} ({n} min plus tôt)',
       waitNoneWalk: 'Correspondance : {walk} min de marche, aucune marge', waitNone: 'Correspondance : aucune marge', waitMissed: 'Correspondance : manquée aux horaires actuels',
       allGone: 'Les itinéraires trouvés ne sont plus possibles (véhicule supprimé ou correspondance manquée). Essayez un départ plus tard.',
-      cancelNotify: '{line} de {dep} supprimé ?', cancelNotifyBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}. Ouvrez l\u2019app pour le remplacer.',
+      cancelNotify: '{line} de {dep} supprimé ?', cancelNotifyBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}.',
       cancelTitle: '{line} de {dep} : supprimé ?', cancelBody: 'Il n\u2019apparaît plus dans les départs en direct de {stop}.', cancelOptions: 'À la place :',
       cancelSame: 'arrivée {t}, comme prévu', cancelLater: 'arrivée {t} ({n} min plus tard)',
       walkingTitle: 'Vous êtes à pied : le {line} de {dep} est parti sans vous', walkingNotify: 'À pied : le {line} de {dep} est parti sans vous',
       motionSetting: 'Distinguer marche et véhicule (capteurs de mouvement du téléphone ; rien n\u2019est envoyé)', motionNow: 'Capteurs : {state}', motionWalk: '🚶 à pied', motionStill: 'immobile', motionVehicle: '🚋 dans un véhicule', motionMoving: 'en mouvement, sans pas', gpsResting: 'GPS en veille',
       trafficInfo: 'Info trafic', sitNotify: 'Info trafic : {line}',
-      lateNotify: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideNotify: '{line} de {dep} manqué ?', lateNotifyBody: 'Ouvrez l\u2019app : d\u2019autres départs depuis où vous êtes.',
+      lateNotify: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideNotify: '{line} de {dep} manqué ?', lateNotifyBody: 'D\u2019autres départs depuis où vous êtes.',
       lateTitle: 'Vous n\u2019aurez pas le {line} de {dep}', missedRideTitle: '{line} de {dep} manqué ?', laterTitle: 'Départ plus tard : autres départs', missedSaidTitle: '{line} de {dep} manqué : autres départs',
       lateOption: '{lines} à {dep} · partir à {leave}', lateOnBoard: 'Je suis à bord', lateState: 'Pas dans le véhicule prévu : choisissez un autre départ, ou annulez.',
       leaveLater: 'Je pars plus tard', missedIt: 'J\u2019ai raté le {line}',
@@ -880,7 +883,8 @@
       altNext: '{line} suivant à {dep}', altReplan: 'Autre trajet : {lines} à {dep}', altFoot: '🚶 Finir à pied depuis {stop}',
       altArrive: 'arrivée {t}', altBest: ' · le plus tôt', altLoading: 'Recherche d\u2019alternatives…', altNone: 'Pas encore d\u2019alternative trouvée.',
       altApplied: 'Trajet mis à jour : {what}.', platformNotify: 'Changement de quai', platformBody: '{line} part maintenant du {p} à {stop}.',
-      missedNotify: 'Correspondance manquée', missedNotifyBody: 'À {stop} : le {line} part à {dep}, vous arrivez à {arr}. Alternatives dans l\u2019app.',
+      missedNotify: 'Correspondance manquée', missedNotifyBody: 'À {stop} : le {line} part à {dep}, vous arrivez à {arr}.',
+      notifyBest: 'Le mieux : {what}, arrivée {t}.', notifyMore: 'Autres choix dans l\u2019app.',
       liveShort: 'direct', gpsOn: '📍 Position suivie : le rappel sonne quand vous quittez l\u2019arrêt précédent.',
       gpsWaiting: '📍 En attente d\u2019une position précise… en attendant, l\u2019horaire en direct décide.',
       gpsDenied: 'Position non autorisée : les rappels suivent seulement l\u2019horaire en direct.',
@@ -3489,8 +3493,10 @@
     a.fired.ready = a.fired.ready || now; a.fired.leave = a.fired.leave || now;   // the planned departure alarms no longer apply
     a.alts = null;
     const line = `${modeName(r.mode)} ${r.label}`, dep = hhmm(new Date(depOf(r)));
-    if (reason === 'late' || reason === 'missed') fireTrip(t(reason === 'late' ? 'lateNotify' : 'missedRideNotify', { line, dep }), t('lateNotifyBody'));
-    if (reason === 'walking') { a.late.left = true; fireTrip(t('walkingNotify', { line, dep }), t('lateNotifyBody')); }
+    if (reason === 'walking') a.late.left = true;
+    // the warning is sent by the caller once the other departures are found (PO, 23.11.2026)
+    const key = { late: 'lateNotify', missed: 'missedRideNotify', walking: 'walkingNotify' }[reason];
+    return key ? { title: t(key, { line, dep }) } : null;
   }
   // US-45: a stay is watched from its arrival until 30 min after its planned end
   const stayWatched = (a, now) => (a.plan || []).map((l, k) => ({ l, k })).filter(({ l }) => l.type === 'stay' && l.place && l.place.coord &&
@@ -4396,15 +4402,14 @@
     for (const c of tripConnections(a.plan)) {
       if (c.state !== 'missed' && !c.next.missing) continue;
       if (depOf(c.next) < now - 10 * 60000) continue;   // long past
-      const key = 'miss' + c.next.dep;
-      if (!a.fired[key]) {
-        a.fired[key] = now; changed = true;
-        fireTrip(t('missedNotify'), t('missedNotifyBody', { stop: c.cur.toStop.name, line: `${modeName(c.next.mode)} ${c.next.label}`,
-          dep: hhmm(new Date(depOf(c.next))), arr: hhmm(new Date(c.ready)) }));
-      }
-      if (!a.alts || a.alts.for !== c.next.dep || now - a.alts.at > 2 * 60000) {
+      const key = 'miss' + c.next.dep, warnNow = !a.fired[key];
+      if (warnNow) { a.fired[key] = now; changed = true; }
+      if (warnNow || !a.alts || a.alts.for !== c.next.dep || now - a.alts.at > 2 * 60000) {
         a.alts = { for: c.next.dep, at: now, list: null };
-        a.alts.list = await findAlternatives(a, c, boardOf, schedOf);
+        const head = t('missedNotifyBody', { stop: c.cur.toStop.name, line: `${modeName(c.next.mode)} ${c.next.label}`,
+          dep: hhmm(new Date(depOf(c.next))), arr: hhmm(new Date(c.ready)) });
+        await searchThenWarn(a.alts, () => findAlternatives(a, c, boardOf, schedOf),
+          warnNow && (list => fireTrip(t('missedNotify'), warnBody(head, list, o => ({ what: missedAltTitle(o, v => hhmm(new Date(v))), t: hhmm(new Date(o.arrive)) })))));
         changed = true;
       }
       break;   // the first broken change decides what comes next
@@ -4436,21 +4441,24 @@
     const gone = first && first.missing && depOf(first) > now - 2 * 60000;
     // US-62: late start or first ride missed (GPS, or the rider said so): other departures from where the rider is
     const why = !gone && checkLate(a, now);
-    if (why) { setLate(a, why, now); changed = true; }
-    if (a.late && !gone && (!a.alts || a.alts.for !== 'late' || now - a.alts.at > 2 * 60000)) {
+    const lateWarn = why ? setLate(a, why, now) : null;
+    if (why) changed = true;
+    if (a.late && !gone && (why || !a.alts || a.alts.for !== 'late' || now - a.alts.at > 2 * 60000)) {
       a.alts = { for: 'late', at: now, list: null };
-      try { a.alts.list = await findLater(a); } catch { a.alts.list = []; }
+      await searchThenWarn(a.alts, () => findLater(a),
+        lateWarn && (list => fireTrip(lateWarn.title, warnBody(t('lateNotifyBody'), list,
+          o => ({ what: t('lateOption', { lines: o.lines, dep: hhmm(new Date(o.dep)), leave: hhmm(new Date(o.leave)) }), t: hhmm(new Date(o.arrive)) })))));
       changed = true;
     }
     if (gone) {
-      const key = 'cancel' + first.dep;
-      if (!a.fired[key]) {
-        a.fired[key] = now; changed = true;
-        fireTrip(t('cancelNotify', { line: `${modeName(first.mode)} ${first.label}`, dep: hhmm(new Date(first.dep)) }), t('cancelNotifyBody', { stop: first.from.name }));
-      }
-      if (!a.alts || a.alts.for !== key || now - a.alts.at > 2 * 60000) {
+      const key = 'cancel' + first.dep, warnNow = !a.fired[key];
+      if (warnNow) { a.fired[key] = now; changed = true; }
+      if (warnNow || !a.alts || a.alts.for !== key || now - a.alts.at > 2 * 60000) {
         a.alts = { for: key, at: now, list: null };
-        try { a.alts.list = await findReplacement(a, firstIdx); } catch { a.alts.list = []; }
+        const title = t('cancelNotify', { line: `${modeName(first.mode)} ${first.label}`, dep: hhmm(new Date(first.dep)) });
+        await searchThenWarn(a.alts, () => findReplacement(a, firstIdx),
+          warnNow && (list => fireTrip(title, warnBody(t('cancelNotifyBody', { stop: first.from.name }), list,
+            o => ({ what: t('altEarly', { lines: o.lines, dep: hhmm(new Date(o.dep)) }), t: hhmm(new Date(o.arrive)) })))));
         changed = true;
       }
     }
@@ -4669,6 +4677,32 @@
     showToast(t('altApplied', { what }), null);
   }
 
+  // PO 23.11.2026: a change of plan (missed change, cancelled vehicle, late start) is announced once its alternatives
+  // are found, with the best one, so that opening the app shows them at once. With none, or after ALT_WAIT_MS without
+  // an answer, the warning goes anyway; the search goes on and fills the followed journey when it ends.
+  const ALT_WAIT_MS = 20000;
+  async function searchThenWarn(alts, search, warn) {
+    const done = Promise.resolve().then(search).catch(() => []).then(list => (alts.list = list || []));
+    if (!warn) return done;
+    let timer = null;
+    const first = await Promise.race([done, new Promise(res => { timer = setTimeout(() => res(null), ALT_WAIT_MS); })]);
+    clearTimeout(timer);
+    warn(first);   // null: still looking
+    return done;
+  }
+  // a warning's text: what happened, then the best way on, or that none is found (yet)
+  function warnBody(head, list, best) {
+    const tail = list == null ? t('altLoading') : !list.length ? t('altNone')
+      : t('notifyBest', best(list[0])) + (list.length > 1 ? ' ' + t('notifyMore') : '');
+    return `${head} ${tail}`;
+  }
+  // an alternative to a missed change, as on its button
+  function missedAltTitle(o, tm) {
+    return o.kind === 'next' ? t('altNext', { line: o.line, dep: tm(o.dep) })
+      : o.kind === 'replan' ? t('altReplan', { lines: o.lines, dep: tm(o.dep) })
+      : t('altFoot', { stop: o.stop }) + ` · ${fmtMin(o.min)} min`;
+  }
+
   function fireTrip(title, body) {
     $('abTitle').textContent = '🔔 ' + title;
     $('abBody').textContent = body;
@@ -4857,9 +4891,7 @@
         const list = a.alts && a.alts.for === broken.next.dep ? a.alts.list : null;
         alts = list == null ? `<small>${esc(t('altLoading'))}</small>` : !list.length ? `<small>${esc(t('altNone'))}</small>` :
           list.map((o, n) => {
-            const title = o.kind === 'next' ? t('altNext', { line: o.line, dep: tm(o.dep) })
-              : o.kind === 'replan' ? t('altReplan', { lines: o.lines, dep: tm(o.dep) })
-              : t('altFoot', { stop: o.stop }) + ` · ${fmtMin(o.min)} min`;
+            const title = missedAltTitle(o, tm);
             return `<button class="trip-alt${n === 0 ? ' best' : ''}" data-act="alt" data-n="${n}"><span>${esc(title)}</span>` +
               `<small>${esc(t('altArrive', { t: tm(o.arrive) }))}${n === 0 && list.length > 1 ? esc(t('altBest')) : ''}</small></button>`;
           }).join('');
