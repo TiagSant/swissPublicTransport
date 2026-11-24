@@ -13,6 +13,8 @@
            instead of changing; listed as a journey of its own when it arrives no later.
   - US-65: the same at the start — walk to a stop a later ride passes and board it there (leaving later than walking
            to where that ride starts); also among "Other options from here".
+  - BUG-26: a notification rings once, also after the phone slept or Android closed the page (one live refresh at a
+           time; what rang is marked in storage at once and kept when a refresh saves).
   - BUG-22: an alternative chosen on the way (it starts with its vehicle) keeps the walk between the two platforms.
   - BUG-20: "fastest" is the journey that lasts the least (arriving earlier breaks a tie).
   - BUG-21: the same vehicles, boarded and left at the same stops, are one card (least walking, then the later start).
@@ -3302,6 +3304,19 @@
   const LIVE_REFRESH_MS = 60000;
   const getAlarms = () => store.get('alarms', []);
   const saveAlarms = list => store.set('alarms', list);
+  // BUG-26: a warning rings once. Its mark is checked and written in storage at once, not only when the live refresh
+  // ends: a refresh works on a copy and can wait minutes for the network while the phone sleeps, and Android may close
+  // the page meanwhile. `byValue`: rings again when the value changes (a new platform). An alarm cancelled meanwhile: no.
+  function claimFired(a, key, val, byValue = false) {
+    const list = getAlarms(), cur = list.find(x => x.id === a.id);
+    if (!cur) return false;
+    const had = (cur.fired || {})[key];
+    if (byValue ? had === val : had) { a.fired[key] = had; return false; }
+    a.fired[key] = val;
+    cur.fired = Object.assign(cur.fired || {}, { [key]: val });
+    saveAlarms(list);
+    return true;
+  }
 
   function alarmTimes(a, s = getSettings()) {
     const dep = (a.live && a.live.dep) || a.first.sched;
@@ -3489,8 +3504,10 @@
     a.fired.ready = a.fired.ready || now; a.fired.leave = a.fired.leave || now;   // the planned departure alarms no longer apply
     a.alts = null;
     const line = `${modeName(r.mode)} ${r.label}`, dep = hhmm(new Date(depOf(r)));
+    if (reason === 'walking') a.late.left = true;
+    if (!['late', 'missed', 'walking'].includes(reason) || !claimFired(a, 'told:' + reason + r.dep, now)) return;   // BUG-26
     if (reason === 'late' || reason === 'missed') fireTrip(t(reason === 'late' ? 'lateNotify' : 'missedRideNotify', { line, dep }), t('lateNotifyBody'));
-    if (reason === 'walking') { a.late.left = true; fireTrip(t('walkingNotify', { line, dep }), t('lateNotifyBody')); }
+    if (reason === 'walking') { fireTrip(t('walkingNotify', { line, dep }), t('lateNotifyBody')); }
   }
   // US-45: a stay is watched from its arrival until 30 min after its planned end
   const stayWatched = (a, now) => (a.plan || []).map((l, k) => ({ l, k })).filter(({ l }) => l.type === 'stay' && l.place && l.place.coord &&
@@ -3808,9 +3825,27 @@
     return up(live) === up(ours) ? null : String(live).trim();
   }
 
+  // BUG-26: one live refresh at a time. While the phone sleeps, a refresh a minute waits for the network; they piled up
+  // and, when it came back, each one saved the alarms as they were when it started and rang them again. One stuck for
+  // longer than LIVE_STUCK_MS no longer blocks the next (the marks below keep it from ringing anything twice).
+  // Asked for while one runs (a new data source…): one more after it, not one per request.
+  const LIVE_STUCK_MS = 5 * 60000;
+  let liveRun = null;
+  function refreshAlarmsLive() {
+    if (liveRun && Date.now() - liveRun.at < LIVE_STUCK_MS) { liveRun.again = true; return liveRun.done; }
+    const run = { at: Date.now(), again: false };
+    liveRun = run;
+    run.done = refreshAlarmsLiveOnce().finally(() => {
+      if (liveRun !== run) return;
+      liveRun = null;
+      if (run.again) refreshAlarmsLive();
+    });
+    return run.done;
+  }
   // US-17: follow the first vehicle on live data while the alarm is pending
-  async function refreshAlarmsLive() {
+  async function refreshAlarmsLiveOnce() {
     const list = getAlarms();
+    const base = new Map(list.map(a => [a.id, marksOf(a)]));   // to keep what changes meanwhile (BUG-26)
     let changed = false;
     const boards = new Map();   // one departure board per stop and refresh
     const boardOf = (id, from) => { if (!boards.has(id)) boards.set(id, data.board(id, from).catch(() => null)); return boards.get(id); };
@@ -3841,12 +3876,30 @@
       if (await improveFollowed(a)) changed = true;
       if (await refreshTrip(a, boardOf, schedOf)) changed = true;
     }
-    if (changed) { saveAlarmsMerged(list); renderAlarms(); tickAlarms(); }
+    if (changed) { saveAlarmsMerged(list, base); renderAlarms(); tickAlarms(); }
   }
-  // Save the live updates without undoing a change the rider made meanwhile (an alternative chosen: rev changed)
-  function saveAlarmsMerged(updated) {
+  // The marks of what already rang (or was seen by the GPS), copied
+  const MARKS = ['fired', 'gpsFired', 'gpsSeen'];
+  const marksOf = a => Object.fromEntries(MARKS.map(m => [m, Object.assign({}, a[m] || {})]));
+  // Save the live updates without undoing a change the rider made meanwhile (an alternative chosen: rev changed).
+  // BUG-26: nor a mark set meanwhile by the clock, the GPS or a tap (that alarm rang): a mark changed in storage since
+  // the refresh started wins; the others are the refresh's own (set, or removed when its plan changed).
+  function saveAlarmsMerged(updated, base) {
     const current = getAlarms();
-    saveAlarms(current.map(c => { const u = updated.find(x => x.id === c.id); return u && (u.rev || 0) === (c.rev || 0) ? u : c; }));
+    saveAlarms(current.map(c => {
+      const u = updated.find(x => x.id === c.id);
+      if (!u || (u.rev || 0) !== (c.rev || 0)) return c;
+      const b = (base && base.get(c.id)) || marksOf({});
+      for (const m of MARKS) {
+        const was = b[m], stored = c[m] || {}, out = Object.assign({}, u[m] || {});
+        for (const k of new Set([...Object.keys(was), ...Object.keys(stored)])) {
+          if (stored[k] === was[k]) continue;   // not touched meanwhile: the refresh decides
+          if (k in stored) out[k] = stored[k]; else delete out[k];
+        }
+        if (Object.keys(out).length || u[m]) u[m] = out;
+      }
+      return u;
+    }));
   }
 
   // ---------- Followed journey (US-38) ----------
@@ -4354,8 +4407,8 @@
         if (Array.isArray(m.situations)) {
           const sits = activeSits(m.situations, r.dep), had = new Set((r.situations || []).map(x => x.id));
           if (JSON.stringify(sits.map(x => x.id)) !== JSON.stringify((r.situations || []).map(x => x.id))) { r.situations = sits; changed = true; }
-          for (const x of sits) if (!had.has(x.id) && !a.fired['sit:' + x.id] && arrOf(r) > now) {
-            a.fired['sit:' + x.id] = now; changed = true;
+          for (const x of sits) if (!had.has(x.id) && !a.fired['sit:' + x.id] && arrOf(r) > now && claimFired(a, 'sit:' + x.id, now)) {
+            changed = true;
             fireTrip(t('sitNotify', { line: `${modeName(r.mode)} ${r.label}` }), x.summary || x.description || t('trafficInfo'));
           }
         }
@@ -4377,8 +4430,7 @@
         }
         viaInOrder(r);
         // a platform change for a ride still to take rings once
-        if (r.platformLive && r.dep > now && !(a.fired['plat' + r.dep] === r.platformLive)) {
-          a.fired['plat' + r.dep] = r.platformLive;
+        if (r.platformLive && r.dep > now && !(a.fired['plat' + r.dep] === r.platformLive) && claimFired(a, 'plat' + r.dep, r.platformLive, true)) {
           fireTrip(t('platformNotify'), t('platformBody', { line: `${modeName(r.mode)} ${r.label}`, p: t(r.mode === 'train' ? 'track' : 'platform', { p: r.platformLive }), stop: r.from.name }));
         }
       }
@@ -4397,8 +4449,8 @@
       if (c.state !== 'missed' && !c.next.missing) continue;
       if (depOf(c.next) < now - 10 * 60000) continue;   // long past
       const key = 'miss' + c.next.dep;
-      if (!a.fired[key]) {
-        a.fired[key] = now; changed = true;
+      if (!a.fired[key] && claimFired(a, key, now)) {
+        changed = true;
         fireTrip(t('missedNotify'), t('missedNotifyBody', { stop: c.cur.toStop.name, line: `${modeName(c.next.mode)} ${c.next.label}`,
           dep: hhmm(new Date(depOf(c.next))), arr: hhmm(new Date(c.ready)) }));
       }
@@ -4444,8 +4496,8 @@
     }
     if (gone) {
       const key = 'cancel' + first.dep;
-      if (!a.fired[key]) {
-        a.fired[key] = now; changed = true;
+      if (!a.fired[key] && claimFired(a, key, now)) {
+        changed = true;
         fireTrip(t('cancelNotify', { line: `${modeName(first.mode)} ${first.label}`, dep: hhmm(new Date(first.dep)) }), t('cancelNotifyBody', { stop: first.from.name }));
       }
       if (!a.alts || a.alts.for !== key || now - a.alts.at > 2 * 60000) {
